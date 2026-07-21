@@ -284,6 +284,7 @@ fun formatSot(timeMs: Long): String {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProcessRow(
     item: ProcessItem,
@@ -292,112 +293,107 @@ fun ProcessRow(
     onFreeze: (String) -> Unit
 ) {
     var showDialog by remember { mutableStateOf(false) }
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { dismissValue ->
+            if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                showDialog = true
+            }
+            false
+        }
+    )
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF1C1C1E)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                if (item.isShizukuMode) {
-                    showDialog = true
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            val color = when (dismissState.targetValue) {
+                SwipeToDismissBoxValue.EndToStart -> Color(0xFFEF4444)
+                else -> Color(0xFF2C2C2E)
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(color, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Button(
+                        onClick = {
+                            onFreeze(item.packageName)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA78BFA), contentColor = Color.White),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Freeze", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            onForceStop(item.packageName)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Red),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Force Stop", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
+        }
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF1C1C1E)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    showDialog = true
+                }
         ) {
-            // App Icon
-            AppIcon(
-                packageName = item.packageName,
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(Color(0x11FFFFFF), RoundedCornerShape(10.dp))
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.name,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // App Icon
+                AppIcon(
+                    packageName = item.packageName,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(Color(0x11FFFFFF), RoundedCornerShape(10.dp))
                 )
-                Text(
-                    text = item.packageName,
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
 
-            Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
-            Column(horizontalAlignment = Alignment.End) {
-                when (sortBy) {
-                    "CPU" -> {
-                        Text(
-                            text = "${item.cpuUsage}% CPU",
-                            color = if (item.cpuUsage > 15f) Color(0xFFFB923C) else Color(0xFF4ADE80),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = "RAM: ${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
-                            color = Color.Gray,
-                            fontSize = 11.sp
-                        )
-                    }
-                    "RAM" -> {
-                        Text(
-                            text = "${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
-                            color = Color(0xFFFB923C),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                        if (item.isShizukuMode) {
-                            Text(
-                                text = "CPU: ${item.cpuUsage}%",
-                                color = Color.Gray,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                    "Time" -> {
-                        Text(
-                            text = formatSot(item.systemTimeForegroundMs),
-                            color = Color(0xFFA78BFA),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = "Active SOT",
-                            color = Color.Gray,
-                            fontSize = 11.sp
-                        )
-                    }
-                    "Battery" -> {
-                        Text(
-                            text = String.format(java.util.Locale.US, "%.1f%%", item.batteryUsagePct),
-                            color = Color(0xFF4ADE80),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = "Est. Battery",
-                            color = Color.Gray,
-                            fontSize = 11.sp
-                        )
-                    }
-                    else -> {
-                        if (item.isShizukuMode) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.name,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = item.packageName,
+                        color = Color.Gray,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(horizontalAlignment = Alignment.End) {
+                    when (sortBy) {
+                        "CPU" -> {
                             Text(
                                 text = "${item.cpuUsage}% CPU",
                                 color = if (item.cpuUsage > 15f) Color(0xFFFB923C) else Color(0xFF4ADE80),
@@ -409,7 +405,23 @@ fun ProcessRow(
                                 color = Color.Gray,
                                 fontSize = 11.sp
                             )
-                        } else {
+                        }
+                        "RAM" -> {
+                            Text(
+                                text = "${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
+                                color = Color(0xFFFB923C),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            if (item.isShizukuMode) {
+                                Text(
+                                    text = "CPU: ${item.cpuUsage}%",
+                                    color = Color.Gray,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        "Time" -> {
                             Text(
                                 text = formatSot(item.systemTimeForegroundMs),
                                 color = Color(0xFFA78BFA),
@@ -417,10 +429,50 @@ fun ProcessRow(
                                 fontSize = 14.sp
                             )
                             Text(
-                                text = "Est: ${String.format(java.util.Locale.US, "%.1f%%", item.batteryUsagePct)}",
+                                text = "Active SOT",
                                 color = Color.Gray,
                                 fontSize = 11.sp
                             )
+                        }
+                        "Battery" -> {
+                            Text(
+                                text = String.format(java.util.Locale.US, "%.1f%%", item.batteryUsagePct),
+                                color = Color(0xFF4ADE80),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Est. Battery",
+                                color = Color.Gray,
+                                fontSize = 11.sp
+                            )
+                        }
+                        else -> {
+                            if (item.isShizukuMode) {
+                                Text(
+                                    text = "${item.cpuUsage}% CPU",
+                                    color = if (item.cpuUsage > 15f) Color(0xFFFB923C) else Color(0xFF4ADE80),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "RAM: ${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
+                                    color = Color.Gray,
+                                    fontSize = 11.sp
+                                )
+                            } else {
+                                Text(
+                                    text = formatSot(item.systemTimeForegroundMs),
+                                    color = Color(0xFFA78BFA),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "Est: ${String.format(java.util.Locale.US, "%.1f%%", item.batteryUsagePct)}",
+                                    color = Color.Gray,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
                 }

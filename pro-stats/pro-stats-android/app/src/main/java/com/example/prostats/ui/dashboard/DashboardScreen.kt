@@ -28,6 +28,12 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(
@@ -37,20 +43,88 @@ fun DashboardScreen(
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pagerState = rememberPagerState(initialPage = 1) { 2 }
-    HorizontalPager(
-        state = pagerState,
-        modifier = Modifier.fillMaxSize()
-    ) { page ->
-        when (page) {
-            0 -> SystemInfoScreen()
-            1 -> DashboardContent(
-                systemMonitor = systemMonitor,
-                onNavigateToProcesses = onNavigateToProcesses,
-                onNavigateToSotDetail = onNavigateToSotDetail,
-                onNavigateToSettings = onNavigateToSettings,
-                modifier = modifier
-            )
+    val pagerState = rememberPagerState(initialPage = 0) { 3 }
+    val coroutineScope = rememberCoroutineScope()
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar(
+                containerColor = Color(0xFF121214),
+                contentColor = Color.White
+            ) {
+                NavigationBarItem(
+                    selected = pagerState.currentPage == 0,
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                    },
+                    icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
+                    label = { Text("Dashboard", fontSize = 11.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF4ADE80),
+                        selectedTextColor = Color(0xFF4ADE80),
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray,
+                        indicatorColor = Color(0x224ADE80)
+                    )
+                )
+                NavigationBarItem(
+                    selected = pagerState.currentPage == 1,
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                    },
+                    icon = { Icon(Icons.Default.Info, contentDescription = "System Info") },
+                    label = { Text("System Info", fontSize = 11.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF4ADE80),
+                        selectedTextColor = Color(0xFF4ADE80),
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray,
+                        indicatorColor = Color(0x224ADE80)
+                    )
+                )
+                NavigationBarItem(
+                    selected = pagerState.currentPage == 2,
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                    },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                    label = { Text("Settings", fontSize = 11.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF4ADE80),
+                        selectedTextColor = Color(0xFF4ADE80),
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray,
+                        indicatorColor = Color(0x224ADE80)
+                    )
+                )
+            }
+        },
+        containerColor = Color(0xFF0A0A0C),
+        modifier = modifier
+    ) { innerPadding ->
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) { page ->
+            when (page) {
+                0 -> DashboardContent(
+                    systemMonitor = systemMonitor,
+                    onNavigateToProcesses = onNavigateToProcesses,
+                    onNavigateToSotDetail = onNavigateToSotDetail,
+                    onNavigateToSettings = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                    }
+                )
+                1 -> SystemInfoScreen()
+                2 -> com.example.prostats.ui.settings.SettingsScreen(
+                    systemMonitor = systemMonitor,
+                    onNavigateBack = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                    }
+                )
+            }
         }
     }
 }
@@ -320,6 +394,7 @@ fun DashboardContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardCard(
     title: String,
@@ -329,21 +404,34 @@ fun DashboardCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-        modifier = modifier
-            .border(1.dp, Color(0x1BFFFFFF), RoundedCornerShape(20.dp))
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp)
+    if (onClick != null) {
+        Card(
+            onClick = onClick,
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+            modifier = modifier.border(1.dp, Color(0x1BFFFFFF), RoundedCornerShape(20.dp))
         ) {
-            Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = color)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(subValue, fontSize = 11.sp, color = Color.Gray)
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = color)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(subValue, fontSize = 11.sp, color = Color.Gray)
+            }
+        }
+    } else {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+            modifier = modifier.border(1.dp, Color(0x1BFFFFFF), RoundedCornerShape(20.dp))
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = color)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(subValue, fontSize = 11.sp, color = Color.Gray)
+            }
         }
     }
 }
