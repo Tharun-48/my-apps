@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Stats - Onboarding</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Ambient Background Glow -->
+        <div class="ambient-glow glow-teal"></div>
+        <div class="ambient-glow glow-orange"></div>
+
+        <header class="header">
+            <h1 class="header-title">STEP 2/3: CONFIGURE PRO STATS ACCESS</h1>
+        </header>
+
+        <main class="main-content">
+            <div class="summary-box">
+                <p>These permissions enable live process tracking, wakelock analysis, and accurate battery health diagnostics.</p>
+            </div>
+
+            <div class="permission-list">
+                
+                <!-- Permission 1: Battery -->
+                <div class="permission-item" id="item-battery">
+                    <div class="item-header">
+                        <div class="icon-container">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                <line x1="12" y1="6" x2="12" y2="6"></line>
+                                <polygon points="11 10 9 14 12 14 11 18 15 13 12 13 11 10"></polygon>
+                            </svg>
+                        </div>
+                        <div class="title-container">
+                            <h2>BATTERY USAGE STATS</h2>
+                        </div>
+                        <div class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="perm-battery">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="item-body">
+                        <p>Access per-app power consumption data and Screen-On Time (SOT) history.</p>
+                        <div class="mini-demo">
+                            <svg class="demo-graph" viewBox="0 0 100 30">
+                                <path d="M0 25 Q 15 25 25 15 T 50 10 T 75 20 T 100 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permission 2: Process Data -->
+                <div class="permission-item" id="item-process">
+                    <div class="item-header">
+                        <div class="icon-container">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+                                <path d="M2 12h20"></path>
+                                <path d="M12 12l4-4"></path>
+                                <circle cx="12" cy="12" r="2"></circle>
+                            </svg>
+                        </div>
+                        <div class="title-container">
+                            <h2>USAGE ACCESS</h2>
+                        </div>
+                        <div class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="perm-process">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="item-body">
+                        <p>Allow Pro Stats to monitor running processes and real-time CPU/RAM usage statistics.</p>
+                        <div class="mini-demo demo-readout">
+                            <span class="readout-label">CPU:</span> <span class="readout-value">18%</span>
+                            <div class="progress-bar"><div class="progress-fill" style="width: 18%"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permission 3: Shizuku -->
+                <div class="permission-item" id="item-shizuku">
+                    <div class="item-header">
+                        <div class="icon-container">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
+                                <polyline points="7 11 12 16 17 11"></polyline>
+                                <line x1="12" y1="4" x2="12" y2="16"></line>
+                                <path d="M10 4a2 2 0 1 0 4 0"></path>
+                            </svg>
+                        </div>
+                        <div class="title-container">
+                            <h2>SHIZUKU AUTHORIZATION</h2>
+                        </div>
+                        <div class="toggle-container">
+                            <label class="switch">
+                                <input type="checkbox" id="perm-shizuku">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="item-body">
+                        <p>Allow Pro Stats to use advanced system monitoring via wireless ADB (Shizuku) for genuine background telemetry.</p>
+                        <div class="mini-demo demo-shizuku">
+                            <svg class="wireless-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                                <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+                                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                                <line x1="12" y1="20" x2="12.01" y2="20"></line>
+                            </svg>
+                            <div class="shizuku-logo">S</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <button id="grant-btn" class="grant-btn">
+                <span class="btn-text">GRANT ALL & START MONITORING</span>
+                <span class="btn-ripple"></span>
+            </button>
+        </footer>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
