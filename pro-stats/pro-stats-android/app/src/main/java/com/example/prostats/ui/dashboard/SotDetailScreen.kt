@@ -178,7 +178,7 @@ fun SotDetailScreen(
 
                             BatteryGraph(
                                 points = points,
-                                is24h = is24h,
+                                is24h = !isSinceCharge,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(180.dp)
