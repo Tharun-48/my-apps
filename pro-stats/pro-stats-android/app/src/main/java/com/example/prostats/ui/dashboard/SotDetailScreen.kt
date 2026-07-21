@@ -43,29 +43,29 @@ fun SotDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var is24h by remember { mutableStateOf(true) }
+    var isSinceCharge by remember { mutableStateOf(true) }
 
     // Fetch history points
-    val points = remember(is24h) {
-        if (is24h) {
-            BatteryTracker.getHistory24h(context)
+    val points = remember(isSinceCharge) {
+        if (isSinceCharge) {
+            BatteryTracker.getHistorySinceLastCharge(context)
         } else {
-            BatteryTracker.getHistory7d(context)
+            BatteryTracker.getHistory24h(context)
         }
     }
 
     // Fetch app usage list
-    val appUsageList = remember(is24h) {
+    val appUsageList = remember(isSinceCharge) {
         val now = System.currentTimeMillis()
-        val limit = if (is24h) 24 * 60 * 60 * 1000L else 7 * 24 * 60 * 60 * 1000L
-        systemMonitor.getAppBatteryUsageList(now - limit, now)
+        val start = if (isSinceCharge) BatteryTracker.getLastFullChargeTimestamp(context) else now - 24 * 60 * 60 * 1000L
+        systemMonitor.getAppBatteryUsageList(start, now)
     }
 
     // Calculate SOT summary
-    val totalSotMs = remember(is24h) {
+    val totalSotMs = remember(isSinceCharge) {
         val now = System.currentTimeMillis()
-        val limit = if (is24h) 24 * 60 * 60 * 1000L else 7 * 24 * 60 * 60 * 1000L
-        systemMonitor.getScreenOnTimeMs(now - limit, now)
+        val start = if (isSinceCharge) BatteryTracker.getLastFullChargeTimestamp(context) else now - 24 * 60 * 60 * 1000L
+        systemMonitor.getScreenOnTimeMs(start, now)
     }
     
     val totalSotFormatted = remember(totalSotMs) {
@@ -134,26 +134,26 @@ fun SotDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
-                                onClick = { is24h = true },
+                                onClick = { isSinceCharge = true },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (is24h) Color(0xFF2C2C2E) else Color.Transparent,
-                                    contentColor = if (is24h) Color(0xFF4ADE80) else Color.Gray
+                                    containerColor = if (isSinceCharge) Color(0xFF2C2C2E) else Color.Transparent,
+                                    contentColor = if (isSinceCharge) Color(0xFF4ADE80) else Color.Gray
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f).height(40.dp)
+                            ) {
+                                Text("Since Last Charge", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                            Button(
+                                onClick = { isSinceCharge = false },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (!isSinceCharge) Color(0xFF2C2C2E) else Color.Transparent,
+                                    contentColor = if (!isSinceCharge) Color(0xFF4ADE80) else Color.Gray
                                 ),
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f).height(40.dp)
                             ) {
                                 Text("Last 24 Hours", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-                            Button(
-                                onClick = { is24h = false },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (!is24h) Color(0xFF2C2C2E) else Color.Transparent,
-                                    contentColor = if (!is24h) Color(0xFF4ADE80) else Color.Gray
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).height(40.dp)
-                            ) {
-                                Text("Last 7 Days", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
                     }

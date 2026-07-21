@@ -49,6 +49,14 @@ object BatteryTracker {
 
             val points = getRawHistory(context).toMutableList()
             
+            // Check if full charge reached
+            val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            val batteryIntent = context.registerReceiver(null, filter)
+            val status = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            if (level >= 99 || status == BatteryManager.BATTERY_STATUS_FULL) {
+                updateLastFullChargeTimestamp(context, now)
+            }
+
             // Add new data point
             points.add(HistoryPoint(now, level, sotToday))
 
@@ -89,10 +97,31 @@ object BatteryTracker {
         }
     }
 
+    private const val PREFS_NAME = "battery_prefs"
+    private const val KEY_LAST_FULL_CHARGE = "last_full_charge_ts"
+
+    fun getLastFullChargeTimestamp(context: Context): Long {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val defaultTs = System.currentTimeMillis() - (12 * 60 * 60 * 1000L) // Default 12 hours ago
+        return prefs.getLong(KEY_LAST_FULL_CHARGE, defaultTs)
+    }
+
+    fun updateLastFullChargeTimestamp(context: Context, timestamp: Long = System.currentTimeMillis()) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putLong(KEY_LAST_FULL_CHARGE, timestamp).apply()
+        Log.d(TAG, "Full charge timestamp updated to $timestamp")
+    }
+
     fun getHistory24h(context: Context): List<HistoryPoint> {
         val now = System.currentTimeMillis()
         val limit = now - 24 * 60 * 60 * 1000L
         return getRawHistory(context).filter { it.timestamp >= limit }
+    }
+
+    fun getHistorySinceLastCharge(context: Context): List<HistoryPoint> {
+        val lastChargeTs = getLastFullChargeTimestamp(context)
+        val raw = getRawHistory(context).filter { it.timestamp >= lastChargeTs }
+        return if (raw.size >= 2) raw else getHistory24h(context)
     }
 
     fun getHistory7d(context: Context): List<HistoryPoint> {

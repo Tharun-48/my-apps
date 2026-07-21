@@ -25,12 +25,16 @@ import kotlinx.coroutines.delay
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(
     systemMonitor: SystemMonitor,
     onNavigateToProcesses: () -> Unit,
     onNavigateToSotDetail: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val pagerState = rememberPagerState(initialPage = 1) { 2 }
@@ -44,6 +48,7 @@ fun DashboardScreen(
                 systemMonitor = systemMonitor,
                 onNavigateToProcesses = onNavigateToProcesses,
                 onNavigateToSotDetail = onNavigateToSotDetail,
+                onNavigateToSettings = onNavigateToSettings,
                 modifier = modifier
             )
         }
@@ -56,6 +61,7 @@ fun DashboardContent(
     systemMonitor: SystemMonitor,
     onNavigateToProcesses: () -> Unit,
     onNavigateToSotDetail: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -81,6 +87,8 @@ fun DashboardContent(
             thermalStatus = systemMonitor.getThermalStatus()
             coreFreqs = systemMonitor.getCpuCoreFrequencies()
             cpuTemp = systemMonitor.getCpuTemperature()
+            batteryTemp = systemMonitor.getBatteryTemperature()
+            sotMs = systemMonitor.getScreenOnTimeSinceLastChargeMs()
             delay(1500)
         }
     }
@@ -89,7 +97,7 @@ fun DashboardContent(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                sotMs = systemMonitor.getScreenOnTimeMs()
+                sotMs = systemMonitor.getScreenOnTimeSinceLastChargeMs()
                 batteryTemp = systemMonitor.getBatteryTemperature()
                 cpuTemp = systemMonitor.getCpuTemperature()
             }
@@ -104,6 +112,11 @@ fun DashboardContent(
         topBar = {
             TopAppBar(
                 title = { Text("ProStats - System Dashboard", fontWeight = FontWeight.Bold, color = Color.White) },
+                actions = {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0C))
             )
         },
@@ -138,7 +151,7 @@ fun DashboardContent(
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Section 1: Grid row (SOT & Temperature)
+                // Section 1: Grid row (SOT & Battery Temperature)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -150,27 +163,27 @@ fun DashboardContent(
                     DashboardCard(
                         title = "SCREEN-ON TIME",
                         value = "${sotHours}h ${sotMins}m",
-                        subValue = "Active today",
+                        subValue = "Since Last Charge",
                         color = Color(0xFFA78BFA),
                         onClick = onNavigateToSotDetail,
                         modifier = Modifier.weight(1f)
                     )
 
                     val tempColor = when {
-                        cpuTemp >= 60f -> Color.Red
-                        cpuTemp >= 45f -> Color(0xFFFB923C)
+                        batteryTemp >= 45f -> Color.Red
+                        batteryTemp >= 38f -> Color(0xFFFB923C)
                         else -> Color(0xFF4ADE80)
                     }
                     DashboardCard(
-                        title = "CPU TEMPERATURE",
-                        value = "${String.format("%.1f", cpuTemp)}°C",
-                        subValue = "Battery: ${String.format("%.1f", batteryTemp)}°C",
+                        title = "BATTERY TEMPERATURE",
+                        value = "${String.format("%.1f", batteryTemp)}°C",
+                        subValue = "Thermal: $thermalStatus",
                         color = tempColor,
                         modifier = Modifier.weight(1f)
                     )
                 }
 
-                // Section 2: Battery Diagnostics Card (BatteryGuru-inspired)
+                // Section 2: Battery Diagnostics Card
                 Card(
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
@@ -197,8 +210,10 @@ fun DashboardContent(
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 val currentText = if (batteryInfo.currentMa < 0) "${batteryInfo.currentMa} mA" else "+${batteryInfo.currentMa} mA"
+                                val wattText = if (batteryInfo.currentMa < 0) "-${String.format("%.2f", batteryInfo.watts)} W" else "+${String.format("%.2f", batteryInfo.watts)} W"
                                 val currentTextColor = if (batteryInfo.currentMa < 0) Color(0xFFFB923C) else Color(0xFF4ADE80)
                                 Text(currentText, fontSize = 14.sp, color = currentTextColor, fontWeight = FontWeight.SemiBold)
+                                Text("Power: $wattText", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Medium)
                                 Text("Status: ${batteryInfo.status} (${batteryInfo.technology})", fontSize = 12.sp, color = Color.Gray)
                             }
                         }

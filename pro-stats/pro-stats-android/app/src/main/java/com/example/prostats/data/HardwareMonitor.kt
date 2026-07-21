@@ -54,7 +54,8 @@ data class SensorInfo(
     val vendor: String,
     val type: String,
     val powerMa: Float,
-    val maxRange: Float
+    val maxRange: Float,
+    val unit: String = ""
 )
 
 class HardwareMonitor(private val context: Context) {
@@ -74,15 +75,23 @@ class HardwareMonitor(private val context: Context) {
         val cores = Runtime.getRuntime().availableProcessors()
         var maxFreq = 0.0
         try {
-            // Check cpu0 max freq
-            val maxFreqFile = File("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq")
-            if (maxFreqFile.exists()) {
-                val freqKhz = maxFreqFile.readText().trim().toLongOrNull() ?: 0L
-                maxFreq = freqKhz / 1000000.0
+            // Check max frequency across ALL available CPU cores (cpu0 .. cpuN-1)
+            for (i in 0 until cores) {
+                for (path in listOf("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq", "/sys/devices/system/cpu/cpu$i/cpufreq/scaling_max_freq")) {
+                    val maxFreqFile = File(path)
+                    if (maxFreqFile.exists() && maxFreqFile.canRead()) {
+                        val freqKhz = maxFreqFile.readText().trim().toLongOrNull() ?: 0L
+                        val freqGhz = freqKhz / 1000000.0
+                        if (freqGhz > maxFreq) {
+                            maxFreq = freqGhz
+                        }
+                    }
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
+        if (maxFreq == 0.0) maxFreq = 2.84 // fallback standard SoC max frequency
         CpuInfo(arch, cores, maxFreq)
     }
 
@@ -149,12 +158,25 @@ class HardwareMonitor(private val context: Context) {
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val sensors = sensorManager.getSensorList(Sensor.TYPE_ALL)
         return sensors.map { s ->
+            val typeStr = s.stringType ?: "Unknown"
+            val unit = when {
+                typeStr.contains("accelerometer") || typeStr.contains("gravity") || typeStr.contains("linear_acceleration") -> "m/s²"
+                typeStr.contains("gyroscope") -> "rad/s"
+                typeStr.contains("magnetic") -> "µT"
+                typeStr.contains("light") -> "lx"
+                typeStr.contains("temperature") || typeStr.contains("temp") -> "°C"
+                typeStr.contains("pressure") -> "hPa"
+                typeStr.contains("proximity") -> "cm"
+                typeStr.contains("step") || typeStr.contains("count") -> "steps"
+                else -> ""
+            }
             SensorInfo(
                 name = s.name,
                 vendor = s.vendor,
-                type = s.stringType ?: "Unknown",
+                type = typeStr,
                 powerMa = s.power,
-                maxRange = s.maximumRange
+                maxRange = s.maximumRange,
+                unit = unit
             )
         }
     }

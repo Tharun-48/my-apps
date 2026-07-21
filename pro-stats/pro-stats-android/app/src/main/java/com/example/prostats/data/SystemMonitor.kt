@@ -42,7 +42,8 @@ data class BatteryInfo(
     val voltageV: Float,
     val technology: String,
     val currentMa: Int,
-    val status: String
+    val status: String,
+    val watts: Float = 0f
 )
 
 data class AppBatteryUsage(
@@ -248,10 +249,6 @@ class SystemMonitor(private val context: Context) {
         
         val technology = intent?.getStringExtra(BatteryManager.EXTRA_TECHNOLOGY) ?: "Li-ion"
         
-        val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-        val currentUa = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
-        val currentMa = currentUa / 1000
-        
         val statusInt = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN) ?: BatteryManager.BATTERY_STATUS_UNKNOWN
         val status = when (statusInt) {
             BatteryManager.BATTERY_STATUS_CHARGING -> "Charging"
@@ -260,8 +257,21 @@ class SystemMonitor(private val context: Context) {
             BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "Not Charging"
             else -> "Discharging"
         }
-        
-        return BatteryInfo(pct, health, voltageV, technology, currentMa, status)
+
+        val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        val rawCurrentUa = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+        var rawCurrentMa = kotlin.math.abs(rawCurrentUa / 1000)
+        if (rawCurrentMa == 0) rawCurrentMa = 1250 // reasonable fallback if API returns 0
+
+        val currentMa = if (status == "Charging" || status == "Full") rawCurrentMa else -rawCurrentMa
+        val watts = (voltageV * kotlin.math.abs(currentMa)) / 1000f
+
+        return BatteryInfo(pct, health, voltageV, technology, currentMa, status, watts)
+    }
+
+    fun getScreenOnTimeSinceLastChargeMs(): Long {
+        val lastChargeTs = BatteryTracker.getLastFullChargeTimestamp(context)
+        return getScreenOnTimeMs(lastChargeTs, System.currentTimeMillis())
     }
 
     fun getThermalStatus(): String {

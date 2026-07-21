@@ -54,11 +54,22 @@ fun MainNavigation() {
             },
             onNavigateToSotDetail = {
               backStack.add(SotDetail)
+            },
+            onNavigateToSettings = {
+              backStack.add(Settings)
             }
           )
         }
         entry<SotDetail> {
           com.example.prostats.ui.dashboard.SotDetailScreen(
+            systemMonitor = systemMonitor,
+            onNavigateBack = {
+              backStack.removeLastOrNull()
+            }
+          )
+        }
+        entry<Settings> {
+          com.example.prostats.ui.settings.SettingsScreen(
             systemMonitor = systemMonitor,
             onNavigateBack = {
               backStack.removeLastOrNull()
