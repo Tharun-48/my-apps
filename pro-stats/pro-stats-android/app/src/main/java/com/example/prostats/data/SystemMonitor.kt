@@ -270,8 +270,45 @@ class SystemMonitor(private val context: Context) {
     }
 
     fun getScreenOnTimeSinceLastChargeMs(): Long {
-        val lastChargeTs = BatteryTracker.getLastFullChargeTimestamp(context)
-        return getScreenOnTimeMs(lastChargeTs, System.currentTimeMillis())
+        val lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
+        if (lastUnplugTs == 0L) return 0L
+        return getScreenOnTimeMs(lastUnplugTs, System.currentTimeMillis())
+    }
+
+    /** Returns battery % that drained while screen was OFF since charger unplugged from 100%. */
+    fun getScreenOffBatteryDrainPct(): Float {
+        val lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
+        if (lastUnplugTs == 0L) return 0f
+        val now = System.currentTimeMillis()
+        val elapsed = now - lastUnplugTs
+        if (elapsed <= 0L) return 0f
+
+        // Total drain from history
+        val points = BatteryTracker.getHistorySinceLastCharge(context)
+        val totalDrain: Float = if (points.size >= 2) {
+            val sorted = points.sortedBy { it.timestamp }
+            var discharge = 0
+            for (i in 0 until sorted.size - 1) {
+                val diff = sorted[i].batteryLevel - sorted[i + 1].batteryLevel
+                if (diff > 0) discharge += diff
+            }
+            discharge.toFloat()
+        } else {
+            // Fallback: 100% minus current level
+            val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            val bi = context.registerReceiver(null, filter)
+            val level = bi?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = bi?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            val pct = if (level >= 0 && scale > 0) (level * 100) / scale else 100
+            (100 - pct).toFloat().coerceAtLeast(0f)
+        }
+
+        // Screen-off time ratio
+        val sotMs = getScreenOnTimeSinceLastChargeMs()
+        val screenOffMs = (elapsed - sotMs).coerceAtLeast(0L)
+        return if (elapsed > 0) {
+            (totalDrain * screenOffMs.toFloat() / elapsed.toFloat()).coerceIn(0f, totalDrain)
+        } else 0f
     }
 
     fun getThermalStatus(): String {
@@ -493,12 +530,15 @@ class SystemMonitor(private val context: Context) {
         if (!hasUsageStatsPermission()) return list
 
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.DAY_OF_YEAR, -1) // Query last 24 hours
+        val lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
+        val startTime = if (lastUnplugTs > 0L) lastUnplugTs else {
+            // Fallback: last 24h if never unplugged from full
+            System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+        }
 
         val stats = usageStatsManager.queryUsageStats(
             UsageStatsManager.INTERVAL_DAILY,
-            cal.timeInMillis,
+            startTime,
             System.currentTimeMillis()
         ) ?: return list
 
@@ -515,7 +555,7 @@ class SystemMonitor(private val context: Context) {
 
         val pm = context.packageManager
         val totalSotMs = combinedStats.sumOf { it.second.first }
-        val totalDischarged = getBatteryDischargedOverPeriod(cal.timeInMillis, System.currentTimeMillis())
+        val totalDischarged = getBatteryDischargedOverPeriod(startTime, System.currentTimeMillis())
 
         val weightedTimes = mutableMapOf<String, Float>()
         var totalWeightedTime = 0f
@@ -579,14 +619,14 @@ class SystemMonitor(private val context: Context) {
         val list = mutableListOf<ProcessItem>()
         val pm = context.packageManager
         
-        // Fetch SOT and Battery Estimation maps for 24h
+        // Fetch SOT and Battery Estimation maps since last unplug from full
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.DAY_OF_YEAR, -1)
+        val lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
+        val startTime = if (lastUnplugTs > 0L) lastUnplugTs else System.currentTimeMillis() - 24 * 60 * 60 * 1000L
         val stats = try {
             usageStatsManager.queryUsageStats(
                 UsageStatsManager.INTERVAL_DAILY,
-                cal.timeInMillis,
+                startTime,
                 System.currentTimeMillis()
             )
         } catch (e: Exception) {
@@ -598,7 +638,7 @@ class SystemMonitor(private val context: Context) {
             ?: emptyMap()
 
         val totalSotMs = combinedStats.values.sumOf { it }
-        val totalDischarged = getBatteryDischargedOverPeriod(cal.timeInMillis, System.currentTimeMillis())
+        val totalDischarged = getBatteryDischargedOverPeriod(startTime, System.currentTimeMillis())
 
         val weightedTimes = mutableMapOf<String, Float>()
         var totalWeightedTime = 0f

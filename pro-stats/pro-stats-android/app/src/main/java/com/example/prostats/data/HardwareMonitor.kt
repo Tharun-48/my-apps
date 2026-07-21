@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -53,6 +55,7 @@ data class SensorInfo(
     val name: String,
     val vendor: String,
     val type: String,
+    val typeInt: Int,
     val powerMa: Float,
     val maxRange: Float,
     val unit: String = ""
@@ -159,21 +162,34 @@ class HardwareMonitor(private val context: Context) {
         val sensors = sensorManager.getSensorList(Sensor.TYPE_ALL)
         return sensors.map { s ->
             val typeStr = s.stringType ?: "Unknown"
-            val unit = when {
-                typeStr.contains("accelerometer") || typeStr.contains("gravity") || typeStr.contains("linear_acceleration") -> "m/s²"
-                typeStr.contains("gyroscope") -> "rad/s"
-                typeStr.contains("magnetic") -> "µT"
-                typeStr.contains("light") -> "lx"
-                typeStr.contains("temperature") || typeStr.contains("temp") -> "°C"
-                typeStr.contains("pressure") -> "hPa"
-                typeStr.contains("proximity") -> "cm"
-                typeStr.contains("step") || typeStr.contains("count") -> "steps"
-                else -> ""
+            val unit = when (s.type) {
+                Sensor.TYPE_ACCELEROMETER, Sensor.TYPE_GRAVITY, Sensor.TYPE_LINEAR_ACCELERATION -> "m/s²"
+                Sensor.TYPE_GYROSCOPE, Sensor.TYPE_GYROSCOPE_UNCALIBRATED -> "rad/s"
+                Sensor.TYPE_MAGNETIC_FIELD, Sensor.TYPE_MAGNETIC_FIELD_UNCALIBRATED -> "µT"
+                Sensor.TYPE_LIGHT -> "lx"
+                Sensor.TYPE_PRESSURE -> "hPa"
+                Sensor.TYPE_PROXIMITY -> "cm"
+                Sensor.TYPE_AMBIENT_TEMPERATURE, Sensor.TYPE_TEMPERATURE -> "°C"
+                Sensor.TYPE_STEP_COUNTER, Sensor.TYPE_STEP_DETECTOR -> "steps"
+                Sensor.TYPE_ROTATION_VECTOR, Sensor.TYPE_GAME_ROTATION_VECTOR -> "rad"
+                Sensor.TYPE_RELATIVE_HUMIDITY -> "%"
+                else -> when {
+                    typeStr.contains("accelerometer") || typeStr.contains("gravity") || typeStr.contains("linear") -> "m/s²"
+                    typeStr.contains("gyro") -> "rad/s"
+                    typeStr.contains("magnetic") -> "µT"
+                    typeStr.contains("light") -> "lx"
+                    typeStr.contains("temp") -> "°C"
+                    typeStr.contains("pressure") -> "hPa"
+                    typeStr.contains("proximity") -> "cm"
+                    typeStr.contains("step") -> "steps"
+                    else -> ""
+                }
             }
             SensorInfo(
                 name = s.name,
                 vendor = s.vendor,
-                type = typeStr,
+                type = typeStr.replace("android.sensor.", ""),
+                typeInt = s.type,
                 powerMa = s.power,
                 maxRange = s.maximumRange,
                 unit = unit
@@ -181,3 +197,31 @@ class HardwareMonitor(private val context: Context) {
         }
     }
 }
+
+/**
+ * Registers SensorEventListeners for all device sensors and maintains a map
+ * of the latest sensor readings. Call [start] to begin listening and [stop] when done.
+ */
+class SensorLiveReader(context: Context) : SensorEventListener {
+    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private val _readings = mutableMapOf<Int, FloatArray>()
+    val readings: Map<Int, FloatArray> get() = _readings
+
+    fun start() {
+        val sensors = sensorManager.getSensorList(Sensor.TYPE_ALL)
+        sensors.forEach { sensor ->
+            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
+        }
+    }
+
+    fun stop() {
+        sensorManager.unregisterListener(this)
+    }
+
+    override fun onSensorChanged(event: SensorEvent) {
+        _readings[event.sensor.type] = event.values.copyOf()
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
+}
+

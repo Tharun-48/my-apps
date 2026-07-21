@@ -31,7 +31,6 @@ import com.example.prostats.data.BatteryTracker
 import com.example.prostats.data.HistoryPoint
 import com.example.prostats.data.SystemMonitor
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -43,52 +42,64 @@ fun SotDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var isSinceCharge by remember { mutableStateOf(true) }
 
-    // Fetch history points
-    val points = remember(isSinceCharge) {
-        if (isSinceCharge) {
-            BatteryTracker.getHistorySinceLastCharge(context)
-        } else {
-            BatteryTracker.getHistory24h(context)
+    // Always since last unplug from full charge
+    val lastUnplugTs = remember { BatteryTracker.getLastUnplugFromFullTimestamp(context) }
+    val hasData = lastUnplugTs > 0L
+
+    // Sort state for app list
+    var appSort by remember { mutableStateOf("Time") } // Time | Battery | Name
+
+    // History points since unplug
+    val points = remember(lastUnplugTs) {
+        BatteryTracker.getHistorySinceLastCharge(context)
+    }
+
+    // App usage list
+    val rawAppList = remember(lastUnplugTs) {
+        if (!hasData) emptyList()
+        else {
+            val now = System.currentTimeMillis()
+            systemMonitor.getAppBatteryUsageList(lastUnplugTs, now)
         }
     }
 
-    // Fetch app usage list
-    val appUsageList = remember(isSinceCharge) {
-        val now = System.currentTimeMillis()
-        val start = if (isSinceCharge) BatteryTracker.getLastFullChargeTimestamp(context) else now - 24 * 60 * 60 * 1000L
-        systemMonitor.getAppBatteryUsageList(start, now)
-    }
-
-    // Calculate SOT summary
-    val totalSotMs = remember(isSinceCharge) {
-        val now = System.currentTimeMillis()
-        val start = if (isSinceCharge) BatteryTracker.getLastFullChargeTimestamp(context) else now - 24 * 60 * 60 * 1000L
-        systemMonitor.getScreenOnTimeMs(start, now)
-    }
-    
-    val totalSotFormatted = remember(totalSotMs) {
-        val mins = totalSotMs / 1000 / 60
-        val hrs = mins / 60
-        val remMins = mins % 60
-        if (hrs > 0) "${hrs}h ${remMins}m" else "${remMins}m"
-    }
-
-    val batteryDischarged = remember(points) {
-        if (points.size >= 2) {
-            val sorted = points.sortedBy { it.timestamp }
-            var discharge = 0
-            for (i in 0 until sorted.size - 1) {
-                val diff = sorted[i].batteryLevel - sorted[i+1].batteryLevel
-                if (diff > 0) {
-                    discharge += diff
-                }
-            }
-            if (discharge > 0) "$discharge%" else "Estimate active"
-        } else {
-            "N/A"
+    val appUsageList = remember(rawAppList, appSort) {
+        when (appSort) {
+            "Battery" -> rawAppList.sortedByDescending { it.batteryUsagePct }
+            "Name" -> rawAppList.sortedBy { it.appName }
+            else -> rawAppList.sortedByDescending { it.foregroundTimeMs }
         }
+    }
+
+    // Screen On Time
+    val totalSotMs = remember(lastUnplugTs) {
+        if (!hasData) 0L
+        else {
+            val now = System.currentTimeMillis()
+            systemMonitor.getScreenOnTimeMs(lastUnplugTs, now)
+        }
+    }
+
+    val totalSotFormatted = remember(totalSotMs, hasData) {
+        if (!hasData) "—"
+        else {
+            val mins = totalSotMs / 1000 / 60
+            val hrs = mins / 60
+            val remMins = mins % 60
+            if (hrs > 0) "${hrs}h ${remMins}m" else "${remMins}m"
+        }
+    }
+
+    // Screen Off Drain
+    val screenOffDrain = remember(lastUnplugTs) {
+        if (!hasData) 0f
+        else systemMonitor.getScreenOffBatteryDrainPct()
+    }
+
+    val screenOffDrainFormatted = remember(screenOffDrain, hasData) {
+        if (!hasData) "—"
+        else String.format(Locale.US, "%.1f%%", screenOffDrain)
     }
 
     Scaffold(
@@ -112,138 +123,142 @@ fun SotDetailScreen(
                 .padding(paddingValues)
                 .background(Color(0xFF0A0A0C))
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(bottom = 24.dp)
-            ) {
-                // SOT Toggle card
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-                        modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(16.dp))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = { isSinceCharge = true },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isSinceCharge) Color(0xFF2C2C2E) else Color.Transparent,
-                                    contentColor = if (isSinceCharge) Color(0xFF4ADE80) else Color.Gray
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).height(40.dp)
-                            ) {
-                                Text("Since Last Charge", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-                            Button(
-                                onClick = { isSinceCharge = false },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (!isSinceCharge) Color(0xFF2C2C2E) else Color.Transparent,
-                                    contentColor = if (!isSinceCharge) Color(0xFF4ADE80) else Color.Gray
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).height(40.dp)
-                            ) {
-                                Text("Last 24 Hours", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-                        }
+            if (!hasData) {
+                // No-data placeholder
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+                        Text("⚡", fontSize = 48.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "No data yet",
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Charge your device to 100%, then unplug the charger to start tracking Screen-on Time and battery drain.",
+                            color = Color.Gray,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
                     }
                 }
-
-                // Custom Graph card
-                item {
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-                        modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(20.dp))
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "BATTERY CHARGE HISTORY",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Gray,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            BatteryGraph(
-                                points = points,
-                                is24h = !isSinceCharge,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(180.dp)
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
-                }
-
-                // Stats summary
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-                            modifier = Modifier.weight(1f).border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(16.dp))
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text("TOTAL SOT", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(totalSotFormatted, fontSize = 18.sp, color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-                            modifier = Modifier.weight(1f).border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(16.dp))
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text("BATTERY DRAIN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(batteryDischarged, fontSize = 18.sp, color = Color(0xFFFB923C), fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
-                // App list header
-                item {
-                    Text(
-                        text = "APP BATTERY CONSUMPTION",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        letterSpacing = 1.sp
-                    )
-                }
-
-                if (appUsageList.isEmpty()) {
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp)
+                ) {
+                    // Graph card
                     item {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().height(100.dp),
-                            contentAlignment = Alignment.Center
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Card(
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                            modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(20.dp))
                         ) {
-                            Text("No SOT usage stats recorded", color = Color.DarkGray, fontSize = 13.sp)
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "BATTERY CHARGE HISTORY — SINCE UNPLUGGED",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Gray,
+                                    letterSpacing = 1.sp
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                BatteryGraph(
+                                    points = points,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(180.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
                         }
                     }
-                } else {
-                    items(appUsageList, key = { it.packageName }) { app ->
-                        AppSotRow(app = app)
+
+                    // Stats summary — SCREEN ON TIME + SCREEN OFF DRAIN
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                                modifier = Modifier.weight(1f).border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(16.dp))
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("SCREEN ON TIME", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(totalSotFormatted, fontSize = 18.sp, color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold)
+                                    Text("Since unplugged", fontSize = 10.sp, color = Color(0x88FFFFFF))
+                                }
+                            }
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                                modifier = Modifier.weight(1f).border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(16.dp))
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("SCREEN OFF DRAIN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(screenOffDrainFormatted, fontSize = 18.sp, color = Color(0xFFFB923C), fontWeight = FontWeight.Bold)
+                                    Text("Background drain", fontSize = 10.sp, color = Color(0x88FFFFFF))
+                                }
+                            }
+                        }
+                    }
+
+                    // App list header + sort tabs
+                    item {
+                        Text(
+                            text = "APP BATTERY CONSUMPTION",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(top = 4.dp),
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("Time" to "Screen Time", "Battery" to "Battery", "Name" to "Name").forEach { (key, label) ->
+                                val active = appSort == key
+                                Button(
+                                    onClick = { appSort = key },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (active) Color(0xFF1F1F23) else Color.Transparent,
+                                        contentColor = if (active) Color(0xFF4ADE80) else Color.Gray
+                                    ),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp, if (active) Color(0x334ADE80) else Color(0x11FFFFFF)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
+
+                    if (appUsageList.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().height(100.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("No SOT usage stats recorded", color = Color.DarkGray, fontSize = 13.sp)
+                            }
+                        }
+                    } else {
+                        items(appUsageList, key = { it.packageName }) { app ->
+                            AppSotRow(app = app)
+                        }
                     }
                 }
             }
@@ -254,12 +269,11 @@ fun SotDetailScreen(
 @Composable
 fun BatteryGraph(
     points: List<HistoryPoint>,
-    is24h: Boolean,
     modifier: Modifier = Modifier
 ) {
     if (points.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Text("No history captured", color = Color.DarkGray, fontSize = 12.sp)
+            Text("No history captured yet", color = Color.DarkGray, fontSize = 12.sp)
         }
         return
     }
@@ -269,19 +283,12 @@ fun BatteryGraph(
     val maxTime = sortedPoints.last().timestamp
     val timeSpan = (maxTime - minTime).coerceAtLeast(1L)
 
-    val labelFormat = remember(is24h) {
-        if (is24h) {
-            SimpleDateFormat("HH:mm", Locale.getDefault())
-        } else {
-            SimpleDateFormat("E", Locale.getDefault())
-        }
-    }
+    val labelFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
     Canvas(modifier = modifier) {
         val width = size.width
-        val height = size.height - 20.dp.toPx() // Reserve bottom space for labels
+        val height = size.height - 20.dp.toPx()
 
-        // Draw horizontal grid lines and Y-axis percentage labels
         val gridColor = Color(0x0CFFFFFF)
         val paint = android.graphics.Paint().apply {
             color = android.graphics.Color.GRAY
@@ -291,76 +298,46 @@ fun BatteryGraph(
 
         for (pct in listOf(25, 50, 75, 100)) {
             val y = height * (1f - pct / 100f)
-            drawLine(
-                color = gridColor,
-                start = Offset(0f, y),
-                end = Offset(width, y),
-                strokeWidth = 1.dp.toPx()
-            )
-            drawContext.canvas.nativeCanvas.drawText(
-                "$pct%",
-                width - 4.dp.toPx(),
-                y - 4.dp.toPx(),
-                paint
-            )
+            drawLine(color = gridColor, start = Offset(0f, y), end = Offset(width, y), strokeWidth = 1.dp.toPx())
+            drawContext.canvas.nativeCanvas.drawText("$pct%", width - 4.dp.toPx(), y - 4.dp.toPx(), paint)
         }
 
-        // Generate points coordinates
         val coords = sortedPoints.map { pt ->
             val xRatio = (pt.timestamp - minTime).toFloat() / timeSpan
             val yRatio = pt.batteryLevel / 100f
             Offset(xRatio * width, height * (1f - yRatio))
         }
 
-        // Draw fill path under line
         if (coords.isNotEmpty()) {
             val fillPath = Path().apply {
                 moveTo(coords[0].x, coords[0].y)
-                for (i in 1 until coords.size) {
-                    lineTo(coords[i].x, coords[i].y)
-                }
+                for (i in 1 until coords.size) lineTo(coords[i].x, coords[i].y)
                 lineTo(coords.last().x, height)
                 lineTo(coords.first().x, height)
                 close()
             }
-            drawPath(
-                path = fillPath,
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color(0x25A78BFA), Color.Transparent)
-                )
-            )
+            drawPath(path = fillPath, brush = Brush.verticalGradient(colors = listOf(Color(0x25A78BFA), Color.Transparent)))
 
-            // Draw line path
             val linePath = Path().apply {
                 moveTo(coords[0].x, coords[0].y)
-                for (i in 1 until coords.size) {
-                    lineTo(coords[i].x, coords[i].y)
-                }
+                for (i in 1 until coords.size) lineTo(coords[i].x, coords[i].y)
             }
             drawPath(
                 path = linePath,
-                brush = Brush.horizontalGradient(
-                    colors = listOf(Color(0xFFA78BFA), Color(0xFF4ADE80))
-                ),
-                style = Stroke(
-                    width = 2.5.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
+                brush = Brush.horizontalGradient(colors = listOf(Color(0xFFA78BFA), Color(0xFF4ADE80))),
+                style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
             )
         }
 
-        // Draw X Axis date/time labels at 4 intervals
         val xLabelPaint = android.graphics.Paint().apply {
             color = android.graphics.Color.GRAY
             textSize = 9.dp.toPx()
             textAlign = android.graphics.Paint.Align.CENTER
         }
-
         val step = timeSpan / 4
         for (i in 0..4) {
             val targetTime = minTime + i * step
-            val xRatio = i / 4f
-            val x = xRatio * width
+            val x = (i / 4f) * width
             val dateStr = labelFormat.format(Date(targetTime))
             drawContext.canvas.nativeCanvas.drawText(
                 dateStr,
@@ -394,9 +371,7 @@ fun AppSotRow(app: AppBatteryUsage) {
                 packageName = app.packageName,
                 modifier = Modifier.size(40.dp).background(Color(0x11FFFFFF), RoundedCornerShape(10.dp))
             )
-
             Spacer(modifier = Modifier.width(14.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = app.appName,
@@ -414,7 +389,6 @@ fun AppSotRow(app: AppBatteryUsage) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                // Progress bar indicating relative battery usage
                 LinearProgressIndicator(
                     progress = (app.batteryUsagePct / 100f).coerceIn(0f, 1f),
                     color = Color(0xFF4ADE80),
@@ -422,9 +396,7 @@ fun AppSotRow(app: AppBatteryUsage) {
                     modifier = Modifier.fillMaxWidth().height(4.dp).background(Color.Transparent, RoundedCornerShape(2.dp))
                 )
             }
-
             Spacer(modifier = Modifier.width(16.dp))
-
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = String.format(Locale.US, "%.1f%%", app.batteryUsagePct),

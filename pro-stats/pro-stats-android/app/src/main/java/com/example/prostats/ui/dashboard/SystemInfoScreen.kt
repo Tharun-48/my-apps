@@ -32,6 +32,24 @@ fun SystemInfoScreen() {
     var cameraInfo by remember { mutableStateOf<CameraInfoData?>(null) }
     var sensorInfoList by remember { mutableStateOf<List<SensorInfo>>(emptyList()) }
 
+    // Live sensor readings map: sensorType -> FloatArray of values
+    var liveReadings by remember { mutableStateOf<Map<Int, FloatArray>>(emptyMap()) }
+
+    // Register/unregister SensorLiveReader with the screen lifecycle
+    val sensorReader = remember { SensorLiveReader(context) }
+    DisposableEffect(Unit) {
+        sensorReader.start()
+        onDispose { sensorReader.stop() }
+    }
+
+    // Refresh live readings every 500ms
+    LaunchedEffect(Unit) {
+        while (true) {
+            liveReadings = sensorReader.readings
+            kotlinx.coroutines.delay(500)
+        }
+    }
+
     LaunchedEffect(Unit) {
         deviceInfo = hardwareMonitor.getDeviceInfo()
         cpuInfo = hardwareMonitor.getCpuInfo()
@@ -123,7 +141,7 @@ fun SystemInfoScreen() {
             }
 
             items(sensorInfoList) { sensor ->
-                SensorRow(sensor)
+                SensorRow(sensor = sensor, liveReading = liveReadings[sensor.typeInt])
             }
             
             item {
@@ -165,7 +183,7 @@ fun InfoRow(label: String, value: String) {
 }
 
 @Composable
-fun SensorRow(sensor: SensorInfo) {
+fun SensorRow(sensor: SensorInfo, liveReading: FloatArray? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -177,11 +195,22 @@ fun SensorRow(sensor: SensorInfo) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = sensor.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(text = sensor.vendor, color = Color.Gray, fontSize = 11.sp)
+            Text(text = "${sensor.vendor} • ${sensor.type}", color = Color.Gray, fontSize = 11.sp)
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(text = "${sensor.powerMa} mA", color = Color(0xFF4ADE80), fontSize = 12.sp)
-            Text(text = "Max: ${sensor.maxRange}", color = Color.Gray, fontSize = 10.sp)
+            // Live sensor value — primary axis (values[0])
+            val valueText = if (liveReading != null && liveReading.isNotEmpty()) {
+                val v = liveReading[0]
+                val formatted = if (v % 1f == 0f) v.toInt().toString()
+                                else String.format(java.util.Locale.US, "%.3f", v)
+                "$formatted ${sensor.unit}".trim()
+            } else {
+                "-- ${sensor.unit}".trim()
+            }
+            Text(text = valueText, color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            val maxStr = if (sensor.maxRange % 1f == 0f) sensor.maxRange.toInt().toString()
+                        else String.format(java.util.Locale.US, "%.2f", sensor.maxRange)
+            Text(text = "Max: $maxStr ${sensor.unit}".trim(), color = Color.Gray, fontSize = 10.sp)
         }
     }
 }

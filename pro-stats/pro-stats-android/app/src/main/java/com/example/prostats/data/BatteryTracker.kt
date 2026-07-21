@@ -49,13 +49,7 @@ object BatteryTracker {
 
             val points = getRawHistory(context).toMutableList()
             
-            // Check if full charge reached
-            val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-            val batteryIntent = context.registerReceiver(null, filter)
-            val status = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-            if (level >= 99 || status == BatteryManager.BATTERY_STATUS_FULL) {
-                updateLastFullChargeTimestamp(context, now)
-            }
+            // NOTE: charge-unplug tracking is handled by BatteryTrackerReceiver via ACTION_POWER_DISCONNECTED
 
             // Add new data point
             points.add(HistoryPoint(now, level, sotToday))
@@ -63,9 +57,7 @@ object BatteryTracker {
             // Keep only last 7 days of history and sort
             val cutOff = now - (MAX_HISTORY_DAYS * 24 * 60 * 60 * 1000L)
             val filteredPoints = points.filter { it.timestamp >= cutOff && it.timestamp <= now }
-                .sortedBy { it.timestamp }
-
-            saveHistory(context, filteredPoints)
+            saveHistory(context, filteredPoints.sortedBy { it.timestamp })
             Log.d(TAG, "Recorded point: Battery=$level%, SOT=${sotToday / 1000 / 60}m")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to record data point", e)
@@ -99,17 +91,31 @@ object BatteryTracker {
 
     private const val PREFS_NAME = "battery_prefs"
     private const val KEY_LAST_FULL_CHARGE = "last_full_charge_ts"
+    private const val KEY_LAST_UNPLUG_FROM_FULL = "last_unplug_from_full_ts"
 
+    // Legacy — kept for history graph fallback only
     fun getLastFullChargeTimestamp(context: Context): Long {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val defaultTs = System.currentTimeMillis() - (12 * 60 * 60 * 1000L) // Default 12 hours ago
+        val now = System.currentTimeMillis()
+        val defaultTs = now - (24 * 60 * 60 * 1000L)
         return prefs.getLong(KEY_LAST_FULL_CHARGE, defaultTs)
     }
 
     fun updateLastFullChargeTimestamp(context: Context, timestamp: Long = System.currentTimeMillis()) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putLong(KEY_LAST_FULL_CHARGE, timestamp).apply()
-        Log.d(TAG, "Full charge timestamp updated to $timestamp")
+    }
+
+    /** Returns the timestamp when charger was last unplugged at >=95% charge. Returns 0L if never recorded. */
+    fun getLastUnplugFromFullTimestamp(context: Context): Long {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getLong(KEY_LAST_UNPLUG_FROM_FULL, 0L)
+    }
+
+    fun updateLastUnplugFromFullTimestamp(context: Context, timestamp: Long = System.currentTimeMillis()) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putLong(KEY_LAST_UNPLUG_FROM_FULL, timestamp).apply()
+        Log.d(TAG, "Unplug-from-full timestamp updated to $timestamp")
     }
 
     fun getHistory24h(context: Context): List<HistoryPoint> {
@@ -119,9 +125,9 @@ object BatteryTracker {
     }
 
     fun getHistorySinceLastCharge(context: Context): List<HistoryPoint> {
-        val lastChargeTs = getLastFullChargeTimestamp(context)
-        val raw = getRawHistory(context).filter { it.timestamp >= lastChargeTs }
-        return if (raw.size >= 2) raw else getHistory24h(context)
+        val lastUnplugTs = getLastUnplugFromFullTimestamp(context)
+        if (lastUnplugTs == 0L) return emptyList()
+        return getRawHistory(context).filter { it.timestamp >= lastUnplugTs }
     }
 
     fun getHistory7d(context: Context): List<HistoryPoint> {
