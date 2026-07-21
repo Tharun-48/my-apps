@@ -60,7 +60,7 @@ fun SystemInfoScreen() {
 
         deviceInfo?.let { di ->
             item {
-                InfoCard(title = "Device", icon = Icons.Default.Smartphone) {
+                InfoCard(title = "Device", icon = Icons.Default.Phone) {
                     InfoRow("Manufacturer", di.manufacturer)
                     InfoRow("Model", di.model)
                     InfoRow("Board", di.board)
@@ -82,7 +82,7 @@ fun SystemInfoScreen() {
 
         batteryInfo?.let { bat ->
             item {
-                InfoCard(title = "Battery", icon = Icons.Default.BatteryFull) {
+                InfoCard(title = "Battery", icon = Icons.Default.Info) {
                     InfoRow("Level", "${bat.level}%")
                     InfoRow("Health", bat.health)
                     InfoRow("Technology", bat.technology)
@@ -104,7 +104,7 @@ fun SystemInfoScreen() {
 
         cameraInfo?.let { cam ->
             item {
-                InfoCard(title = "Camera", icon = Icons.Default.Camera) {
+                InfoCard(title = "Camera", icon = Icons.Default.Search) {
                     InfoRow("Rear Sensor", cam.rearMegapixels?.let { "$it MP" } ?: "Unknown")
                     InfoRow("Front Sensor", cam.frontMegapixels?.let { "$it MP" } ?: "Unknown")
                 }

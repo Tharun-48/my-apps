@@ -12,8 +12,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -176,7 +176,7 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Layers, contentDescription = null, tint = Color(0xFF4ADE80))
+                        Icon(Icons.Default.List, contentDescription = null, tint = Color(0xFF4ADE80))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("System Floating HUD Overlays", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }

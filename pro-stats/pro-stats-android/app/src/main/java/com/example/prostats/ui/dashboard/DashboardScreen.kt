@@ -28,7 +28,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 
-import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.rememberCoroutineScope
@@ -57,7 +57,7 @@ fun DashboardScreen(
                     onClick = {
                         coroutineScope.launch { pagerState.animateScrollToPage(0) }
                     },
-                    icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Dashboard") },
                     label = { Text("Dashboard", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color(0xFF4ADE80),
