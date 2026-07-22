@@ -42,11 +42,11 @@ fun SystemInfoScreen() {
         onDispose { sensorReader.stop() }
     }
 
-    // Refresh live readings every 500ms
+    // Refresh live readings every 1000ms
     LaunchedEffect(Unit) {
         while (true) {
             liveReadings = sensorReader.readings
-            kotlinx.coroutines.delay(500)
+            kotlinx.coroutines.delay(1000)
         }
     }
 
@@ -208,9 +208,6 @@ fun SensorRow(sensor: SensorInfo, liveReading: FloatArray? = null) {
                 "-- ${sensor.unit}".trim()
             }
             Text(text = valueText, color = Color(0xFFA78BFA), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            val maxStr = if (sensor.maxRange % 1f == 0f) sensor.maxRange.toInt().toString()
-                        else String.format(java.util.Locale.US, "%.2f", sensor.maxRange)
-            Text(text = "Max: $maxStr ${sensor.unit}".trim(), color = Color.Gray, fontSize = 10.sp)
         }
     }
 }

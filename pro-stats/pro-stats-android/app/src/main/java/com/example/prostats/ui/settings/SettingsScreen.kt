@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,6 +45,9 @@ fun SettingsScreen(
     var overlayHz by remember { mutableStateOf(OverlayService.isHzEnabled(context)) }
     var overlayCpu by remember { mutableStateOf(OverlayService.isCpuEnabled(context)) }
     var overlayRam by remember { mutableStateOf(OverlayService.isRamEnabled(context)) }
+
+    val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+    var currentTheme by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
 
     LaunchedEffect(Unit) {
         isShizukuRunning = systemMonitor.isShizukuRunning()
@@ -124,7 +130,7 @@ fun SettingsScreen(
                             text = statusText,
                             color = statusColor,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            fontSize = 10.sp,
                             modifier = Modifier
                                 .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -132,18 +138,14 @@ fun SettingsScreen(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Shizuku provides high-precision top CPU load metrics without root.",
-                        color = Color.Gray,
-                        fontSize = 13.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            if (isShizukuRunning) {
+                    OverlayToggleRow(
+                        title = "Enable Shizuku",
+                        subtitle = "High-precision top CPU load metrics",
+                        checked = isShizukuRunning && hasShizukuPerm,
+                        onCheckedChange = {
+                            if (it && isShizukuRunning && !hasShizukuPerm) {
                                 systemMonitor.requestShizukuPermission()
-                            } else {
+                            } else if (!isShizukuRunning) {
                                 try {
                                     val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
                                     if (launchIntent != null) {
@@ -152,16 +154,55 @@ fun SettingsScreen(
                                         val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app"))
                                         context.startActivity(webIntent)
                                     }
-                                } catch (e: Exception) {
-                                    systemMonitor.requestShizukuPermission()
-                                }
+                                } catch (e: Exception) {}
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C2E), contentColor = Color.White),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (isShizukuRunning) "Request Shizuku Permission" else "Open / Get Shizuku App")
+                        }
+                    )
+                }
+            }
+
+            // App Theme Card
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(20.dp))
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF60A5FA))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("App Theme", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    val themes = listOf("Material You", "Light", "Dark", "Pure Black (AMOLED)")
+                    themes.forEach { theme ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    currentTheme = theme
+                                    prefs.edit().putString("app_theme", theme).apply()
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(theme, color = Color.White, fontSize = 14.sp)
+                            RadioButton(
+                                selected = currentTheme == theme,
+                                onClick = {
+                                    currentTheme = theme
+                                    prefs.edit().putString("app_theme", theme).apply()
+                                },
+                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF60A5FA), unselectedColor = Color.Gray)
+                            )
+                        }
+                        if (theme != themes.last()) {
+                            Divider(color = Color(0x11FFFFFF))
+                        }
                     }
                 }
             }
@@ -272,6 +313,43 @@ fun SettingsScreen(
                 }
             }
             
+            // About & Updates
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(20.dp))
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFFBBF24))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("About & Updates", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Version", color = Color.Gray, fontSize = 14.sp)
+                        Text("v1.5", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Tharun-48/pro-stats-android/releases"))
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C2E), contentColor = Color.White),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Check for Updates on GitHub")
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
         }
     }

@@ -36,13 +36,26 @@ fun ProStatsTheme(
   dynamicColor: Boolean = true,
   content: @Composable () -> Unit,
 ) {
+  val context = LocalContext.current
+  val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+  val themePref = prefs.getString("app_theme", "Material You") ?: "Material You"
+
+  val isDark = when (themePref) {
+      "Light" -> false
+      "Dark", "Pure Black (AMOLED)" -> true
+      else -> darkTheme
+  }
+
   val colorScheme =
     when {
-      dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-        val context = LocalContext.current
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+      themePref == "Pure Black (AMOLED)" -> DarkColorScheme.copy(
+          background = androidx.compose.ui.graphics.Color.Black,
+          surface = androidx.compose.ui.graphics.Color.Black
+      )
+      themePref == "Material You" && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+        if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
       }
-      darkTheme -> DarkColorScheme
+      isDark -> DarkColorScheme
       else -> LightColorScheme
     }
 

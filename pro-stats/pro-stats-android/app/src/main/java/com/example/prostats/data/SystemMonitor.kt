@@ -30,6 +30,7 @@ data class ProcessItem(
     val cpuUsage: Float,
     val ramUsageMb: Float,
     val systemTimeForegroundMs: Long = 0,
+    val lastTimeUsedMs: Long = 0,
     val isShizukuMode: Boolean,
     val batteryUsagePct: Float = 0f
 )
@@ -606,6 +607,7 @@ class SystemMonitor(private val context: Context) {
                     cpuUsage = 0f,
                     ramUsageMb = 0f,
                     systemTimeForegroundMs = pair.first,
+                    lastTimeUsedMs = pair.second,
                     isShizukuMode = false,
                     batteryUsagePct = batteryPct
                 )
@@ -634,16 +636,20 @@ class SystemMonitor(private val context: Context) {
         }
 
         val combinedStats = stats?.groupBy { it.packageName }
-            ?.mapValues { entry -> entry.value.sumOf { it.totalTimeInForeground } }
+            ?.mapValues { entry -> 
+                val foregroundMs = entry.value.sumOf { it.totalTimeInForeground }
+                val lastTimeUsed = entry.value.maxOfOrNull { it.lastTimeUsed } ?: 0L
+                Pair(foregroundMs, lastTimeUsed)
+            }
             ?: emptyMap()
 
-        val totalSotMs = combinedStats.values.sumOf { it }
+        val totalSotMs = combinedStats.values.sumOf { it.first }
         val totalDischarged = getBatteryDischargedOverPeriod(startTime, System.currentTimeMillis())
 
         val weightedTimes = mutableMapOf<String, Float>()
         var totalWeightedTime = 0f
-        
-        combinedStats.forEach { (packageName, foregroundMs) ->
+        combinedStats.forEach { (packageName, pair) ->
+            val foregroundMs = pair.first
             val appInfo = try { pm.getApplicationInfo(packageName, 0) } catch (e: Exception) { null }
             val weight = if (appInfo != null) {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -715,7 +721,8 @@ class SystemMonitor(private val context: Context) {
                         name
                     }
 
-                    val sotMs = combinedStats[name] ?: 0L
+                    val sotMs = combinedStats[name]?.first ?: 0L
+                    val lastTimeUsedMs = combinedStats[name]?.second ?: 0L
                     val weightedTime = weightedTimes[name] ?: 0f
                     val batteryPct = if (totalWeightedTime > 0) {
                         (weightedTime / totalWeightedTime) * totalDischarged
@@ -731,6 +738,7 @@ class SystemMonitor(private val context: Context) {
                             cpuUsage = cpu,
                             ramUsageMb = ramMb,
                             systemTimeForegroundMs = sotMs,
+                            lastTimeUsedMs = lastTimeUsedMs,
                             isShizukuMode = true,
                             batteryUsagePct = batteryPct
                         )

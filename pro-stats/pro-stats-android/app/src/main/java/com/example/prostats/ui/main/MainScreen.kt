@@ -94,7 +94,7 @@ fun MainScreen(
 
     // Set default sort for Basic Mode vs Pro Mode
     LaunchedEffect(isShizuku) {
-        sortBy = if (isShizuku) "CPU" else "Time"
+        sortBy = if (isShizuku) "CPU" else "Recent"
     }
 
     Scaffold(
@@ -157,8 +157,7 @@ fun MainScreen(
                             "CPU" -> processes.sortedByDescending { it.cpuUsage }
                             "RAM" -> processes.sortedByDescending { it.ramUsageMb }
                             "Name" -> processes.sortedBy { it.name }
-                            "Time" -> processes.sortedByDescending { it.systemTimeForegroundMs }
-                            "Battery" -> processes.sortedByDescending { it.batteryUsagePct }
+                            "Recent" -> processes.sortedByDescending { it.lastTimeUsedMs }
                             else -> processes
                         }
                     }
@@ -249,8 +248,7 @@ fun SortingHeader(
             SortTab(title = "Sort by CPU", active = selectedSort == "CPU", onClick = { onSortChange("CPU") })
             SortTab(title = "Sort by RAM", active = selectedSort == "RAM", onClick = { onSortChange("RAM") })
         }
-        SortTab(title = "Sort by Screen Time", active = selectedSort == "Time", onClick = { onSortChange("Time") })
-        SortTab(title = "Sort by Battery Usage", active = selectedSort == "Battery", onClick = { onSortChange("Battery") })
+        SortTab(title = "Recently Used", active = selectedSort == "Recent", onClick = { onSortChange("Recent") })
         SortTab(title = "Sort by Name", active = selectedSort == "Name", onClick = { onSortChange("Name") })
     }
 }
@@ -421,28 +419,22 @@ fun ProcessRow(
                                 )
                             }
                         }
-                        "Time" -> {
+                        "Recent" -> {
+                            val diffSec = (System.currentTimeMillis() - item.lastTimeUsedMs) / 1000
+                            val timeStr = when {
+                                item.lastTimeUsedMs == 0L -> "Never"
+                                diffSec < 60 -> "${diffSec}s ago"
+                                diffSec < 3600 -> "${diffSec / 60}m ago"
+                                else -> "${diffSec / 3600}h ago"
+                            }
                             Text(
-                                text = formatSot(item.systemTimeForegroundMs),
+                                text = timeStr,
                                 color = Color(0xFFA78BFA),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )
                             Text(
-                                text = "Active SOT",
-                                color = Color.Gray,
-                                fontSize = 11.sp
-                            )
-                        }
-                        "Battery" -> {
-                            Text(
-                                text = String.format(java.util.Locale.US, "%.1f%%", item.batteryUsagePct),
-                                color = Color(0xFF4ADE80),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                text = "Est. Battery",
+                                text = String.format(java.util.Locale.US, "Drained: %.1f%%", item.batteryUsagePct),
                                 color = Color.Gray,
                                 fontSize = 11.sp
                             )
@@ -461,14 +453,21 @@ fun ProcessRow(
                                     fontSize = 11.sp
                                 )
                             } else {
+                                val diffSec = (System.currentTimeMillis() - item.lastTimeUsedMs) / 1000
+                                val timeStr = when {
+                                    item.lastTimeUsedMs == 0L -> "Never"
+                                    diffSec < 60 -> "${diffSec}s ago"
+                                    diffSec < 3600 -> "${diffSec / 60}m ago"
+                                    else -> "${diffSec / 3600}h ago"
+                                }
                                 Text(
-                                    text = formatSot(item.systemTimeForegroundMs),
+                                    text = timeStr,
                                     color = Color(0xFFA78BFA),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
                                 Text(
-                                    text = "Est: ${String.format(java.util.Locale.US, "%.1f%%", item.batteryUsagePct)}",
+                                    text = String.format(java.util.Locale.US, "Drained: %.1f%%", item.batteryUsagePct),
                                     color = Color.Gray,
                                     fontSize = 11.sp
                                 )
