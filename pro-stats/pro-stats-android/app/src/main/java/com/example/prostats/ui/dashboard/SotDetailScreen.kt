@@ -91,15 +91,20 @@ fun SotDetailScreen(
         }
     }
 
-    // Screen Off Drain
-    val screenOffDrain = remember(lastUnplugTs) {
-        if (!hasData) 0f
-        else systemMonitor.getScreenOffBatteryDrainPct()
+    // Screen Off Time
+    val screenOffMs = remember(lastUnplugTs) {
+        if (!hasData) 0L
+        else systemMonitor.getScreenOffTimeSinceLastChargeMs()
     }
 
-    val screenOffDrainFormatted = remember(screenOffDrain, hasData) {
+    val screenOffTimeFormatted = remember(screenOffMs, hasData) {
         if (!hasData) "—"
-        else String.format(Locale.US, "%.1f%%", screenOffDrain)
+        else {
+            val mins = screenOffMs / 1000 / 60
+            val hrs = mins / 60
+            val remMins = mins % 60
+            if (hrs > 0) "${hrs}h ${remMins}m" else "${remMins}m"
+        }
     }
 
     // Average daily SOT
@@ -223,10 +228,10 @@ fun SotDetailScreen(
                                 modifier = Modifier.weight(1f).border(1.dp, colors.borderColor, RoundedCornerShape(16.dp))
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("SCREEN OFF DRAIN", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
+                                    Text("SCREEN OFF TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
                                     Spacer(modifier = Modifier.height(6.dp))
-                                    Text(screenOffDrainFormatted, fontSize = 18.sp, color = colors.accentOrange, fontWeight = FontWeight.Bold)
-                                    Text("Background drain", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
+                                    Text(screenOffTimeFormatted, fontSize = 18.sp, color = colors.accentOrange, fontWeight = FontWeight.Bold)
+                                    Text("Time in background", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
                                 }
                             }
                         }

@@ -29,7 +29,9 @@ import androidx.compose.ui.unit.sp
 import com.example.prostats.data.SystemMonitor
 import com.example.prostats.service.OverlayService
 import com.example.prostats.theme.ProStatsColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,9 +58,15 @@ fun SettingsScreen(
     // Auto-refresh Shizuku status every 3s
     LaunchedEffect(Unit) {
         while (true) {
-            isShizukuRunning = systemMonitor.isShizukuRunning()
-            hasShizukuPerm = systemMonitor.hasShizukuPermission()
-            hasUsageAccess = systemMonitor.hasUsageStatsPermission()
+            withContext(Dispatchers.IO) {
+                val shizRunning = systemMonitor.isShizukuRunning()
+                val shizPerm = systemMonitor.hasShizukuPermission()
+                val usageAccess = systemMonitor.hasUsageStatsPermission()
+                
+                isShizukuRunning = shizRunning
+                hasShizukuPerm = shizPerm
+                hasUsageAccess = usageAccess
+            }
             canDrawOverlay = Settings.canDrawOverlays(context)
             delay(3000)
         }

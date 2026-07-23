@@ -52,7 +52,7 @@ object BatteryTracker {
         try {
             val now = System.currentTimeMillis()
             val level = getBatteryPctNow(context)
-            val sotToday = getSotNow(context)
+            val sotToday = getSotSinceLastCharge(context)
 
             val points = loadHistory(context).toMutableList()
             
@@ -177,10 +177,10 @@ object BatteryTracker {
         return if (level >= 0 && scale > 0) (level * 100) / scale else 50
     }
 
-    private fun getSotNow(context: Context): Long {
+    private fun getSotSinceLastCharge(context: Context): Long {
         return try {
             val systemMonitor = SystemMonitor(context)
-            systemMonitor.getScreenOnTimeMs()
+            systemMonitor.getScreenOnTimeSinceLastChargeMs()
         } catch (e: Exception) {
             0L
         }

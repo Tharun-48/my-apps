@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.prostats.data.*
 import com.example.prostats.theme.ProStatsColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SystemInfoScreen() {
@@ -60,16 +62,29 @@ fun SystemInfoScreen() {
     }
 
     LaunchedEffect(Unit) {
-        deviceInfo = hardwareMonitor.getDeviceInfo()
-        cpuInfo = hardwareMonitor.getCpuInfo()
-        batteryInfo = hardwareMonitor.getBatteryInfo()
-        displayInfo = hardwareMonitor.getDisplayInfo()
-        cameraInfo = hardwareMonitor.getCameraInfo()
-        sensorInfoList = hardwareMonitor.getSensorInfo()
-        gpuInfo = systemMonitor.getGpuInfo()
-        networkInfo = systemMonitor.getNetworkInfo()
-        storageInfo = systemMonitor.getStorageInfo()
-        memoryDetail = systemMonitor.getMemoryDetailInfo()
+        withContext(Dispatchers.IO) {
+            val dInfo = hardwareMonitor.getDeviceInfo()
+            val cInfo = hardwareMonitor.getCpuInfo()
+            val bInfo = hardwareMonitor.getBatteryInfo()
+            val dispInfo = hardwareMonitor.getDisplayInfo()
+            val camInfo = hardwareMonitor.getCameraInfo()
+            val sInfoList = hardwareMonitor.getSensorInfo()
+            val gInfo = systemMonitor.getGpuInfo()
+            val nInfo = systemMonitor.getNetworkInfo()
+            val stInfo = systemMonitor.getStorageInfo()
+            val memInfo = systemMonitor.getMemoryDetailInfo()
+            
+            deviceInfo = dInfo
+            cpuInfo = cInfo
+            batteryInfo = bInfo
+            displayInfo = dispInfo
+            cameraInfo = camInfo
+            sensorInfoList = sInfoList
+            gpuInfo = gInfo
+            networkInfo = nInfo
+            storageInfo = stInfo
+            memoryDetail = memInfo
+        }
     }
 
     LazyColumn(

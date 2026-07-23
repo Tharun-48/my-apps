@@ -359,6 +359,15 @@ class SystemMonitor(private val context: Context) {
         return getScreenOnTimeMs(lastUnplugTs, System.currentTimeMillis())
     }
 
+    fun getScreenOffTimeSinceLastChargeMs(): Long {
+        val lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
+        if (lastUnplugTs == 0L) return 0L
+        val now = System.currentTimeMillis()
+        val elapsed = (now - lastUnplugTs).coerceAtLeast(0L)
+        val sotMs = getScreenOnTimeMs(lastUnplugTs, now)
+        return (elapsed - sotMs).coerceAtLeast(0L)
+    }
+
     /** Returns battery % that drained while screen was OFF since charger unplugged from >=90%. */
     fun getScreenOffBatteryDrainPct(): Float {
         val lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)

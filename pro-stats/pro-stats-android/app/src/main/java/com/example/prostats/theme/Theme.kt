@@ -1,5 +1,6 @@
 package com.example.prostats.theme
 
+import android.content.SharedPreferences
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -9,10 +10,11 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -112,8 +114,23 @@ fun ProStatsTheme(
   content: @Composable () -> Unit,
 ) {
   val context = LocalContext.current
-  val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
-  val themePref = prefs.getString("app_theme", "Material You") ?: "Material You"
+
+  // Reactively observe the theme preference so Compose recomposes on change
+  val prefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
+  var themePref by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
+
+  // Register a SharedPreferences listener to update state on any theme change
+  DisposableEffect(prefs) {
+    val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+      if (key == "app_theme") {
+        themePref = prefs.getString("app_theme", "Material You") ?: "Material You"
+      }
+    }
+    prefs.registerOnSharedPreferenceChangeListener(listener)
+    onDispose {
+      prefs.unregisterOnSharedPreferenceChangeListener(listener)
+    }
+  }
 
   val isDark = when (themePref) {
       "Light" -> false

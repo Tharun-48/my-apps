@@ -25,7 +25,9 @@ import com.example.prostats.data.BatteryHealthData
 import com.example.prostats.data.SystemMonitor
 import com.example.prostats.data.BatteryInfo
 import com.example.prostats.theme.ProStatsColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 
@@ -159,17 +161,19 @@ fun DashboardContent(
     // Live update loop for CPU, RAM, Battery, and Health data
     LaunchedEffect(Unit) {
         while (true) {
-            cpuUsage = systemMonitor.getSystemCpuUsage()
-            val ramInfo = systemMonitor.getRamInfo()
-            ramUsedGb = ramInfo.usedGb
-            ramTotalGb = ramInfo.totalGb
-            batteryInfo = systemMonitor.getBatteryInfo()
-            thermalStatus = systemMonitor.getThermalStatus()
-            coreFreqs = systemMonitor.getCpuCoreFrequencies()
-            cpuTemp = systemMonitor.getCpuTemperature()
-            batteryTemp = systemMonitor.getBatteryTemperature()
-            sotMs = systemMonitor.getScreenOnTimeSinceLastChargeMs()
-            healthData = BatteryHealthEstimator.getHealthData(context)
+            withContext(Dispatchers.IO) {
+                cpuUsage = systemMonitor.getSystemCpuUsage()
+                val ramInfo = systemMonitor.getRamInfo()
+                ramUsedGb = ramInfo.usedGb
+                ramTotalGb = ramInfo.totalGb
+                batteryInfo = systemMonitor.getBatteryInfo()
+                thermalStatus = systemMonitor.getThermalStatus()
+                coreFreqs = systemMonitor.getCpuCoreFrequencies()
+                cpuTemp = systemMonitor.getCpuTemperature()
+                batteryTemp = systemMonitor.getBatteryTemperature()
+                sotMs = systemMonitor.getScreenOnTimeSinceLastChargeMs()
+                healthData = BatteryHealthEstimator.getHealthData(context)
+            }
             delay(1500)
         }
     }
