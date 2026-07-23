@@ -180,10 +180,11 @@ fun SettingsScreen(
                                     systemMonitor.requestShizukuPermission()
                                 } else if (!isShizukuRunning) {
                                     try {
-                                        val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+                                        val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.manager")
                                         if (launchIntent != null) {
                                             context.startActivity(launchIntent)
                                         } else {
+                                            // Fallback to website if Shizuku manager not installed
                                             val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app"))
                                             context.startActivity(webIntent)
                                         }
