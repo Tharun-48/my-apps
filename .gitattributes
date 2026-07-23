@@ -1,0 +1,11 @@
+# Mark binary files so Git never corrupts them with CRLF conversion
+*.apk binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.jar binary
+*.aar binary
+*.keystore binary
