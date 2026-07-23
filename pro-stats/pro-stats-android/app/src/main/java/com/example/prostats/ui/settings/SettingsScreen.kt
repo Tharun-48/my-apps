@@ -11,7 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Lock
@@ -32,6 +32,7 @@ import com.example.prostats.theme.ProStatsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import rikka.shizuku.Shizuku
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,20 +56,79 @@ fun SettingsScreen(
     val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
     var currentTheme by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
 
-    // Auto-refresh Shizuku status every 3s
+    var latestVersion by remember { mutableStateOf<String?>(null) }
+    var updateAvailable by remember { mutableStateOf(false) }
+
+    // Auto-refresh Usage/Overlay status every 3s
     LaunchedEffect(Unit) {
         while (true) {
             withContext(Dispatchers.IO) {
-                val shizRunning = systemMonitor.isShizukuRunning()
-                val shizPerm = systemMonitor.hasShizukuPermission()
                 val usageAccess = systemMonitor.hasUsageStatsPermission()
-                
-                isShizukuRunning = shizRunning
-                hasShizukuPerm = shizPerm
                 hasUsageAccess = usageAccess
             }
             canDrawOverlay = Settings.canDrawOverlays(context)
             delay(3000)
+        }
+    }
+
+    // Check for updates
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                val url = java.net.URL("https://api.github.com/repos/Tharun-48/my-apps/contents/pro-stats/releases")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                if (connection.responseCode == 200) {
+                    val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream))
+                    val response = reader.readText()
+                    val jsonArray = org.json.JSONArray(response)
+                    var maxVersionStr = "2.0"
+                    var maxVersionNum = 2.0f
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        val name = obj.getString("name") // e.g., ProStats-v2.1.apk
+                        if (name.endsWith(".apk") && name.contains("-v")) {
+                            val vStr = name.substringAfter("-v").substringBefore(".apk")
+                            val vNum = vStr.toFloatOrNull()
+                            if (vNum != null && vNum > maxVersionNum) {
+                                maxVersionNum = vNum
+                                maxVersionStr = vStr
+                            }
+                        }
+                    }
+                    if (maxVersionNum > 2.0f) {
+                        latestVersion = maxVersionStr
+                        updateAvailable = true
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("UpdateCheck", "Failed to check for updates", e)
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val binderReceivedListener = Shizuku.OnBinderReceivedListener {
+            isShizukuRunning = true
+            hasShizukuPerm = systemMonitor.hasShizukuPermission()
+        }
+        val binderDeadListener = Shizuku.OnBinderDeadListener {
+            isShizukuRunning = false
+            hasShizukuPerm = false
+        }
+        val permissionResultListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+            if (requestCode == 0) {
+                hasShizukuPerm = (grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED)
+            }
+        }
+        Shizuku.addBinderReceivedListener(binderReceivedListener)
+        Shizuku.addBinderDeadListener(binderDeadListener)
+        Shizuku.addRequestPermissionResultListener(permissionResultListener)
+        onDispose {
+            Shizuku.removeBinderReceivedListener(binderReceivedListener)
+            Shizuku.removeBinderDeadListener(binderDeadListener)
+            Shizuku.removeRequestPermissionResultListener(permissionResultListener)
         }
     }
 
@@ -92,7 +152,7 @@ fun SettingsScreen(
                 title = { Text("Settings & Overlays", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back", tint = colors.textPrimary)
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
@@ -200,7 +260,7 @@ fun SettingsScreen(
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text("Shizuku Service Not Running", color = colors.accentOrange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("Open Shizuku app to start the service via Wireless Debugging, ADB, or Root.", color = colors.textPrimary, fontSize = 12.sp)
+                                Text("Open Shizuku app to start the service via Wireless Debugging or ADB. If you don't have the app, download it below.", color = colors.textPrimary, fontSize = 12.sp)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -214,15 +274,26 @@ fun SettingsScreen(
                                             if (launchIntent != null) {
                                                 context.startActivity(launchIntent)
                                             } else {
-                                                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app"))
-                                                context.startActivity(webIntent)
+                                                android.widget.Toast.makeText(context, "Shizuku app not found on device.", android.widget.Toast.LENGTH_SHORT).show()
                                             }
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = colors.accentOrange, contentColor = Color.Black),
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        Text("Open Shizuku App", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        Text("Open App", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                    
+                                    Button(
+                                        onClick = {
+                                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app"))
+                                            context.startActivity(webIntent)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = colors.elevatedSurface, contentColor = colors.textPrimary),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Download App", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                     }
                                 }
                             }
@@ -231,7 +302,7 @@ fun SettingsScreen(
 
                     // Usage Access status
                     Spacer(modifier = Modifier.height(12.dp))
-                    Divider(color = colors.borderColor)
+                    HorizontalDivider(color = colors.borderColor)
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier
@@ -323,7 +394,7 @@ fun SettingsScreen(
                             )
                         }
                         if (theme != themes.last()) {
-                            Divider(color = colors.borderColor)
+                            HorizontalDivider(color = colors.borderColor)
                         }
                     }
                 }
@@ -339,7 +410,7 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.List, contentDescription = null, tint = colors.accentGreen)
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = colors.accentGreen)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("System Floating HUD Overlays", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
@@ -394,7 +465,7 @@ fun SettingsScreen(
                         }
                     )
 
-                    Divider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
 
                     OverlayToggleRow(
                         title = "Refresh Rate (Hz)",
@@ -407,7 +478,7 @@ fun SettingsScreen(
                         }
                     )
 
-                    Divider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
 
                     OverlayToggleRow(
                         title = "CPU Usage (%)",
@@ -420,7 +491,7 @@ fun SettingsScreen(
                         }
                     )
 
-                    Divider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
 
                     OverlayToggleRow(
                         title = "RAM Usage (%)",
@@ -457,6 +528,32 @@ fun SettingsScreen(
                         Text("Version", color = colors.textSecondary, fontSize = 14.sp)
                         Text("v2.0", color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
+                    
+                    if (updateAvailable && latestVersion != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = colors.accentGreen.copy(alpha = 0.15f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("New Update Available: v$latestVersion!", color = colors.accentGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Tharun-48/my-apps/raw/main/pro-stats/releases/ProStats-v$latestVersion.apk"))
+                                        context.startActivity(intent)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentGreen, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Download Update Now", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = {
