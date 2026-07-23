@@ -22,9 +22,10 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
                 val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
                 val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
                 val pct = if (level >= 0 && scale > 0) (level * 100) / scale else 0
-                if (pct >= 90) {
+                val targetResetLevel = BatteryTracker.getTargetResetBatteryLevel(context)
+                if (pct >= targetResetLevel) {
                     BatteryTracker.updateLastUnplugFromFullTimestamp(context)
-                    Log.d("BatteryTrackerReceiver", "Charger unplugged from full charge ($pct%)")
+                    Log.d("BatteryTrackerReceiver", "Charger unplugged from charge level ($pct% >= $targetResetLevel%)")
                 }
             }
             else -> {

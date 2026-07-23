@@ -126,10 +126,29 @@ object BatteryTracker {
         prefs.edit().putLong(KEY_LAST_FULL_CHARGE, timestamp).apply()
     }
 
-    /** Returns the timestamp when charger was last unplugged at >=90% charge. Returns 0L if never recorded. */
+    private const val KEY_RESET_BATTERY_LEVEL = "reset_battery_level_pct"
+
+    /** Returns target battery percentage (e.g. 90%) to trigger SOT reset on charger unplug. */
+    fun getTargetResetBatteryLevel(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getInt(KEY_RESET_BATTERY_LEVEL, 90)
+    }
+
+    fun setTargetResetBatteryLevel(context: Context, levelPct: Int) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putInt(KEY_RESET_BATTERY_LEVEL, levelPct.coerceIn(50, 100)).apply()
+    }
+
+    /** Returns the timestamp when charger was last unplugged at target charge level. Initializes to app install/launch time if 0. */
     fun getLastUnplugFromFullTimestamp(context: Context): Long {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getLong(KEY_LAST_UNPLUG_FROM_FULL, 0L)
+        var ts = prefs.getLong(KEY_LAST_UNPLUG_FROM_FULL, 0L)
+        if (ts == 0L) {
+            ts = System.currentTimeMillis()
+            prefs.edit().putLong(KEY_LAST_UNPLUG_FROM_FULL, ts).apply()
+            Log.d(TAG, "Initialized SOT baseline to app installation/first-launch time: $ts")
+        }
+        return ts
     }
 
     fun updateLastUnplugFromFullTimestamp(context: Context, timestamp: Long = System.currentTimeMillis()) {

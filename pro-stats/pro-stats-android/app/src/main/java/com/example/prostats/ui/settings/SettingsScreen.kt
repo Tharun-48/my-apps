@@ -156,7 +156,7 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Shizuku benefits explanation
+                    // Shizuku benefits explanation & Action buttons
                     if (isShizukuRunning && hasShizukuPerm) {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = colors.accentGreen.copy(alpha = 0.1f)),
@@ -170,28 +170,63 @@ fun SettingsScreen(
                                     color = colors.textPrimary, fontSize = 12.sp, lineHeight = 18.sp)
                             }
                         }
-                    } else {
-                        OverlayToggleRow(
-                            title = "Enable Shizuku",
-                            subtitle = "High-precision CPU metrics, force stop, wakelocks, dumpsys access",
-                            checked = isShizukuRunning && hasShizukuPerm,
-                            onCheckedChange = {
-                                if (it && isShizukuRunning && !hasShizukuPerm) {
-                                    systemMonitor.requestShizukuPermission()
-                                } else if (!isShizukuRunning) {
-                                    try {
-                                        val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.manager")
-                                        if (launchIntent != null) {
-                                            context.startActivity(launchIntent)
-                                        } else {
-                                            // Fallback to website if Shizuku manager not installed
-                                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app"))
-                                            context.startActivity(webIntent)
-                                        }
-                                    } catch (e: Exception) {}
+                    } else if (isShizukuRunning && !hasShizukuPerm) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = colors.accentYellow.copy(alpha = 0.12f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("Shizuku Running — Permission Needed", color = colors.accentYellow, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Shizuku service is running. Tap below to grant permission to ProStats.", color = colors.textPrimary, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = { systemMonitor.requestShizukuPermission() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentYellow, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Grant Shizuku Permission", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                             }
-                        )
+                        }
+                    } else {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = colors.accentOrange.copy(alpha = 0.12f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("Shizuku Service Not Running", color = colors.accentOrange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Open Shizuku app to start the service via Wireless Debugging, ADB, or Root.", color = colors.textPrimary, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            val pm = context.packageManager
+                                            val launchIntent = pm.getLaunchIntentForPackage("moe.shizuku.manager")
+                                                ?: pm.getLaunchIntentForPackage("rikka.shizuku.manager")
+                                            if (launchIntent != null) {
+                                                context.startActivity(launchIntent)
+                                            } else {
+                                                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app"))
+                                                context.startActivity(webIntent)
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = colors.accentOrange, contentColor = Color.Black),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Open Shizuku App", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Usage Access status

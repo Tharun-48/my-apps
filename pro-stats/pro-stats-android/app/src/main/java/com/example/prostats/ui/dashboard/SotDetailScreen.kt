@@ -43,9 +43,14 @@ fun SotDetailScreen(
     val context = LocalContext.current
     val colors = ProStatsColors.current
 
-    // Always since last unplug from full charge (>= 90%)
-    val lastUnplugTs = remember { BatteryTracker.getLastUnplugFromFullTimestamp(context) }
-    val hasData = lastUnplugTs > 0L
+    // Baseline timestamp (initialized to app install/first run, or last charge >= 90%)
+    var lastUnplugTs by remember { mutableLongStateOf(BatteryTracker.getLastUnplugFromFullTimestamp(context)) }
+    val hasData = true
+
+    val startDateFormatted = remember(lastUnplugTs) {
+        val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+        sdf.format(Date(lastUnplugTs))
+    }
 
     // Sort state for app list
     var appSort by remember { mutableStateOf("Time") } // Time | Battery | Name
@@ -186,13 +191,33 @@ fun SotDetailScreen(
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = "BATTERY CHARGE HISTORY — SINCE UNPLUGGED",
+                                    text = "BATTERY CHARGE HISTORY",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = colors.textSecondary,
                                     letterSpacing = 1.sp
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("Baseline: $startDateFormatted", fontSize = 12.sp, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                                        Text("Auto-resets on charger unplug at >= ${BatteryTracker.getTargetResetBatteryLevel(context)}%", fontSize = 10.sp, color = colors.textSecondary)
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            val now = System.currentTimeMillis()
+                                            BatteryTracker.updateLastUnplugFromFullTimestamp(context, now)
+                                            lastUnplugTs = now
+                                        }
+                                    ) {
+                                        Text("Reset Cycle", fontSize = 11.sp, color = colors.accentPurple, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
                                 BatteryGraph(
                                     points = points,
                                     modifier = Modifier
