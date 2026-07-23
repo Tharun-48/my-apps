@@ -13,24 +13,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.prostats.data.BatteryHealthEstimator
+import com.example.prostats.data.BatteryHealthData
 import com.example.prostats.data.SystemMonitor
 import com.example.prostats.data.BatteryInfo
+import com.example.prostats.theme.ProStatsColors
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
-
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
@@ -43,14 +45,15 @@ fun DashboardScreen(
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = ProStatsColors.current
     val pagerState = rememberPagerState(initialPage = 0) { 3 }
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         bottomBar = {
             NavigationBar(
-                containerColor = Color(0xFF121214),
-                contentColor = Color.White
+                containerColor = colors.navBarColor,
+                contentColor = colors.textPrimary
             ) {
                 NavigationBarItem(
                     selected = pagerState.currentPage == 0,
@@ -60,11 +63,11 @@ fun DashboardScreen(
                     icon = { Icon(Icons.Default.Home, contentDescription = "Dashboard") },
                     label = { Text("Dashboard", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF4ADE80),
-                        selectedTextColor = Color(0xFF4ADE80),
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray,
-                        indicatorColor = Color(0x224ADE80)
+                        selectedIconColor = colors.accentGreen,
+                        selectedTextColor = colors.accentGreen,
+                        unselectedIconColor = colors.textSecondary,
+                        unselectedTextColor = colors.textSecondary,
+                        indicatorColor = colors.accentGreen.copy(alpha = 0.13f)
                     )
                 )
                 NavigationBarItem(
@@ -75,11 +78,11 @@ fun DashboardScreen(
                     icon = { Icon(Icons.Default.Info, contentDescription = "System Info") },
                     label = { Text("System Info", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF4ADE80),
-                        selectedTextColor = Color(0xFF4ADE80),
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray,
-                        indicatorColor = Color(0x224ADE80)
+                        selectedIconColor = colors.accentGreen,
+                        selectedTextColor = colors.accentGreen,
+                        unselectedIconColor = colors.textSecondary,
+                        unselectedTextColor = colors.textSecondary,
+                        indicatorColor = colors.accentGreen.copy(alpha = 0.13f)
                     )
                 )
                 NavigationBarItem(
@@ -90,16 +93,16 @@ fun DashboardScreen(
                     icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
                     label = { Text("Settings", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF4ADE80),
-                        selectedTextColor = Color(0xFF4ADE80),
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray,
-                        indicatorColor = Color(0x224ADE80)
+                        selectedIconColor = colors.accentGreen,
+                        selectedTextColor = colors.accentGreen,
+                        unselectedIconColor = colors.textSecondary,
+                        unselectedTextColor = colors.textSecondary,
+                        indicatorColor = colors.accentGreen.copy(alpha = 0.13f)
                     )
                 )
             }
         },
-        containerColor = Color(0xFF0A0A0C),
+        containerColor = colors.background,
         modifier = modifier
     ) { innerPadding ->
         HorizontalPager(
@@ -138,6 +141,8 @@ fun DashboardContent(
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = ProStatsColors.current
+    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     
     var sotMs by remember { mutableStateOf(0L) }
@@ -149,8 +154,9 @@ fun DashboardContent(
     var batteryInfo by remember { mutableStateOf(BatteryInfo(0, "Good", 0f, "Li-ion", 0, "Idle")) }
     var thermalStatus by remember { mutableStateOf("Normal") }
     var coreFreqs by remember { mutableStateOf<List<Long>>(emptyList()) }
+    var healthData by remember { mutableStateOf<BatteryHealthData?>(null) }
 
-    // Live update loop for CPU, RAM, and Battery Currents/Temps
+    // Live update loop for CPU, RAM, Battery, and Health data
     LaunchedEffect(Unit) {
         while (true) {
             cpuUsage = systemMonitor.getSystemCpuUsage()
@@ -163,6 +169,7 @@ fun DashboardContent(
             cpuTemp = systemMonitor.getCpuTemperature()
             batteryTemp = systemMonitor.getBatteryTemperature()
             sotMs = systemMonitor.getScreenOnTimeSinceLastChargeMs()
+            healthData = BatteryHealthEstimator.getHealthData(context)
             delay(1500)
         }
     }
@@ -185,35 +192,37 @@ fun DashboardContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ProStats - System Dashboard", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("ProStats - System Dashboard", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
                 actions = {
                     IconButton(onClick = onNavigateToSettings) {
-                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings", tint = colors.textPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0C))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
             )
         },
-        containerColor = Color(0xFF0A0A0C),
+        containerColor = colors.background,
         modifier = modifier
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFF0A0A0C))
+                .background(colors.background)
         ) {
-            // Glows
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(Color(0x1A4ADE80), Color.Transparent),
-                            radius = 900f
+            // Glows — only on dark themes
+            if (colors.isDark) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(colors.accentGreen.copy(alpha = 0.1f), Color.Transparent),
+                                radius = 900f
+                            )
                         )
-                    )
-            )
+                )
+            }
 
             Column(
                 modifier = Modifier
@@ -238,15 +247,15 @@ fun DashboardContent(
                         title = "SCREEN-ON TIME",
                         value = "${sotHours}h ${sotMins}m",
                         subValue = "Since Last Charge",
-                        color = Color(0xFFA78BFA),
+                        color = colors.accentPurple,
                         onClick = onNavigateToSotDetail,
                         modifier = Modifier.weight(1f)
                     )
 
                     val tempColor = when {
                         batteryTemp >= 45f -> Color.Red
-                        batteryTemp >= 38f -> Color(0xFFFB923C)
-                        else -> Color(0xFF4ADE80)
+                        batteryTemp >= 38f -> colors.accentOrange
+                        else -> colors.accentGreen
                     }
                     DashboardCard(
                         title = "BATTERY TEMPERATURE",
@@ -257,20 +266,123 @@ fun DashboardContent(
                     )
                 }
 
+                // Section 1b: Battery Health Score Card (NEW — Battery Guru inspired)
+                healthData?.let { hd ->
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Text(
+                                text = "BATTERY HEALTH",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textSecondary,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    val healthColor = when {
+                                        hd.healthScore >= 80 -> colors.accentGreen
+                                        hd.healthScore >= 50 -> colors.accentYellow
+                                        else -> Color.Red
+                                    }
+                                    Text(
+                                        text = "${hd.healthScore}%",
+                                        fontSize = 32.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = healthColor
+                                    )
+                                    Text(
+                                        text = "Health Score",
+                                        fontSize = 12.sp,
+                                        color = colors.textSecondary
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("Cycles: ${hd.chargeCycles}", fontSize = 13.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
+                                    Text("Capacity: ${hd.currentCapacityMah}/${hd.designCapacityMah} mAh", fontSize = 11.sp, color = colors.textSecondary)
+                                    if (hd.avgDailySotMs > 0) {
+                                        val avgSotMins = hd.avgDailySotMs / 1000 / 60
+                                        val avgSotH = avgSotMins / 60
+                                        val avgSotM = avgSotMins % 60
+                                        Text("Avg Daily SOT: ${avgSotH}h ${avgSotM}m", fontSize = 11.sp, color = colors.textSecondary)
+                                    }
+                                }
+                            }
+                            // Charge/Discharge info
+                            Spacer(modifier = Modifier.height(12.dp))
+                            if (batteryInfo.status == "Charging" && hd.chargeSpeedMa > 0) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "⚡ Charging at ${hd.chargeSpeedMa} mA (${String.format("%.1f", hd.chargeSpeedWatts)}W)",
+                                        fontSize = 12.sp,
+                                        color = colors.accentGreen,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                if (hd.estimatedTimeToFull > 0) {
+                                    val minsToFull = hd.estimatedTimeToFull / 1000 / 60
+                                    val hrsToFull = minsToFull / 60
+                                    val remMins = minsToFull % 60
+                                    Text(
+                                        text = "~${hrsToFull}h ${remMins}m to full",
+                                        fontSize = 11.sp,
+                                        color = colors.textSecondary
+                                    )
+                                }
+                            } else if (hd.estimatedBatteryLife > 0) {
+                                val minsLeft = hd.estimatedBatteryLife / 1000 / 60
+                                val hrsLeft = minsLeft / 60
+                                val remMins = minsLeft % 60
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Est. Battery Life: ${hrsLeft}h ${remMins}m",
+                                        fontSize = 12.sp,
+                                        color = colors.accentOrange,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    if (hd.dischargeRatePctPerHour > 0) {
+                                        Text(
+                                            text = "${String.format("%.1f", hd.dischargeRatePctPerHour)}%/hr",
+                                            fontSize = 12.sp,
+                                            color = colors.textSecondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Section 2: Battery Diagnostics Card
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                    colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, Color(0x1BFFFFFF), RoundedCornerShape(20.dp))
+                        .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text(
                             text = "BATTERY DIAGNOSTICS",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Gray,
+                            color = colors.textSecondary,
                             letterSpacing = 1.sp
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -279,23 +391,23 @@ fun DashboardContent(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {
-                                Text("Health: ${batteryInfo.health}", fontSize = 14.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
-                                Text("Voltage: ${String.format("%.2f", batteryInfo.voltageV)} V", fontSize = 12.sp, color = Color.Gray)
+                                Text("Health: ${batteryInfo.health}", fontSize = 14.sp, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                                Text("Voltage: ${String.format("%.2f", batteryInfo.voltageV)} V", fontSize = 12.sp, color = colors.textSecondary)
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 val currentText = if (batteryInfo.currentMa < 0) "${batteryInfo.currentMa} mA" else "+${batteryInfo.currentMa} mA"
                                 val wattText = if (batteryInfo.currentMa < 0) "-${String.format("%.2f", batteryInfo.watts)} W" else "+${String.format("%.2f", batteryInfo.watts)} W"
-                                val currentTextColor = if (batteryInfo.currentMa < 0) Color(0xFFFB923C) else Color(0xFF4ADE80)
+                                val currentTextColor = if (batteryInfo.currentMa < 0) colors.accentOrange else colors.accentGreen
                                 Text(currentText, fontSize = 14.sp, color = currentTextColor, fontWeight = FontWeight.SemiBold)
-                                Text("Power: $wattText", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Medium)
-                                Text("Status: ${batteryInfo.status} (${batteryInfo.technology})", fontSize = 12.sp, color = Color.Gray)
+                                Text("Power: $wattText", fontSize = 12.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
+                                Text("Status: ${batteryInfo.status} (${batteryInfo.technology})", fontSize = 12.sp, color = colors.textSecondary)
                             }
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = "System Thermal State: $thermalStatus",
                             fontSize = 12.sp,
-                            color = if (thermalStatus != "Normal") Color.Red else Color.Gray,
+                            color = if (thermalStatus != "Normal") Color.Red else colors.textSecondary,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -304,17 +416,17 @@ fun DashboardContent(
                 // Section 3: CPU Cores Monitor Card (DevCheck-inspired)
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                    colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, Color(0x1BFFFFFF), RoundedCornerShape(20.dp))
+                        .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text(
                             text = "CPU CLUSTER FREQUENCIES",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Gray,
+                            color = colors.textSecondary,
                             letterSpacing = 1.sp
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -329,19 +441,19 @@ fun DashboardContent(
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .background(Color(0xFF2C2C2E), RoundedCornerShape(10.dp))
-                                            .border(1.dp, Color(0x0FFFFFFF), RoundedCornerShape(10.dp))
+                                            .background(colors.elevatedSurface, RoundedCornerShape(10.dp))
+                                            .border(1.dp, colors.borderColor.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
                                             .padding(8.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text("Core $coreId", fontSize = 10.sp, color = Color.Gray)
+                                            Text("Core $coreId", fontSize = 10.sp, color = colors.textSecondary)
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text(
-                                                text = "$freq MHz",
+                                                text = if (freq > 0) "$freq MHz" else "—",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = Color.White
+                                                color = colors.textPrimary
                                             )
                                         }
                                     }
@@ -357,7 +469,7 @@ fun DashboardContent(
                     title = "SYSTEM CPU LOAD",
                     value = "${cpuUsage.toInt()}%",
                     progress = cpuUsage / 100f,
-                    color = Color(0xFF4ADE80)
+                    color = colors.accentGreen
                 )
 
                 // Section 5: System RAM allocation
@@ -366,7 +478,7 @@ fun DashboardContent(
                     title = "RAM ALLOCATION",
                     value = "${String.format("%.1f", ramUsedGb)} GB / ${String.format("%.1f", ramTotalGb)} GB",
                     progress = ramPercentage,
-                    color = Color(0xFFFB923C)
+                    color = colors.accentOrange
                 )
 
                 // Section 6: Main Navigation Button
@@ -374,8 +486,8 @@ fun DashboardContent(
                     onClick = onNavigateToProcesses,
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black
+                        containerColor = if (colors.isDark) Color.White else Color(0xFF1C1C1E),
+                        contentColor = if (colors.isDark) Color.Black else Color.White
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -404,33 +516,34 @@ fun DashboardCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
+    val colors = ProStatsColors.current
     if (onClick != null) {
         Card(
             onClick = onClick,
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-            modifier = modifier.border(1.dp, Color(0x1BFFFFFF), RoundedCornerShape(20.dp))
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            modifier = modifier.border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
+                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary, letterSpacing = 1.sp)
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = color)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(subValue, fontSize = 11.sp, color = Color.Gray)
+                Text(subValue, fontSize = 11.sp, color = colors.textSecondary)
             }
         }
     } else {
         Card(
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
-            modifier = modifier.border(1.dp, Color(0x1BFFFFFF), RoundedCornerShape(20.dp))
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            modifier = modifier.border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
+                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary, letterSpacing = 1.sp)
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = color)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(subValue, fontSize = 11.sp, color = Color.Gray)
+                Text(subValue, fontSize = 11.sp, color = colors.textSecondary)
             }
         }
     }
@@ -444,12 +557,13 @@ fun SystemLoadCard(
     color: Color,
     modifier: Modifier = Modifier
 ) {
+    val colors = ProStatsColors.current
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+        colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, Color(0x1BFFFFFF), RoundedCornerShape(20.dp))
+            .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
     ) {
         Column(
             modifier = Modifier.padding(20.dp)
@@ -459,14 +573,14 @@ fun SystemLoadCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray, letterSpacing = 1.sp)
-                Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary, letterSpacing = 1.sp)
+                Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
             }
             Spacer(modifier = Modifier.height(16.dp))
             LinearProgressIndicator(
                 progress = progress,
                 color = color,
-                trackColor = Color(0x22FFFFFF),
+                trackColor = if (colors.isDark) Color(0x22FFFFFF) else Color(0x22000000),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)

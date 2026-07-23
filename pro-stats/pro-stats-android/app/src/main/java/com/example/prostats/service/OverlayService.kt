@@ -167,23 +167,39 @@ class OverlayService : Service() {
         serviceScope.coroutineContext.cancelChildren()
         serviceScope.launch {
             while (isActive) {
-                if (isTempOn) {
-                    val batTemp = systemMonitor.getBatteryTemperature()
-                    txtTemp?.text = "${String.format("%.1f", batTemp)}°C"
-                }
-                if (isHzOn) {
+                // Perform heavy I/O reads off the main thread
+                val tempText = if (isTempOn) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val batTemp = systemMonitor.getBatteryTemperature()
+                        "${String.format("%.1f", batTemp)}°C"
+                    }
+                } else null
+
+                val hzText = if (isHzOn) {
                     val displayInfo = hardwareMonitor.getDisplayInfo()
-                    txtHz?.text = "${displayInfo.refreshRate.toInt()}Hz"
-                }
-                if (isCpuOn) {
-                    val cpu = systemMonitor.getSystemCpuUsage()
-                    txtCpu?.text = "CPU ${cpu.toInt()}%"
-                }
-                if (isRamOn) {
-                    val ram = systemMonitor.getRamInfo()
-                    val pct = if (ram.totalGb > 0) ((ram.usedGb / ram.totalGb) * 100).toInt() else 0
-                    txtRam?.text = "RAM $pct%"
-                }
+                    "${displayInfo.refreshRate.toInt()}Hz"
+                } else null
+
+                val cpuText = if (isCpuOn) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val cpu = systemMonitor.getSystemCpuUsage()
+                        "CPU ${cpu.toInt()}%"
+                    }
+                } else null
+
+                val ramText = if (isRamOn) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val ram = systemMonitor.getRamInfo()
+                        val pct = if (ram.totalGb > 0) ((ram.usedGb / ram.totalGb) * 100).toInt() else 0
+                        "RAM $pct%"
+                    }
+                } else null
+
+                // Update UI on main thread
+                tempText?.let { txtTemp?.text = it }
+                hzText?.let { txtHz?.text = it }
+                cpuText?.let { txtCpu?.text = it }
+                ramText?.let { txtRam?.text = it }
                 delay(1000)
             }
         }

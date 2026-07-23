@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.prostats.data.SystemMonitor
 import com.example.prostats.service.OverlayService
+import com.example.prostats.theme.ProStatsColors
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,9 +38,11 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = ProStatsColors.current
     val context = LocalContext.current
     var isShizukuRunning by remember { mutableStateOf(systemMonitor.isShizukuRunning()) }
     var hasShizukuPerm by remember { mutableStateOf(systemMonitor.hasShizukuPermission()) }
+    var hasUsageAccess by remember { mutableStateOf(systemMonitor.hasUsageStatsPermission()) }
     var canDrawOverlay by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
     var overlayTemp by remember { mutableStateOf(OverlayService.isTempEnabled(context)) }
@@ -49,10 +53,15 @@ fun SettingsScreen(
     val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
     var currentTheme by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
 
+    // Auto-refresh Shizuku status every 3s
     LaunchedEffect(Unit) {
-        isShizukuRunning = systemMonitor.isShizukuRunning()
-        hasShizukuPerm = systemMonitor.hasShizukuPermission()
-        canDrawOverlay = Settings.canDrawOverlays(context)
+        while (true) {
+            isShizukuRunning = systemMonitor.isShizukuRunning()
+            hasShizukuPerm = systemMonitor.hasShizukuPermission()
+            hasUsageAccess = systemMonitor.hasUsageStatsPermission()
+            canDrawOverlay = Settings.canDrawOverlays(context)
+            delay(3000)
+        }
     }
 
     fun updateOverlayService() {
@@ -72,23 +81,23 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings & Overlays", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("Settings & Overlays", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back", tint = colors.textPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0A0A0C))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
             )
         },
-        containerColor = Color(0xFF0A0A0C),
+        containerColor = colors.background,
         modifier = modifier
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFF0A0A0C))
+                .background(colors.background)
                 .padding(horizontal = 20.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -98,10 +107,10 @@ fun SettingsScreen(
             // Shizuku Service Integration Card
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(20.dp))
+                    .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(
@@ -110,9 +119,9 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Build, contentDescription = null, tint = Color(0xFFA78BFA))
+                            Icon(Icons.Default.Build, contentDescription = null, tint = colors.accentPurple)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Shizuku Status", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("Shizuku Status", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
 
                         val statusText = when {
@@ -121,9 +130,9 @@ fun SettingsScreen(
                             else -> "NOT RUNNING"
                         }
                         val statusColor = when {
-                            isShizukuRunning && hasShizukuPerm -> Color(0xFF4ADE80)
-                            isShizukuRunning -> Color(0xFFFBBF24)
-                            else -> Color(0xFFFB923C)
+                            isShizukuRunning && hasShizukuPerm -> colors.accentGreen
+                            isShizukuRunning -> colors.accentYellow
+                            else -> colors.accentOrange
                         }
 
                         Text(
@@ -138,42 +147,98 @@ fun SettingsScreen(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    OverlayToggleRow(
-                        title = "Enable Shizuku",
-                        subtitle = "High-precision top CPU load metrics",
-                        checked = isShizukuRunning && hasShizukuPerm,
-                        onCheckedChange = {
-                            if (it && isShizukuRunning && !hasShizukuPerm) {
-                                systemMonitor.requestShizukuPermission()
-                            } else if (!isShizukuRunning) {
-                                try {
-                                    val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
-                                    if (launchIntent != null) {
-                                        context.startActivity(launchIntent)
-                                    } else {
-                                        val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app"))
-                                        context.startActivity(webIntent)
-                                    }
-                                } catch (e: Exception) {}
+
+                    // Shizuku benefits explanation
+                    if (isShizukuRunning && hasShizukuPerm) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = colors.accentGreen.copy(alpha = 0.1f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("Pro Mode Active", color = colors.accentGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("• Real-time CPU & RAM per process via 'top'\n• Force stop & freeze apps via ADB\n• Enhanced battery stats via 'dumpsys'\n• Wakelock monitoring via 'dumpsys power'\n• More accurate battery drain estimation",
+                                    color = colors.textPrimary, fontSize = 12.sp, lineHeight = 18.sp)
                             }
                         }
-                    )
+                    } else {
+                        OverlayToggleRow(
+                            title = "Enable Shizuku",
+                            subtitle = "High-precision CPU metrics, force stop, wakelocks, dumpsys access",
+                            checked = isShizukuRunning && hasShizukuPerm,
+                            onCheckedChange = {
+                                if (it && isShizukuRunning && !hasShizukuPerm) {
+                                    systemMonitor.requestShizukuPermission()
+                                } else if (!isShizukuRunning) {
+                                    try {
+                                        val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+                                        if (launchIntent != null) {
+                                            context.startActivity(launchIntent)
+                                        } else {
+                                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app"))
+                                            context.startActivity(webIntent)
+                                        }
+                                    } catch (e: Exception) {}
+                                }
+                            }
+                        )
+                    }
+
+                    // Usage Access status
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Divider(color = colors.borderColor)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (!hasUsageAccess) systemMonitor.launchUsageAccessSettings()
+                            },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Usage Access", color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text(
+                                text = if (hasUsageAccess) "Granted — improves SOT and battery accuracy" 
+                                       else "Not granted — tap to enable for better accuracy",
+                                color = colors.textSecondary, fontSize = 11.sp
+                            )
+                            if (isShizukuRunning && hasShizukuPerm && hasUsageAccess) {
+                                Text(
+                                    text = "✓ Combined with Shizuku for maximum accuracy",
+                                    color = colors.accentGreen, fontSize = 11.sp
+                                )
+                            }
+                        }
+                        val accessColor = if (hasUsageAccess) colors.accentGreen else colors.accentOrange
+                        Text(
+                            text = if (hasUsageAccess) "GRANTED" else "GRANT",
+                            color = accessColor,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            modifier = Modifier
+                                .background(accessColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             }
 
             // App Theme Card
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(20.dp))
+                    .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF60A5FA))
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = colors.accentBlue)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("App Theme", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("App Theme", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     
@@ -190,18 +255,31 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(theme, color = Color.White, fontSize = 14.sp)
+                            Column {
+                                Text(theme, color = colors.textPrimary, fontSize = 14.sp)
+                                Text(
+                                    text = when (theme) {
+                                        "Material You" -> "Dynamic colors from your wallpaper"
+                                        "Light" -> "Bright backgrounds with dark text"
+                                        "Dark" -> "Dark backgrounds with light text"
+                                        "Pure Black (AMOLED)" -> "True black for OLED power savings"
+                                        else -> ""
+                                    },
+                                    color = colors.textSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
                             RadioButton(
                                 selected = currentTheme == theme,
                                 onClick = {
                                     currentTheme = theme
                                     prefs.edit().putString("app_theme", theme).apply()
                                 },
-                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF60A5FA), unselectedColor = Color.Gray)
+                                colors = RadioButtonDefaults.colors(selectedColor = colors.accentBlue, unselectedColor = colors.textSecondary)
                             )
                         }
                         if (theme != themes.last()) {
-                            Divider(color = Color(0x11FFFFFF))
+                            Divider(color = colors.borderColor)
                         }
                     }
                 }
@@ -210,22 +288,22 @@ fun SettingsScreen(
             // Floating Overlays Card
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(20.dp))
+                    .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.List, contentDescription = null, tint = Color(0xFF4ADE80))
+                        Icon(Icons.Default.List, contentDescription = null, tint = colors.accentGreen)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("System Floating HUD Overlays", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("System Floating HUD Overlays", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "Display live metrics overlay on top of any application on your screen.",
-                        color = Color.Gray,
+                        color = colors.textSecondary,
                         fontSize = 13.sp
                     )
 
@@ -233,14 +311,14 @@ fun SettingsScreen(
 
                     if (!canDrawOverlay) {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0x22FB923C)),
+                            colors = CardDefaults.cardColors(containerColor = colors.accentOrange.copy(alpha = 0.13f)),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Display Over Apps Permission Required", color = Color(0xFFFB923C), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text("Display Over Apps Permission Required", color = colors.accentOrange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("Grant overlay permission so ProStats can draw the HUD floating widget.", color = Color.White, fontSize = 12.sp)
+                                Text("Grant overlay permission so ProStats can draw the HUD floating widget.", color = colors.textPrimary, fontSize = 12.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
                                     onClick = {
@@ -250,7 +328,7 @@ fun SettingsScreen(
                                         )
                                         context.startActivity(intent)
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFB923C), contentColor = Color.Black),
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentOrange, contentColor = Color.Black),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text("Grant Overlay Permission", fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -272,7 +350,7 @@ fun SettingsScreen(
                         }
                     )
 
-                    Divider(color = Color(0x11FFFFFF), modifier = Modifier.padding(vertical = 8.dp))
+                    Divider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
 
                     OverlayToggleRow(
                         title = "Refresh Rate (Hz)",
@@ -285,7 +363,7 @@ fun SettingsScreen(
                         }
                     )
 
-                    Divider(color = Color(0x11FFFFFF), modifier = Modifier.padding(vertical = 8.dp))
+                    Divider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
 
                     OverlayToggleRow(
                         title = "CPU Usage (%)",
@@ -298,7 +376,7 @@ fun SettingsScreen(
                         }
                     )
 
-                    Divider(color = Color(0x11FFFFFF), modifier = Modifier.padding(vertical = 8.dp))
+                    Divider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
 
                     OverlayToggleRow(
                         title = "RAM Usage (%)",
@@ -316,32 +394,32 @@ fun SettingsScreen(
             // About & Updates
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, Color(0x11FFFFFF), RoundedCornerShape(20.dp))
+                    .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFFBBF24))
+                        Icon(Icons.Default.Info, contentDescription = null, tint = colors.accentYellow)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("About & Updates", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("About & Updates", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Version", color = Color.Gray, fontSize = 14.sp)
-                        Text("v1.5", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Version", color = colors.textSecondary, fontSize = 14.sp)
+                        Text("v2.0", color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Tharun-48/pro-stats-android/releases"))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Tharun-48/my-apps/tree/main/pro-stats/releases"))
                             context.startActivity(intent)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C2E), contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.elevatedSurface, contentColor = colors.textPrimary),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -362,6 +440,7 @@ fun OverlayToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val colors = ProStatsColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -370,17 +449,17 @@ fun OverlayToggleRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(subtitle, color = Color.Gray, fontSize = 11.sp)
+            Text(title, color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(subtitle, color = colors.textSecondary, fontSize = 11.sp)
         }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.Black,
-                checkedTrackColor = Color(0xFF4ADE80),
-                uncheckedThumbColor = Color.Gray,
-                uncheckedTrackColor = Color(0xFF2C2C2E)
+                checkedTrackColor = colors.accentGreen,
+                uncheckedThumbColor = colors.textSecondary,
+                uncheckedTrackColor = colors.elevatedSurface
             )
         )
     }

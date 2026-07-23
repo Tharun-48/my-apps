@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.prostats.data.ProcessItem
+import com.example.prostats.theme.ProStatsColors
 
 // Extension helper to convert Drawable to Bitmap for Compose
 fun Drawable.toBitmap(): Bitmap {
@@ -45,6 +46,7 @@ fun Drawable.toBitmap(): Bitmap {
 @Composable
 fun AppIcon(packageName: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val colors = ProStatsColors.current
     val iconBitmap = remember(packageName) {
         try {
             val pm = context.packageManager
@@ -63,12 +65,12 @@ fun AppIcon(packageName: String, modifier: Modifier = Modifier) {
         )
     } else {
         Box(
-            modifier = modifier.background(Color(0xFF2C2C2E), RoundedCornerShape(8.dp)),
+            modifier = modifier.background(colors.elevatedSurface, RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = packageName.take(2).uppercase(),
-                color = Color.White,
+                color = colors.textPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp
             )
@@ -85,6 +87,7 @@ fun MainScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = ProStatsColors.current
     var sortBy by remember { mutableStateOf("CPU") }
     
     val isShizuku = when (uiState) {
@@ -100,22 +103,22 @@ fun MainScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Running Processes", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("Running Processes", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = colors.textPrimary
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF0A0A0C)
+                    containerColor = colors.background
                 )
             )
         },
-        containerColor = Color(0xFF0A0A0C),
+        containerColor = colors.background,
         modifier = modifier
     ) { paddingValues ->
         Column(
@@ -126,7 +129,7 @@ fun MainScreen(
             when (uiState) {
                 MainScreenUiState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFF4ADE80))
+                        CircularProgressIndicator(color = colors.accentGreen)
                     }
                 }
                 is MainScreenUiState.Error -> {
@@ -134,7 +137,7 @@ fun MainScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.Warning, contentDescription = "Error", tint = Color.Red, modifier = Modifier.size(48.dp))
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("Failed to query processes: ${uiState.throwable.message}", color = Color.White)
+                            Text("Failed to query processes: ${uiState.throwable.message}", color = colors.textPrimary)
                         }
                     }
                 }
@@ -164,7 +167,7 @@ fun MainScreen(
 
                     if (sortedList.isEmpty()) {
                         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text("No processes running", color = Color.Gray)
+                            Text("No processes running", color = colors.textSecondary)
                         }
                     } else {
                         LazyColumn(
@@ -192,10 +195,11 @@ fun MainScreen(
 
 @Composable
 fun ModeBanner(isShizuku: Boolean) {
+    val colors = ProStatsColors.current
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isShizuku) Color(0xFF142B1B) else Color(0xFF2C1E14)
+            containerColor = if (isShizuku) colors.accentGreen.copy(alpha = 0.1f) else colors.accentOrange.copy(alpha = 0.1f)
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -208,20 +212,20 @@ fun ModeBanner(isShizuku: Boolean) {
             Icon(
                 imageVector = Icons.Default.Info,
                 contentDescription = "Mode info",
-                tint = if (isShizuku) Color(0xFF4ADE80) else Color(0xFFFB923C)
+                tint = if (isShizuku) colors.accentGreen else colors.accentOrange
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(
                     text = if (isShizuku) "Pro Mode Active (Shizuku)" else "Basic Mode Active (Usage Access)",
-                    color = if (isShizuku) Color(0xFF4ADE80) else Color(0xFFFB923C),
+                    color = if (isShizuku) colors.accentGreen else colors.accentOrange,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
                 Text(
                     text = if (isShizuku) "Displaying real-time CPU/RAM stats. System management commands enabled."
                     else "Real-time CPU/RAM is disabled. To upgrade to Pro Mode, set up Shizuku and relaunch.",
-                    color = Color.White,
+                    color = colors.textPrimary,
                     fontSize = 11.sp,
                     lineHeight = 15.sp
                 )
@@ -236,6 +240,7 @@ fun SortingHeader(
     selectedSort: String,
     onSortChange: (String) -> Unit
 ) {
+    val colors = ProStatsColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -255,13 +260,14 @@ fun SortingHeader(
 
 @Composable
 fun SortTab(title: String, active: Boolean, onClick: () -> Unit) {
+    val colors = ProStatsColors.current
     Button(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (active) Color(0xFF1F1F23) else Color.Transparent,
-            contentColor = if (active) Color(0xFF4ADE80) else Color.Gray
+            containerColor = if (active) colors.cardSurface else Color.Transparent,
+            contentColor = if (active) colors.accentGreen else colors.textSecondary
         ),
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (active) Color(0x334ADE80) else Color(0x11FFFFFF)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (active) colors.accentGreen.copy(alpha = 0.2f) else colors.borderColor),
         shape = RoundedCornerShape(10.dp),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
         modifier = Modifier.height(36.dp)
@@ -290,6 +296,7 @@ fun ProcessRow(
     onForceStop: (String) -> Unit,
     onFreeze: (String) -> Unit
 ) {
+    val colors = ProStatsColors.current
     var showDialog by remember { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { dismissValue ->
@@ -307,7 +314,7 @@ fun ProcessRow(
         backgroundContent = {
             val color = when (dismissState.targetValue) {
                 SwipeToDismissBoxValue.EndToStart -> Color(0xFFEF4444)
-                else -> Color(0xFF2C2C2E)
+                else -> colors.elevatedSurface
             }
             Box(
                 modifier = Modifier
@@ -321,7 +328,7 @@ fun ProcessRow(
                         onClick = {
                             onFreeze(item.packageName)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA78BFA), contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.accentPurple, contentColor = Color.White),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         modifier = Modifier.height(32.dp)
@@ -347,7 +354,7 @@ fun ProcessRow(
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF1C1C1E)
+                containerColor = colors.cardSurface
             ),
             modifier = Modifier
                 .fillMaxWidth()
@@ -364,7 +371,7 @@ fun ProcessRow(
                     packageName = item.packageName,
                     modifier = Modifier
                         .size(40.dp)
-                        .background(Color(0x11FFFFFF), RoundedCornerShape(10.dp))
+                        .background(colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(10.dp))
                 )
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -372,7 +379,7 @@ fun ProcessRow(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.name,
-                        color = Color.White,
+                        color = colors.textPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         maxLines = 1,
@@ -380,7 +387,7 @@ fun ProcessRow(
                     )
                     Text(
                         text = item.packageName,
-                        color = Color.Gray,
+                        color = colors.textSecondary,
                         fontSize = 11.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -394,27 +401,27 @@ fun ProcessRow(
                         "CPU" -> {
                             Text(
                                 text = "${item.cpuUsage}% CPU",
-                                color = if (item.cpuUsage > 15f) Color(0xFFFB923C) else Color(0xFF4ADE80),
+                                color = if (item.cpuUsage > 15f) colors.accentOrange else colors.accentGreen,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )
                             Text(
                                 text = "RAM: ${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
-                                color = Color.Gray,
+                                color = colors.textSecondary,
                                 fontSize = 11.sp
                             )
                         }
                         "RAM" -> {
                             Text(
                                 text = "${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
-                                color = Color(0xFFFB923C),
+                                color = colors.accentOrange,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )
                             if (item.isShizukuMode) {
                                 Text(
                                     text = "CPU: ${item.cpuUsage}%",
-                                    color = Color.Gray,
+                                    color = colors.textSecondary,
                                     fontSize = 11.sp
                                 )
                             }
@@ -429,27 +436,49 @@ fun ProcessRow(
                             }
                             Text(
                                 text = timeStr,
-                                color = Color(0xFFA78BFA),
+                                color = colors.accentPurple,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )
                             Text(
                                 text = String.format(java.util.Locale.US, "Drained: %.1f%%", item.batteryUsagePct),
-                                color = Color.Gray,
+                                color = colors.textSecondary,
                                 fontSize = 11.sp
                             )
+                        }
+                        "Name" -> {
+                            // Show drained battery % for Name sort too
+                            Text(
+                                text = String.format(java.util.Locale.US, "%.1f%%", item.batteryUsagePct),
+                                color = colors.accentPurple,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            if (item.isShizukuMode) {
+                                Text(
+                                    text = "CPU: ${item.cpuUsage}%",
+                                    color = colors.textSecondary,
+                                    fontSize = 11.sp
+                                )
+                            } else {
+                                Text(
+                                    text = "Battery drain",
+                                    color = colors.textSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                         else -> {
                             if (item.isShizukuMode) {
                                 Text(
                                     text = "${item.cpuUsage}% CPU",
-                                    color = if (item.cpuUsage > 15f) Color(0xFFFB923C) else Color(0xFF4ADE80),
+                                    color = if (item.cpuUsage > 15f) colors.accentOrange else colors.accentGreen,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
                                 Text(
                                     text = "RAM: ${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
-                                    color = Color.Gray,
+                                    color = colors.textSecondary,
                                     fontSize = 11.sp
                                 )
                             } else {
@@ -462,13 +491,13 @@ fun ProcessRow(
                                 }
                                 Text(
                                     text = timeStr,
-                                    color = Color(0xFFA78BFA),
+                                    color = colors.accentPurple,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
                                 Text(
                                     text = String.format(java.util.Locale.US, "Drained: %.1f%%", item.batteryUsagePct),
-                                    color = Color.Gray,
+                                    color = colors.textSecondary,
                                     fontSize = 11.sp
                                 )
                             }
@@ -501,7 +530,7 @@ fun ProcessRow(
                         showDialog = false
                     }
                 ) {
-                    Text("Freeze App", color = Color(0xFFA78BFA))
+                    Text("Freeze App", color = colors.accentPurple)
                 }
             }
         )

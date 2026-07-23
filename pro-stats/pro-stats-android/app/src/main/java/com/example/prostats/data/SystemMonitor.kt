@@ -8,9 +8,14 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
 import android.os.BatteryManager
+import android.os.Environment
 import android.os.PowerManager
 import android.os.Process
+import android.os.StatFs
 import android.provider.Settings
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +27,7 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
 import java.util.Calendar
+import java.util.concurrent.ConcurrentHashMap
 
 data class ProcessItem(
     val pid: Int,
@@ -54,7 +60,84 @@ data class AppBatteryUsage(
     val batteryUsagePct: Float
 )
 
+data class WakelockInfo(
+    val name: String,
+    val count: Int,
+    val totalDurationMs: Long
+)
+
+data class GpuInfo(
+    val renderer: String,
+    val vendor: String,
+    val maxFreqMhz: Long,
+    val currentFreqMhz: Long
+)
+
+data class NetworkInfo(
+    val connectionType: String,
+    val wifiSsid: String,
+    val wifiSignalStrength: Int,
+    val ipAddress: String,
+    val linkSpeedMbps: Int
+)
+
+data class StorageInfo(
+    val internalTotalGb: Float,
+    val internalUsedGb: Float,
+    val externalTotalGb: Float,
+    val externalUsedGb: Float
+)
+
+data class MemoryDetailInfo(
+    val totalRamMb: Long,
+    val availRamMb: Long,
+    val usedRamMb: Long,
+    val threshold: Long,
+    val lowMemory: Boolean,
+    val zramTotalMb: Long,
+    val zramUsedMb: Long,
+    val swapTotalMb: Long,
+    val swapUsedMb: Long
+)
+
 class SystemMonitor(private val context: Context) {
+
+    // Cached app name lookups to avoid repeated PackageManager queries
+    private val appNameCache = ConcurrentHashMap<String, String>()
+
+    private fun getAppName(packageName: String): String {
+        return appNameCache.getOrPut(packageName) {
+            try {
+                val pm = context.packageManager
+                val appInfo = pm.getApplicationInfo(packageName, 0)
+                pm.getApplicationLabel(appInfo).toString()
+            } catch (e: Exception) {
+                packageName
+            }
+        }
+    }
+
+    /** Reusable weight multiplier based on app category. Used for battery drain estimation. */
+    private fun getAppCategoryWeight(packageName: String): Float {
+        return try {
+            val pm = context.packageManager
+            val appInfo = pm.getApplicationInfo(packageName, 0)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                when (appInfo.category) {
+                    ApplicationInfo.CATEGORY_GAME -> 2.0f
+                    ApplicationInfo.CATEGORY_VIDEO -> 1.5f
+                    ApplicationInfo.CATEGORY_IMAGE -> 1.2f
+                    ApplicationInfo.CATEGORY_SOCIAL -> 1.1f
+                    ApplicationInfo.CATEGORY_AUDIO -> 0.8f
+                    else -> 1.0f
+                }
+            } else {
+                1.0f
+            }
+        } catch (e: Exception) {
+            1.0f
+        }
+    }
 
     // 1. Permission checks
     fun hasUsageStatsPermission(): Boolean {
@@ -276,7 +359,7 @@ class SystemMonitor(private val context: Context) {
         return getScreenOnTimeMs(lastUnplugTs, System.currentTimeMillis())
     }
 
-    /** Returns battery % that drained while screen was OFF since charger unplugged from 100%. */
+    /** Returns battery % that drained while screen was OFF since charger unplugged from >=90%. */
     fun getScreenOffBatteryDrainPct(): Float {
         val lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
         if (lastUnplugTs == 0L) return 0f
@@ -345,10 +428,9 @@ class SystemMonitor(private val context: Context) {
             }
         }
         if (freqs.isEmpty()) {
-            val baseFreqs = listOf(1800L, 2000L, 2400L)
+            // Return 0 for unknown rather than fake random values
             for (i in 0 until cores) {
-                val base = baseFreqs[i % baseFreqs.size]
-                freqs.add(base + ((-100..100).random()))
+                freqs.add(0L)
             }
         }
         return freqs
@@ -421,18 +503,26 @@ class SystemMonitor(private val context: Context) {
             }
             if (count > 0) {
                 val load = (sumRatio / count) * 100f
-                val jitter = (-3..3).random()
-                return (load + jitter).coerceIn(5f, 95f)
+                return load.coerceIn(0f, 100f)
             }
         } catch (e: Exception) {}
 
-        // Ultimate fallback: Dynamic fluctuation
-        val timeJitter = (System.currentTimeMillis() % 15).toFloat()
-        return (12f + timeJitter + (-2..2).random()).coerceIn(5f, 95f)
+        // Ultimate fallback: report 0 (unknown) instead of fake random data
+        return 0f
     }
 
     // Helper: calculate total battery discharged in period from logs or fallback
     fun getBatteryDischargedOverPeriod(startTime: Long, endTime: Long): Float {
+        // Try Shizuku-enhanced approach first for more accuracy
+        if (isShizukuRunning() && hasShizukuPermission()) {
+            try {
+                val discharged = getShizukuBatteryDischarged()
+                if (discharged > 0f) return discharged
+            } catch (e: Exception) {
+                Log.d("SystemMonitor", "Shizuku battery stats fallback", e)
+            }
+        }
+
         val points = BatteryTracker.getRawHistory(context)
             .filter { it.timestamp in startTime..endTime }
             .sortedBy { it.timestamp }
@@ -448,10 +538,31 @@ class SystemMonitor(private val context: Context) {
         }
         val totalSotMs = getScreenOnTimeMs(startTime, endTime)
         val totalSotHours = totalSotMs / (1000f * 60f * 60f)
-        return (totalSotHours * 12f).coerceIn(5f, 95f)
+        return (totalSotHours * 12f).coerceIn(1f, 95f)
     }
 
-    // Helper: App usage list with estimated battery usage
+    /** Uses Shizuku's dumpsys batterystats for more accurate battery discharge data */
+    private fun getShizukuBatteryDischarged(): Float {
+        val process = Shizuku.newProcess(arrayOf("dumpsys", "batterystats", "--charged"), null, null)
+        val reader = BufferedReader(InputStreamReader(process.inputStream))
+        var discharge = 0f
+        reader.useLines { lines ->
+            for (line in lines) {
+                val trimmed = line.trim()
+                // Look for "Discharge step" or total discharge percentage
+                if (trimmed.contains("Discharge amount:") || trimmed.contains("discharge:")) {
+                    val match = Regex("(\\d+\\.?\\d*)%?").find(trimmed.substringAfter(":"))
+                    match?.value?.replace("%", "")?.toFloatOrNull()?.let {
+                        discharge = it
+                    }
+                }
+            }
+        }
+        process.waitFor()
+        return discharge
+    }
+
+    // Helper: App usage list with estimated battery usage — normalized to 100%
     fun getAppBatteryUsageList(startTime: Long, endTime: Long): List<AppBatteryUsage> {
         val list = mutableListOf<AppBatteryUsage>()
         if (!hasUsageStatsPermission()) return list
@@ -459,32 +570,13 @@ class SystemMonitor(private val context: Context) {
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime) ?: return list
 
-        val pm = context.packageManager
-        val totalDischarged = getBatteryDischargedOverPeriod(startTime, endTime)
-
         val appUsageData = statsMap.values.filter { it.totalTimeInForeground > 0 }
         val weightedTimes = mutableMapOf<String, Float>()
         var totalWeightedTime = 0f
 
         appUsageData.forEach { stat ->
             val pkg = stat.packageName
-            val appInfo = try { pm.getApplicationInfo(pkg, 0) } catch (e: Exception) { null }
-            val weight = if (appInfo != null) {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    when (appInfo.category) {
-                        ApplicationInfo.CATEGORY_GAME -> 2.0f
-                        ApplicationInfo.CATEGORY_VIDEO -> 1.5f
-                        ApplicationInfo.CATEGORY_IMAGE -> 1.2f
-                        ApplicationInfo.CATEGORY_SOCIAL -> 1.1f
-                        ApplicationInfo.CATEGORY_AUDIO -> 0.8f
-                        else -> 1.0f
-                    }
-                } else {
-                    1.0f
-                }
-            } else {
-                1.0f
-            }
+            val weight = getAppCategoryWeight(pkg)
             val weightedTime = stat.totalTimeInForeground * weight
             weightedTimes[pkg] = weightedTime
             totalWeightedTime += weightedTime
@@ -492,16 +584,12 @@ class SystemMonitor(private val context: Context) {
 
         appUsageData.forEach { stat ->
             val pkg = stat.packageName
-            val appName = try {
-                val appInfo = pm.getApplicationInfo(pkg, 0)
-                pm.getApplicationLabel(appInfo).toString()
-            } catch (e: Exception) {
-                pkg
-            }
+            val appName = getAppName(pkg)
 
             val weightedTime = weightedTimes[pkg] ?: 0f
+            // Normalized to 100% — each app's share of total drain
             val batteryUsagePct = if (totalWeightedTime > 0) {
-                (weightedTime / totalWeightedTime) * totalDischarged
+                (weightedTime / totalWeightedTime) * 100f
             } else {
                 0f
             }
@@ -554,47 +642,23 @@ class SystemMonitor(private val context: Context) {
             .toList()
             .sortedByDescending { it.second.second } // Sort by last time used
 
-        val pm = context.packageManager
-        val totalSotMs = combinedStats.sumOf { it.second.first }
-        val totalDischarged = getBatteryDischargedOverPeriod(startTime, System.currentTimeMillis())
-
         val weightedTimes = mutableMapOf<String, Float>()
         var totalWeightedTime = 0f
 
         combinedStats.forEach { (packageName, pair) ->
-            val appInfo = try { pm.getApplicationInfo(packageName, 0) } catch (e: Exception) { null }
-            val weight = if (appInfo != null) {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    when (appInfo.category) {
-                        ApplicationInfo.CATEGORY_GAME -> 2.0f
-                        ApplicationInfo.CATEGORY_VIDEO -> 1.5f
-                        ApplicationInfo.CATEGORY_IMAGE -> 1.2f
-                        ApplicationInfo.CATEGORY_SOCIAL -> 1.1f
-                        ApplicationInfo.CATEGORY_AUDIO -> 0.8f
-                        else -> 1.0f
-                    }
-                } else {
-                    1.0f
-                }
-            } else {
-                1.0f
-            }
+            val weight = getAppCategoryWeight(packageName)
             val weightedTime = pair.first * weight
             weightedTimes[packageName] = weightedTime
             totalWeightedTime += weightedTime
         }
 
         combinedStats.forEachIndexed { index, (packageName, pair) ->
-            val appName = try {
-                val appInfo = pm.getApplicationInfo(packageName, 0)
-                pm.getApplicationLabel(appInfo).toString()
-            } catch (e: Exception) {
-                packageName
-            }
+            val appName = getAppName(packageName)
 
             val weightedTime = weightedTimes[packageName] ?: 0f
+            // Normalized: shows each app's share out of 100%
             val batteryPct = if (totalWeightedTime > 0) {
-                (weightedTime / totalWeightedTime) * totalDischarged
+                (weightedTime / totalWeightedTime) * 100f
             } else {
                 0f
             }
@@ -619,7 +683,6 @@ class SystemMonitor(private val context: Context) {
     // Pro mode using Shizuku
     private fun fetchProcessesViaShizuku(): List<ProcessItem> {
         val list = mutableListOf<ProcessItem>()
-        val pm = context.packageManager
         
         // Fetch SOT and Battery Estimation maps since last unplug from full
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -643,31 +706,11 @@ class SystemMonitor(private val context: Context) {
             }
             ?: emptyMap()
 
-        val totalSotMs = combinedStats.values.sumOf { it.first }
-        val totalDischarged = getBatteryDischargedOverPeriod(startTime, System.currentTimeMillis())
-
         val weightedTimes = mutableMapOf<String, Float>()
         var totalWeightedTime = 0f
         combinedStats.forEach { (packageName, pair) ->
-            val foregroundMs = pair.first
-            val appInfo = try { pm.getApplicationInfo(packageName, 0) } catch (e: Exception) { null }
-            val weight = if (appInfo != null) {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    when (appInfo.category) {
-                        ApplicationInfo.CATEGORY_GAME -> 2.0f
-                        ApplicationInfo.CATEGORY_VIDEO -> 1.5f
-                        ApplicationInfo.CATEGORY_IMAGE -> 1.2f
-                        ApplicationInfo.CATEGORY_SOCIAL -> 1.1f
-                        ApplicationInfo.CATEGORY_AUDIO -> 0.8f
-                        else -> 1.0f
-                    }
-                } else {
-                    1.0f
-                }
-            } else {
-                1.0f
-            }
-            val weightedTime = foregroundMs * weight
+            val weight = getAppCategoryWeight(packageName)
+            val weightedTime = pair.first * weight
             weightedTimes[packageName] = weightedTime
             totalWeightedTime += weightedTime
         }
@@ -711,12 +754,7 @@ class SystemMonitor(private val context: Context) {
                     if (name == "top") continue
 
                     val appName = if (name.contains(".")) {
-                        try {
-                            val appInfo = pm.getApplicationInfo(name, 0)
-                            pm.getApplicationLabel(appInfo).toString()
-                        } catch (e: Exception) {
-                            name
-                        }
+                        getAppName(name)
                     } else {
                         name
                     }
@@ -724,8 +762,9 @@ class SystemMonitor(private val context: Context) {
                     val sotMs = combinedStats[name]?.first ?: 0L
                     val lastTimeUsedMs = combinedStats[name]?.second ?: 0L
                     val weightedTime = weightedTimes[name] ?: 0f
+                    // Normalized: shows each app's share out of 100%
                     val batteryPct = if (totalWeightedTime > 0) {
-                        (weightedTime / totalWeightedTime) * totalDischarged
+                        (weightedTime / totalWeightedTime) * 100f
                     } else {
                         0f
                     }
@@ -765,39 +804,322 @@ class SystemMonitor(private val context: Context) {
         }
     }
 
-    // 5. Force Stop (via Shizuku)
-    fun forceStopApp(packageName: String): Boolean {
-        if (!isShizukuRunning() || !hasShizukuPermission()) return false
-        return try {
-            val process = Shizuku.newProcess(arrayOf("am", "force-stop", packageName), null, null)
-            process.waitFor() == 0
+    // 5. Force Stop
+    suspend fun forceStopApp(packageName: String): Boolean = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        var success = false
+        
+        // 1. Try standard ActivityManager killBackgroundProcesses
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            am.killBackgroundProcesses(packageName)
+            success = true
         } catch (e: Exception) {
-            Log.e("SystemMonitor", "Error force-stopping app", e)
-            false
+            Log.e("SystemMonitor", "killBackgroundProcesses failed for $packageName", e)
+        }
+
+        // 2. If Shizuku is running and granted, execute shell commands
+        if (isShizukuRunning() && hasShizukuPermission()) {
+            try {
+                val p1 = Shizuku.newProcess(arrayOf("am", "force-stop", packageName), null, null)
+                val exit1 = p1.waitFor()
+                
+                val p2 = Shizuku.newProcess(arrayOf("am", "force-stop", "--user", "0", packageName), null, null)
+                val exit2 = p2.waitFor()
+
+                val p3 = Shizuku.newProcess(arrayOf("pkill", "-f", packageName), null, null)
+                p3.waitFor()
+
+                if (exit1 == 0 || exit2 == 0) {
+                    success = true
+                }
+            } catch (e: Exception) {
+                Log.e("SystemMonitor", "Shizuku forceStopApp failed", e)
+            }
+        }
+
+        // 3. Fallback: if force stop couldn't be completed automatically, open App Settings page
+        if (!isShizukuRunning() || !hasShizukuPermission()) {
+            try {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.parse("package:$packageName")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+                success = true
+            } catch (e: Exception) {
+                Log.e("SystemMonitor", "Failed to launch app details settings for $packageName", e)
+            }
+        }
+
+        return@withContext success
+    }
+
+    // 6. Freeze App
+    suspend fun freezeApp(packageName: String): Boolean = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        if (isShizukuRunning() && hasShizukuPermission()) {
+            return@withContext try {
+                val p1 = Shizuku.newProcess(arrayOf("pm", "disable-user", "--user", "0", packageName), null, null)
+                val exit1 = p1.waitFor()
+                if (exit1 == 0) true else {
+                    val p2 = Shizuku.newProcess(arrayOf("pm", "disable", packageName), null, null)
+                    p2.waitFor() == 0
+                }
+            } catch (e: Exception) {
+                Log.e("SystemMonitor", "Error freezing app", e)
+                false
+            }
+        } else {
+            return@withContext try {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.parse("package:$packageName")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+                true
+            } catch (e: Exception) {
+                false
+            }
         }
     }
 
-    // 6. Freeze App (via Shizuku)
-    fun freezeApp(packageName: String): Boolean {
-        if (!isShizukuRunning() || !hasShizukuPermission()) return false
-        return try {
-            val process = Shizuku.newProcess(arrayOf("pm", "disable-user", packageName), null, null)
-            process.waitFor() == 0
-        } catch (e: Exception) {
-            Log.e("SystemMonitor", "Error freezing app", e)
-            false
-        }
-    }
-
-    // 7. Unfreeze App (via Shizuku)
-    fun unfreezeApp(packageName: String): Boolean {
-        if (!isShizukuRunning() || !hasShizukuPermission()) return false
-        return try {
+    // 7. Unfreeze App
+    suspend fun unfreezeApp(packageName: String): Boolean = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        if (!isShizukuRunning() || !hasShizukuPermission()) return@withContext false
+        return@withContext try {
             val process = Shizuku.newProcess(arrayOf("pm", "enable", packageName), null, null)
             process.waitFor() == 0
         } catch (e: Exception) {
             Log.e("SystemMonitor", "Error unfreezing app", e)
             false
         }
+    }
+
+    // ========== NEW FEATURES: Battery Guru / DevCheck Inspired ==========
+
+    /** Get wakelock info via Shizuku's dumpsys power */
+    fun getWakelockInfo(): List<WakelockInfo> {
+        if (!isShizukuRunning() || !hasShizukuPermission()) return emptyList()
+        val list = mutableListOf<WakelockInfo>()
+        try {
+            val process = Shizuku.newProcess(arrayOf("dumpsys", "power"), null, null)
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            var inWakeLockSection = false
+            reader.useLines { lines ->
+                for (line in lines) {
+                    val trimmed = line.trim()
+                    if (trimmed.startsWith("Wake Locks:")) {
+                        inWakeLockSection = true
+                        continue
+                    }
+                    if (inWakeLockSection) {
+                        if (trimmed.isBlank() || (!trimmed.startsWith("PARTIAL_WAKE_LOCK") && !trimmed.startsWith("FULL_WAKE_LOCK") && !trimmed.contains("WAKE_LOCK"))) {
+                            if (trimmed.isBlank() && list.isNotEmpty()) break
+                            // Try parsing wakelock lines
+                        }
+                        // Parse lines like: PARTIAL_WAKE_LOCK 'WakelockName' ON (uid=1000 pid=2345) count=5 duration=12345ms
+                        val nameMatch = Regex("'([^']+)'").find(trimmed)
+                        val countMatch = Regex("count=(\\d+)").find(trimmed)
+                        val durationMatch = Regex("duration=(\\d+)ms").find(trimmed)
+                        if (nameMatch != null) {
+                            list.add(WakelockInfo(
+                                name = nameMatch.groupValues[1],
+                                count = countMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0,
+                                totalDurationMs = durationMatch?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                            ))
+                        }
+                    }
+                    if (list.size >= 20) break // Cap at 20
+                }
+            }
+            process.waitFor()
+        } catch (e: Exception) {
+            Log.e("SystemMonitor", "Error getting wakelock info", e)
+        }
+        return list.sortedByDescending { it.totalDurationMs }
+    }
+
+    /** Get GPU info from sysfs or Shizuku */
+    fun getGpuInfo(): GpuInfo {
+        var renderer = "Unknown"
+        var vendor = "Unknown"
+        var maxFreqMhz = 0L
+        var currentFreqMhz = 0L
+
+        // Try Qualcomm Adreno path
+        val kgslDir = File("/sys/class/kgsl/kgsl-3d0/")
+        if (kgslDir.exists()) {
+            vendor = "Qualcomm Adreno"
+            try {
+                val maxFreqFile = File(kgslDir, "max_gpuclk")
+                val curFreqFile = File(kgslDir, "gpuclk")
+                if (maxFreqFile.exists()) maxFreqMhz = (maxFreqFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
+                if (curFreqFile.exists()) currentFreqMhz = (curFreqFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
+            } catch (e: Exception) {}
+        }
+
+        // Try Mali path
+        if (maxFreqMhz == 0L) {
+            val maliDir = File("/sys/devices/platform/").listFiles()?.find { it.name.contains("mali") || it.name.contains("gpu") }
+            if (maliDir != null) {
+                vendor = "ARM Mali"
+                try {
+                    val maxFreqFile = File(maliDir, "max_freq")
+                    val curFreqFile = File(maliDir, "cur_freq")
+                    if (maxFreqFile.exists()) maxFreqMhz = (maxFreqFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
+                    if (curFreqFile.exists()) currentFreqMhz = (curFreqFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
+                } catch (e: Exception) {}
+            }
+        }
+
+        // Try devfreq path (common for Mali/IMG)
+        if (maxFreqMhz == 0L) {
+            try {
+                val devfreqDir = File("/sys/class/devfreq/")
+                val gpuDev = devfreqDir.listFiles()?.find { it.name.contains("gpu") || it.name.contains("mali") || it.name.contains("13000000") }
+                if (gpuDev != null) {
+                    val maxFile = File(gpuDev, "max_freq")
+                    val curFile = File(gpuDev, "cur_freq")
+                    if (maxFile.exists()) maxFreqMhz = (maxFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
+                    if (curFile.exists()) currentFreqMhz = (curFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
+                    if (vendor == "Unknown") vendor = "GPU"
+                }
+            } catch (e: Exception) {}
+        }
+
+        // Try Shizuku dumpsys for renderer name
+        if (isShizukuRunning() && hasShizukuPermission()) {
+            try {
+                val process = Shizuku.newProcess(arrayOf("dumpsys", "SurfaceFlinger", "--list"), null, null)
+                val reader = BufferedReader(InputStreamReader(process.inputStream))
+                // Just confirm it's accessible; renderer info is limited from dumpsys
+                process.waitFor()
+            } catch (e: Exception) {}
+        }
+
+        renderer = vendor
+
+        return GpuInfo(renderer, vendor, maxFreqMhz, currentFreqMhz)
+    }
+
+    /** Get network connection details */
+    fun getNetworkInfo(): NetworkInfo {
+        var connectionType = "Disconnected"
+        var wifiSsid = ""
+        var signalStrength = 0
+        var ipAddress = ""
+        var linkSpeed = 0
+
+        try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = cm.activeNetwork
+            val capabilities = cm.getNetworkCapabilities(network)
+
+            if (capabilities != null) {
+                connectionType = when {
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH) -> "Bluetooth"
+                    else -> "Other"
+                }
+
+                if (connectionType == "Wi-Fi") {
+                    val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                    val wifiInfo = wifiManager.connectionInfo
+                    @Suppress("DEPRECATION")
+                    wifiSsid = wifiInfo.ssid?.replace("\"", "") ?: ""
+                    signalStrength = WifiManager.calculateSignalLevel(wifiInfo.rssi, 5)
+                    linkSpeed = wifiInfo.linkSpeed
+                    val ip = wifiInfo.ipAddress
+                    ipAddress = String.format(
+                        "%d.%d.%d.%d",
+                        ip and 0xff, ip shr 8 and 0xff, ip shr 16 and 0xff, ip shr 24 and 0xff
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("SystemMonitor", "Error getting network info", e)
+        }
+
+        return NetworkInfo(connectionType, wifiSsid, signalStrength, ipAddress, linkSpeed)
+    }
+
+    /** Get storage usage info */
+    fun getStorageInfo(): StorageInfo {
+        val internalStat = StatFs(Environment.getDataDirectory().path)
+        val internalTotal = internalStat.totalBytes / (1024f * 1024f * 1024f)
+        val internalFree = internalStat.availableBytes / (1024f * 1024f * 1024f)
+
+        var externalTotal = 0f
+        var externalFree = 0f
+        val externalDir = Environment.getExternalStorageDirectory()
+        if (externalDir.exists()) {
+            try {
+                val extStat = StatFs(externalDir.path)
+                externalTotal = extStat.totalBytes / (1024f * 1024f * 1024f)
+                externalFree = extStat.availableBytes / (1024f * 1024f * 1024f)
+            } catch (e: Exception) {}
+        }
+
+        return StorageInfo(
+            internalTotalGb = internalTotal,
+            internalUsedGb = internalTotal - internalFree,
+            externalTotalGb = externalTotal,
+            externalUsedGb = externalTotal - externalFree
+        )
+    }
+
+    /** Get detailed memory info including ZRAM and swap */
+    fun getMemoryDetailInfo(): MemoryDetailInfo {
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val memInfo = ActivityManager.MemoryInfo()
+        activityManager.getMemoryInfo(memInfo)
+
+        val totalRamMb = memInfo.totalMem / (1024L * 1024L)
+        val availRamMb = memInfo.availMem / (1024L * 1024L)
+        val usedRamMb = totalRamMb - availRamMb
+
+        var zramTotal = 0L
+        var zramUsed = 0L
+        var swapTotal = 0L
+        var swapUsed = 0L
+
+        try {
+            val memInfoFile = File("/proc/meminfo")
+            if (memInfoFile.exists()) {
+                memInfoFile.readLines().forEach { line ->
+                    when {
+                        line.startsWith("SwapTotal:") -> {
+                            swapTotal = line.replace(Regex("[^\\d]"), "").toLongOrNull() ?: 0L
+                            swapTotal /= 1024 // kB to MB
+                        }
+                        line.startsWith("SwapFree:") -> {
+                            val swapFree = line.replace(Regex("[^\\d]"), "").toLongOrNull() ?: 0L
+                            swapUsed = swapTotal - (swapFree / 1024)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+
+        // ZRAM info
+        try {
+            val zramSizeFile = File("/sys/block/zram0/disksize")
+            val zramUsedFile = File("/sys/block/zram0/mem_used_total")
+            if (zramSizeFile.exists()) zramTotal = (zramSizeFile.readText().trim().toLongOrNull() ?: 0L) / (1024L * 1024L)
+            if (zramUsedFile.exists()) zramUsed = (zramUsedFile.readText().trim().toLongOrNull() ?: 0L) / (1024L * 1024L)
+        } catch (e: Exception) {}
+
+        return MemoryDetailInfo(
+            totalRamMb = totalRamMb,
+            availRamMb = availRamMb,
+            usedRamMb = usedRamMb,
+            threshold = memInfo.threshold / (1024L * 1024L),
+            lowMemory = memInfo.lowMemory,
+            zramTotalMb = zramTotal,
+            zramUsedMb = zramUsed,
+            swapTotalMb = swapTotal,
+            swapUsedMb = swapUsed.coerceAtLeast(0)
+        )
     }
 }

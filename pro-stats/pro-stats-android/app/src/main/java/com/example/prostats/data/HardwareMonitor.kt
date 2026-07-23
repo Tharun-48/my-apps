@@ -62,43 +62,58 @@ data class SensorInfo(
 )
 
 class HardwareMonitor(private val context: Context) {
+
+    // Cached static info — these don't change at runtime
+    @Volatile private var cachedDeviceInfo: DeviceInfo? = null
+    @Volatile private var cachedCpuInfo: CpuInfo? = null
+    @Volatile private var cachedCameraInfo: CameraInfoData? = null
+    @Volatile private var cachedSensorInfo: List<SensorInfo>? = null
     
     fun getDeviceInfo(): DeviceInfo {
-        return DeviceInfo(
+        cachedDeviceInfo?.let { return it }
+        val info = DeviceInfo(
             manufacturer = Build.MANUFACTURER,
             model = Build.MODEL,
             board = Build.BOARD,
             hardware = Build.HARDWARE,
             androidVersion = Build.VERSION.RELEASE
         )
+        cachedDeviceInfo = info
+        return info
     }
 
-    suspend fun getCpuInfo(): CpuInfo = withContext(Dispatchers.IO) {
-        val arch = Build.SUPPORTED_ABIS.firstOrNull() ?: "Unknown"
-        val cores = Runtime.getRuntime().availableProcessors()
-        var maxFreq = 0.0
-        try {
-            // Check max frequency across ALL available CPU cores (cpu0 .. cpuN-1)
-            for (i in 0 until cores) {
-                for (path in listOf("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq", "/sys/devices/system/cpu/cpu$i/cpufreq/scaling_max_freq")) {
-                    val maxFreqFile = File(path)
-                    if (maxFreqFile.exists() && maxFreqFile.canRead()) {
-                        val freqKhz = maxFreqFile.readText().trim().toLongOrNull() ?: 0L
-                        val freqGhz = freqKhz / 1000000.0
-                        if (freqGhz > maxFreq) {
-                            maxFreq = freqGhz
+    suspend fun getCpuInfo(): CpuInfo {
+        cachedCpuInfo?.let { return it }
+        val info = withContext(Dispatchers.IO) {
+            val arch = Build.SUPPORTED_ABIS.firstOrNull() ?: "Unknown"
+            val cores = Runtime.getRuntime().availableProcessors()
+            var maxFreq = 0.0
+            try {
+                // Check max frequency across ALL available CPU cores (cpu0 .. cpuN-1)
+                for (i in 0 until cores) {
+                    for (path in listOf("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq", "/sys/devices/system/cpu/cpu$i/cpufreq/scaling_max_freq")) {
+                        val maxFreqFile = File(path)
+                        if (maxFreqFile.exists() && maxFreqFile.canRead()) {
+                            val freqKhz = maxFreqFile.readText().trim().toLongOrNull() ?: 0L
+                            val freqGhz = freqKhz / 1000000.0
+                            if (freqGhz > maxFreq) {
+                                maxFreq = freqGhz
+                            }
                         }
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+            if (maxFreq == 0.0) maxFreq = 2.84 // fallback standard SoC max frequency
+            CpuInfo(arch, cores, maxFreq)
         }
-        if (maxFreq == 0.0) maxFreq = 2.84 // fallback standard SoC max frequency
-        CpuInfo(arch, cores, maxFreq)
+        cachedCpuInfo = info
+        return info
     }
 
     fun getBatteryInfo(): HwBatteryInfo {
+        // Battery info is NOT cached — it changes in real-time
         val batteryStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let { ifilter ->
             context.registerReceiver(null, ifilter)
         }
@@ -123,7 +138,9 @@ class HardwareMonitor(private val context: Context) {
     fun getDisplayInfo(): DisplayInfo {
         val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val metrics = DisplayMetrics()
+        @Suppress("DEPRECATION")
         windowManager.defaultDisplay.getRealMetrics(metrics)
+        @Suppress("DEPRECATION")
         val refreshRate = windowManager.defaultDisplay.refreshRate
         return DisplayInfo(
             resolution = "${metrics.widthPixels} x ${metrics.heightPixels}",
@@ -133,6 +150,7 @@ class HardwareMonitor(private val context: Context) {
     }
 
     fun getCameraInfo(): CameraInfoData {
+        cachedCameraInfo?.let { return it }
         val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         var rearMp: Float? = null
         var frontMp: Float? = null
@@ -154,13 +172,16 @@ class HardwareMonitor(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        return CameraInfoData(rearMp, frontMp)
+        val info = CameraInfoData(rearMp, frontMp)
+        cachedCameraInfo = info
+        return info
     }
 
     fun getSensorInfo(): List<SensorInfo> {
+        cachedSensorInfo?.let { return it }
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val sensors = sensorManager.getSensorList(Sensor.TYPE_ALL)
-        return sensors.map { s ->
+        val info = sensors.map { s ->
             val typeStr = s.stringType ?: "Unknown"
             val unit = when (s.type) {
                 Sensor.TYPE_ACCELEROMETER, Sensor.TYPE_GRAVITY, Sensor.TYPE_LINEAR_ACCELERATION -> "m/s²"
@@ -195,17 +216,36 @@ class HardwareMonitor(private val context: Context) {
                 unit = unit
             )
         }
+        cachedSensorInfo = info
+        return info
     }
 }
 
 /**
  * Registers SensorEventListeners for all device sensors and maintains a map
  * of the latest sensor readings. Call [start] to begin listening and [stop] when done.
+ *
+ * FIX: Uses a versioned counter so callers can detect changes by comparing
+ * the version number, since the map reference itself would be the same object.
+ * The [getSnapshot] method returns a defensive copy for Compose state detection.
  */
 class SensorLiveReader(context: Context) : SensorEventListener {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val _readings = mutableMapOf<Int, FloatArray>()
-    val readings: Map<Int, FloatArray> get() = _readings
+
+    @Volatile
+    var version: Long = 0L
+        private set
+
+    /** Returns a snapshot copy of current readings. Creates a new map each call so Compose detects state change. */
+    fun getSnapshot(): Map<Int, FloatArray> {
+        synchronized(_readings) {
+            return _readings.mapValues { it.value.copyOf() }
+        }
+    }
+
+    // Legacy accessor — kept for compatibility but callers should prefer getSnapshot()
+    val readings: Map<Int, FloatArray> get() = getSnapshot()
 
     fun start() {
         val sensors = sensorManager.getSensorList(Sensor.TYPE_ALL)
@@ -219,9 +259,11 @@ class SensorLiveReader(context: Context) : SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent) {
-        _readings[event.sensor.type] = event.values.copyOf()
+        synchronized(_readings) {
+            _readings[event.sensor.type] = event.values.copyOf()
+        }
+        version++
     }
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
 }
-

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.prostats.data.SystemMonitor
+import com.example.prostats.theme.ProStatsColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +36,7 @@ fun OnboardingScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val colors = ProStatsColors.current
 
     var hasBatteryOptimizations by remember { mutableStateOf(false) }
     var hasUsageAccess by remember { mutableStateOf(false) }
@@ -62,19 +64,21 @@ fun OnboardingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A0C))
+            .background(colors.background)
     ) {
-        // Ambient background glow (Simulated with gradients)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(Color(0x254ADE80), Color.Transparent),
-                        radius = 800f
+        // Ambient background glow (only on dark themes)
+        if (colors.isDark) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(colors.accentGreen.copy(alpha = 0.15f), Color.Transparent),
+                            radius = 800f
+                        )
                     )
-                )
-        )
+            )
+        }
 
         Column(
             modifier = Modifier
@@ -88,7 +92,7 @@ fun OnboardingScreen(
             
             Text(
                 text = "STEP 2/3: CONFIGURE PRO STATS ACCESS",
-                color = Color(0xFFA0A0A5),
+                color = colors.textSecondary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 2.sp,
@@ -100,7 +104,7 @@ fun OnboardingScreen(
 
             Text(
                 text = "These permissions enable live process tracking, battery optimization analyses, and background statistics.",
-                color = Color.White,
+                color = colors.textPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Light,
                 lineHeight = 22.sp,
@@ -175,10 +179,10 @@ fun OnboardingScreen(
                 enabled = isReadyToStart,
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isReadyToStart) Color(0xFF4ADE80) else Color(0xFF1F1F23),
+                    containerColor = if (isReadyToStart) colors.accentGreen else colors.cardSurface,
                     contentColor = Color.Black,
-                    disabledContainerColor = Color(0xFF1F1F23),
-                    disabledContentColor = Color(0xFF5A5A60)
+                    disabledContainerColor = colors.cardSurface,
+                    disabledContentColor = colors.textSecondary
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -202,16 +206,17 @@ fun PermissionCard(
     isOptional: Boolean = false,
     onClick: () -> Unit
 ) {
+    val colors = ProStatsColors.current
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF1C1C1E)
+            containerColor = colors.cardSurface
         ),
         modifier = Modifier
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = if (isGranted) Color(0xFF4ADE80) else Color(0x33FFFFFF),
+                color = if (isGranted) colors.accentGreen else colors.borderColor,
                 shape = RoundedCornerShape(20.dp)
             )
             .clickable(onClick = onClick)
@@ -225,14 +230,14 @@ fun PermissionCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    color = if (isGranted) Color(0xFF4ADE80) else Color.White,
+                    color = if (isGranted) colors.accentGreen else colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = description,
-                    color = Color(0xFFA0A0A5),
+                    color = colors.textSecondary,
                     fontSize = 12.sp,
                     lineHeight = 16.sp
                 )
@@ -245,7 +250,7 @@ fun PermissionCard(
                 Box(
                     modifier = Modifier
                         .size(24.dp)
-                        .background(Color(0xFF4ADE80), RoundedCornerShape(12.dp)),
+                        .background(colors.accentGreen, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -258,13 +263,13 @@ fun PermissionCard(
             } else {
                 Text(
                     text = if (isOptional) "OPTIONAL" else "GRANT",
-                    color = if (isOptional) Color(0xFFA78BFA) else Color(0xFFFB923C),
+                    color = if (isOptional) colors.accentPurple else colors.accentOrange,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
                     modifier = Modifier
                         .border(
                             width = 1.dp,
-                            color = if (isOptional) Color(0xFFA78BFA) else Color(0xFFFB923C),
+                            color = if (isOptional) colors.accentPurple else colors.accentOrange,
                             shape = RoundedCornerShape(6.dp)
                         )
                         .padding(horizontal = 8.dp, vertical = 4.dp)

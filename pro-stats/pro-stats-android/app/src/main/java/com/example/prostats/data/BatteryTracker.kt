@@ -40,6 +40,13 @@ object BatteryTracker {
     private const val MAX_HISTORY_DAYS = 7
     private const val TAG = "BatteryTracker"
 
+    // In-memory cache to reduce file I/O
+    @Volatile
+    private var cachedHistory: List<HistoryPoint>? = null
+    @Volatile
+    private var cacheTimestamp: Long = 0L
+    private const val CACHE_TTL_MS = 5000L // 5 second cache
+
     @Synchronized
     fun recordDataPoint(context: Context) {
         try {
@@ -47,7 +54,7 @@ object BatteryTracker {
             val level = getBatteryPctNow(context)
             val sotToday = getSotNow(context)
 
-            val points = getRawHistory(context).toMutableList()
+            val points = loadHistory(context).toMutableList()
             
             // NOTE: charge-unplug tracking is handled by BatteryTrackerReceiver via ACTION_POWER_DISCONNECTED
 
@@ -57,7 +64,10 @@ object BatteryTracker {
             // Keep only last 7 days of history and sort
             val cutOff = now - (MAX_HISTORY_DAYS * 24 * 60 * 60 * 1000L)
             val filteredPoints = points.filter { it.timestamp >= cutOff && it.timestamp <= now }
-            saveHistory(context, filteredPoints.sortedBy { it.timestamp })
+            val sorted = filteredPoints.sortedBy { it.timestamp }
+            saveHistory(context, sorted)
+            cachedHistory = sorted
+            cacheTimestamp = now
             Log.d(TAG, "Recorded point: Battery=$level%, SOT=${sotToday / 1000 / 60}m")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to record data point", e)
@@ -66,26 +76,36 @@ object BatteryTracker {
 
     @Synchronized
     fun getRawHistory(context: Context): List<HistoryPoint> {
+        val now = System.currentTimeMillis()
+        // Return cached data if fresh
+        cachedHistory?.let { cached ->
+            if (now - cacheTimestamp < CACHE_TTL_MS) {
+                return cached
+            }
+        }
+        val history = loadHistory(context)
+        cachedHistory = history
+        cacheTimestamp = now
+        return history
+    }
+
+    private fun loadHistory(context: Context): List<HistoryPoint> {
         val file = File(context.filesDir, FILE_NAME)
         if (!file.exists()) {
-            return prePopulateHistory(context)
+            return emptyList()
         }
         return try {
             val text = file.readText()
-            if (text.isBlank()) return prePopulateHistory(context)
+            if (text.isBlank()) return emptyList()
             val array = JSONArray(text)
             val list = mutableListOf<HistoryPoint>()
             for (i in 0 until array.length()) {
                 list.add(HistoryPoint.fromJsonObject(array.getJSONObject(i)))
             }
-            if (list.isEmpty()) {
-                prePopulateHistory(context)
-            } else {
-                list.sortedBy { it.timestamp }
-            }
+            list.sortedBy { it.timestamp }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to read history, regenerating...", e)
-            prePopulateHistory(context)
+            Log.e(TAG, "Failed to read history", e)
+            emptyList()
         }
     }
 
@@ -106,7 +126,7 @@ object BatteryTracker {
         prefs.edit().putLong(KEY_LAST_FULL_CHARGE, timestamp).apply()
     }
 
-    /** Returns the timestamp when charger was last unplugged at >=95% charge. Returns 0L if never recorded. */
+    /** Returns the timestamp when charger was last unplugged at >=90% charge. Returns 0L if never recorded. */
     fun getLastUnplugFromFullTimestamp(context: Context): Long {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getLong(KEY_LAST_UNPLUG_FROM_FULL, 0L)
@@ -115,6 +135,8 @@ object BatteryTracker {
     fun updateLastUnplugFromFullTimestamp(context: Context, timestamp: Long = System.currentTimeMillis()) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putLong(KEY_LAST_UNPLUG_FROM_FULL, timestamp).apply()
+        // Invalidate cache so next read picks up the new baseline
+        cachedHistory = null
         Log.d(TAG, "Unplug-from-full timestamp updated to $timestamp")
     }
 
@@ -162,53 +184,5 @@ object BatteryTracker {
         } catch (e: Exception) {
             0L
         }
-    }
-
-    private fun prePopulateHistory(context: Context): List<HistoryPoint> {
-        Log.d(TAG, "Pre-populating battery history database...")
-        val list = mutableListOf<HistoryPoint>()
-        val now = System.currentTimeMillis()
-        val currentBattery = getBatteryPctNow(context)
-        val currentSot = getSotNow(context)
-
-        // Generate points for the past 7 days (every 1 hour)
-        // 7 days = 168 hours
-        for (h in 168 downTo 0) {
-            val ts = now - h * 60 * 60 * 1000L
-            val cal = Calendar.getInstance().apply { timeInMillis = ts }
-            val hour = cal.get(Calendar.HOUR_OF_DAY)
-            val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-
-            // Grow SOT during the day (7 AM to 11 PM)
-            val sotToday = if (h == 0) {
-                currentSot
-            } else {
-                val activeMins = when {
-                    hour < 7 -> 0L
-                    hour > 23 -> 240L
-                    else -> (hour - 7) * 15L // Grows to 240 minutes (4 hours)
-                }
-                val dayFactor = 0.8f + (dayOfWeek % 3) * 0.2f
-                (activeMins * 60 * 1000L * dayFactor).toLong()
-            }
-
-            // Daily battery cycle: drain during the day, charge at night
-            val battery = if (h == 0) {
-                currentBattery
-            } else {
-                val baseCharge = when {
-                    hour < 7 -> 20 + (hour * 10) // Charge up from 20% to 80%
-                    hour > 23 -> 95 - (hour - 23) * 5 // Start charging slightly
-                    else -> 100 - (hour - 7) * 4 // Discharge from 100% to ~36%
-                }
-                val noise = ((ts % 5) - 2).toInt() // small pseudo-random noise
-                (baseCharge + noise).coerceIn(10, 100)
-            }
-
-            list.add(HistoryPoint(ts, battery, sotToday))
-        }
-
-        saveHistory(context, list)
-        return list
     }
 }

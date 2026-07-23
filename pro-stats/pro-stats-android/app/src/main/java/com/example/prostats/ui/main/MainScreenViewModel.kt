@@ -21,13 +21,13 @@ class MainScreenViewModel(private val systemMonitor: SystemMonitor) : ViewModel(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MainScreenUiState.Loading)
 
     fun forceStop(packageName: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             systemMonitor.forceStopApp(packageName)
         }
     }
 
     fun freeze(packageName: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             systemMonitor.freezeApp(packageName)
         }
     }
