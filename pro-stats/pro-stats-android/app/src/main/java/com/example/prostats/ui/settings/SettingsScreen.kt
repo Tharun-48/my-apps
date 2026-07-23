@@ -13,7 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.CheckCircle
@@ -269,7 +269,8 @@ fun SettingsScreen(
                                     Button(
                                         onClick = {
                                             val pm = context.packageManager
-                                            val launchIntent = pm.getLaunchIntentForPackage("moe.shizuku.manager")
+                                            val launchIntent = pm.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+                                                ?: pm.getLaunchIntentForPackage("moe.shizuku.manager")
                                                 ?: pm.getLaunchIntentForPackage("rikka.shizuku.manager")
                                             if (launchIntent != null) {
                                                 context.startActivity(launchIntent)

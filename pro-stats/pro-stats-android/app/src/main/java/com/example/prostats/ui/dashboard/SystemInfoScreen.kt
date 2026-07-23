@@ -144,6 +144,9 @@ fun SystemInfoScreen() {
                     InfoRow("Level", "${bat.level}%")
                     InfoRow("Health", bat.health)
                     InfoRow("Technology", bat.technology)
+                    if (bat.capacityMah > 0) {
+                        InfoRow("Design Capacity", "${bat.capacityMah.toInt()} mAh")
+                    }
                     InfoRow("Voltage", "${bat.voltageMv} mV")
                     InfoRow("Temperature", "${bat.temperatureC} °C")
                 }

@@ -37,7 +37,8 @@ data class HwBatteryInfo(
     val technology: String,
     val voltageMv: Int,
     val temperatureC: Float,
-    val level: Int
+    val level: Int,
+    val capacityMah: Double = 0.0
 )
 
 data class DisplayInfo(
@@ -132,7 +133,16 @@ class HardwareMonitor(private val context: Context) {
         val temperature = (batteryStatus?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1) / 10f
         val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
 
-        return HwBatteryInfo(healthString, technology, voltage, temperature, level)
+        var capacityMah = 0.0
+        try {
+            val powerProfileClass = "com.android.internal.os.PowerProfile"
+            val mPowerProfile = Class.forName(powerProfileClass).getConstructor(Context::class.java).newInstance(context)
+            capacityMah = Class.forName(powerProfileClass).getMethod("getBatteryCapacity").invoke(mPowerProfile) as Double
+        } catch (e: Exception) {
+            capacityMah = 0.0
+        }
+
+        return HwBatteryInfo(healthString, technology, voltage, temperature, level, capacityMah)
     }
 
     fun getDisplayInfo(): DisplayInfo {

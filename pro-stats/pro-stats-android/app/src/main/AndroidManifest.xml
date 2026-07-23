@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <queries>
+        <package android:name="moe.shizuku.privileged.api" />
         <package android:name="moe.shizuku.manager" />
         <package android:name="rikka.shizuku.manager" />
     </queries>

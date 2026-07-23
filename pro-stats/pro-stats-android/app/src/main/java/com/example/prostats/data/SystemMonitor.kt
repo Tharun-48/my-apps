@@ -50,7 +50,8 @@ data class BatteryInfo(
     val technology: String,
     val currentMa: Int,
     val status: String,
-    val watts: Float = 0f
+    val watts: Float = 0f,
+    val capacityMah: Double = 0.0
 )
 
 data class AppBatteryUsage(
@@ -350,7 +351,16 @@ class SystemMonitor(private val context: Context) {
         val currentMa = if (status == "Charging" || status == "Full") rawCurrentMa else -rawCurrentMa
         val watts = (voltageV * kotlin.math.abs(currentMa)) / 1000f
 
-        return BatteryInfo(pct, health, voltageV, technology, currentMa, status, watts)
+        var capacityMah = 0.0
+        try {
+            val powerProfileClass = "com.android.internal.os.PowerProfile"
+            val mPowerProfile = Class.forName(powerProfileClass).getConstructor(Context::class.java).newInstance(context)
+            capacityMah = Class.forName(powerProfileClass).getMethod("getBatteryCapacity").invoke(mPowerProfile) as Double
+        } catch (e: Exception) {
+            capacityMah = 0.0
+        }
+
+        return BatteryInfo(pct, health, voltageV, technology, currentMa, status, watts, capacityMah)
     }
 
     fun getScreenOnTimeSinceLastChargeMs(): Long {

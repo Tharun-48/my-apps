@@ -397,6 +397,9 @@ fun DashboardContent(
                             Column {
                                 Text("Health: ${batteryInfo.health}", fontSize = 14.sp, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                                 Text("Voltage: ${String.format("%.2f", batteryInfo.voltageV)} V", fontSize = 12.sp, color = colors.textSecondary)
+                                if (batteryInfo.capacityMah > 0) {
+                                    Text("Capacity: ${batteryInfo.capacityMah.toInt()} mAh", fontSize = 12.sp, color = colors.textSecondary)
+                                }
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 val currentText = if (batteryInfo.currentMa < 0) "${batteryInfo.currentMa} mA" else "+${batteryInfo.currentMa} mA"
