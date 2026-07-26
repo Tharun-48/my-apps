@@ -14,6 +14,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    com.example.prostats.data.AppLogger.init(applicationContext)
 
     try {
       com.example.prostats.data.BatteryTrackerReceiver.scheduleTracker(applicationContext)

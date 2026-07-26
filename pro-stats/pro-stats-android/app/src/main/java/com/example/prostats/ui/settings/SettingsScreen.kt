@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.prostats.data.AppLogger
 import com.example.prostats.data.SystemMonitor
 import com.example.prostats.service.OverlayService
 import com.example.prostats.theme.ProStatsColors
@@ -49,6 +50,7 @@ fun SettingsScreen(
     var canDrawOverlay by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
     var overlayTemp by remember { mutableStateOf(OverlayService.isTempEnabled(context)) }
+    var overlayMa by remember { mutableStateOf(OverlayService.isMaEnabled(context)) }
     var overlayHz by remember { mutableStateOf(OverlayService.isHzEnabled(context)) }
     var overlayCpu by remember { mutableStateOf(OverlayService.isCpuEnabled(context)) }
     var overlayRam by remember { mutableStateOf(OverlayService.isRamEnabled(context)) }
@@ -83,11 +85,11 @@ fun SettingsScreen(
                     val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream))
                     val response = reader.readText()
                     val jsonArray = org.json.JSONArray(response)
-                    var maxVersionStr = "2.0"
-                    var maxVersionNum = 2.0f
+                    var maxVersionStr = "2.2"
+                    var maxVersionNum = 2.2f
                     for (i in 0 until jsonArray.length()) {
                         val obj = jsonArray.getJSONObject(i)
-                        val name = obj.getString("name") // e.g., ProStats-v2.1.apk
+                        val name = obj.getString("name") // e.g., ProStats-v2.2.apk
                         if (name.endsWith(".apk") && name.contains("-v")) {
                             val vStr = name.substringAfter("-v").substringBefore(".apk")
                             val vNum = vStr.toFloatOrNull()
@@ -97,7 +99,7 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    if (maxVersionNum > 2.0f) {
+                    if (maxVersionNum > 2.2f) {
                         latestVersion = maxVersionStr
                         updateAvailable = true
                     }
@@ -135,11 +137,12 @@ fun SettingsScreen(
     fun updateOverlayService() {
         val intent = Intent(context, OverlayService::class.java).apply {
             putExtra(OverlayService.EXTRA_TEMP, overlayTemp)
+            putExtra(OverlayService.EXTRA_MA, overlayMa)
             putExtra(OverlayService.EXTRA_HZ, overlayHz)
             putExtra(OverlayService.EXTRA_CPU, overlayCpu)
             putExtra(OverlayService.EXTRA_RAM, overlayRam)
         }
-        if (overlayTemp || overlayHz || overlayCpu || overlayRam) {
+        if (overlayTemp || overlayMa || overlayHz || overlayCpu || overlayRam) {
             context.startForegroundService(intent)
         } else {
             context.stopService(intent)
@@ -469,6 +472,19 @@ fun SettingsScreen(
                     HorizontalDivider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
 
                     OverlayToggleRow(
+                        title = "Battery Current (mA)",
+                        subtitle = "Realtime discharge / charge current rate",
+                        checked = overlayMa,
+                        onCheckedChange = {
+                            overlayMa = it
+                            OverlayService.setMaEnabled(context, it)
+                            updateOverlayService()
+                        }
+                    )
+
+                    HorizontalDivider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
+
+                    OverlayToggleRow(
                         title = "Refresh Rate (Hz)",
                         subtitle = "Screen display FPS / Hz rate",
                         checked = overlayHz,
@@ -506,6 +522,101 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            // Error Logging & Storage Card
+            var hasStoragePermission by remember { mutableStateOf(AppLogger.hasStoragePermission(context)) }
+            var testLogStatus by remember { mutableStateOf<String?>(null) }
+            val logDir = AppLogger.getLogDirectory(context)
+
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Build, contentDescription = null, tint = colors.accentBlue)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Log & Error Reporting", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Errors and crash reports are automatically recorded in a log folder on your phone outside the Android system folder.",
+                        color = colors.textSecondary,
+                        fontSize = 13.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Log Folder Path", color = colors.accentBlue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = logDir.absolutePath,
+                                color = colors.textPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (!hasStoragePermission) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = colors.accentOrange.copy(alpha = 0.13f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("Storage Access Permission Recommended", color = colors.accentOrange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Grant storage access to allow log file writing directly outside the Android system folder.", color = colors.textPrimary, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        AppLogger.requestStoragePermission(context)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentOrange, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Grant Storage Access", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                AppLogger.logError(context, "TestTag", "Manual test error log generated from Settings")
+                                testLogStatus = "Test log written to: ${logDir.name}"
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.elevatedSurface, contentColor = colors.textPrimary),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Write Test Log Entry", fontSize = 12.sp)
+                        }
+                    }
+
+                    if (testLogStatus != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(testLogStatus!!, color = colors.accentGreen, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
             
             // About & Updates
             Card(
@@ -527,7 +638,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Version", color = colors.textSecondary, fontSize = 14.sp)
-                        Text("v2.0", color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("v2.2", color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                     
                     if (updateAvailable && latestVersion != null) {

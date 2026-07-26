@@ -160,6 +160,7 @@ fun DashboardContent(
 
     // Live update loop for CPU, RAM, Battery, and Health data
     LaunchedEffect(Unit) {
+        var loopCount = 0
         while (true) {
             withContext(Dispatchers.IO) {
                 cpuUsage = systemMonitor.getSystemCpuUsage()
@@ -172,7 +173,10 @@ fun DashboardContent(
                 cpuTemp = systemMonitor.getCpuTemperature()
                 batteryTemp = systemMonitor.getBatteryTemperature()
                 sotMs = systemMonitor.getScreenOnTimeSinceLastChargeMs()
-                healthData = BatteryHealthEstimator.getHealthData(context)
+                if (loopCount % 6 == 0) {
+                    healthData = BatteryHealthEstimator.getHealthData(context)
+                }
+                loopCount++
             }
             delay(1500)
         }
@@ -312,7 +316,8 @@ fun DashboardContent(
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("Cycles: ${hd.chargeCycles}", fontSize = 13.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
+                                    val cycleTag = if (hd.cycleSourceIsSystem) " (System)" else ""
+                                    Text("Cycles: ${hd.chargeCycles}$cycleTag", fontSize = 13.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
                                     Text("Capacity: ${hd.currentCapacityMah}/${hd.designCapacityMah} mAh", fontSize = 11.sp, color = colors.textSecondary)
                                     if (hd.avgDailySotMs > 0) {
                                         val avgSotMins = hd.avgDailySotMs / 1000 / 60
@@ -402,9 +407,21 @@ fun DashboardContent(
                                 }
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                val currentText = if (batteryInfo.currentMa < 0) "${batteryInfo.currentMa} mA" else "+${batteryInfo.currentMa} mA"
-                                val wattText = if (batteryInfo.currentMa < 0) "-${String.format("%.2f", batteryInfo.watts)} W" else "+${String.format("%.2f", batteryInfo.watts)} W"
-                                val currentTextColor = if (batteryInfo.currentMa < 0) colors.accentOrange else colors.accentGreen
+                                val currentText = when {
+                                    batteryInfo.currentMa == 0 -> "—"
+                                    batteryInfo.currentMa < 0 -> "${batteryInfo.currentMa} mA"
+                                    else -> "+${batteryInfo.currentMa} mA"
+                                }
+                                val wattText = when {
+                                    batteryInfo.currentMa == 0 -> "—"
+                                    batteryInfo.currentMa < 0 -> "-${String.format("%.2f", batteryInfo.watts)} W"
+                                    else -> "+${String.format("%.2f", batteryInfo.watts)} W"
+                                }
+                                val currentTextColor = when {
+                                    batteryInfo.currentMa < 0 -> colors.accentOrange
+                                    batteryInfo.currentMa > 0 -> colors.accentGreen
+                                    else -> colors.textSecondary
+                                }
                                 Text(currentText, fontSize = 14.sp, color = currentTextColor, fontWeight = FontWeight.SemiBold)
                                 Text("Power: $wattText", fontSize = 12.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
                                 Text("Status: ${batteryInfo.status} (${batteryInfo.technology})", fontSize = 12.sp, color = colors.textSecondary)

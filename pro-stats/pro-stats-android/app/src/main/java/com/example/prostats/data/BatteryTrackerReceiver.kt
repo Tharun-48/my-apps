@@ -14,9 +14,13 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
         val action = intent.action
         Log.d("BatteryTrackerReceiver", "Received intent action: $action")
         when (action) {
-            Intent.ACTION_BOOT_COMPLETED -> scheduleTracker(context)
+            Intent.ACTION_BOOT_COMPLETED -> {
+                scheduleTracker(context)
+                Log.d("BatteryTrackerReceiver", "Boot completed — tracker scheduled")
+            }
+
             Intent.ACTION_POWER_DISCONNECTED -> {
-                // Check if battery was at full charge when unplugged
+                // Check if battery is at or above the configured reset level when unplugged
                 val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
                 val batteryIntent = context.registerReceiver(null, filter)
                 val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
@@ -25,23 +29,52 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
                 val targetResetLevel = BatteryTracker.getTargetResetBatteryLevel(context)
                 if (pct >= targetResetLevel) {
                     BatteryTracker.updateLastUnplugFromFullTimestamp(context)
-                    Log.d("BatteryTrackerReceiver", "Charger unplugged from charge level ($pct% >= $targetResetLevel%)")
+                    Log.d("BatteryTrackerReceiver", "Charger unplugged at $pct% (>= $targetResetLevel%) — SOT baseline reset")
+                } else {
+                    Log.d("BatteryTrackerReceiver", "Charger unplugged at $pct% (< $targetResetLevel%) — no SOT reset")
                 }
-            }
-            else -> {
+                // Always record a data point on unplug
                 try {
                     BatteryTracker.recordDataPoint(context)
                 } catch (e: Exception) {
-                    Log.e("BatteryTrackerReceiver", "Error recording battery point", e)
+                    Log.e("BatteryTrackerReceiver", "Error recording battery point on unplug", e)
                 }
+            }
+
+            Intent.ACTION_POWER_CONNECTED -> {
+                // Charger connected — log it and record a data point
+                Log.d("BatteryTrackerReceiver", "Charger connected — logging event")
+                try {
+                    BatteryTracker.recordDataPoint(context)
+                } catch (e: Exception) {
+                    Log.e("BatteryTrackerReceiver", "Error recording battery point on connect", e)
+                }
+            }
+
+            ALARM_ACTION -> {
+                // Alarm-triggered periodic recording (every 30 minutes)
+                try {
+                    BatteryTracker.recordDataPoint(context)
+                    BatteryHealthEstimator.trackCycleData(context)
+                } catch (e: Exception) {
+                    Log.e("BatteryTrackerReceiver", "Error during alarm-triggered recording", e)
+                }
+            }
+
+            else -> {
+                Log.d("BatteryTrackerReceiver", "Unknown action: $action — ignoring")
             }
         }
     }
 
     companion object {
+        const val ALARM_ACTION = "com.example.prostats.BATTERY_TRACKER_ALARM"
+
         fun scheduleTracker(context: Context) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val intent = Intent(context, BatteryTrackerReceiver::class.java)
+            val intent = Intent(context, BatteryTrackerReceiver::class.java).apply {
+                action = ALARM_ACTION
+            }
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 1001,
@@ -60,7 +93,7 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
                     interval,
                     pendingIntent
                 )
-                Log.d("BatteryTrackerReceiver", "Successfully scheduled battery tracker alarm.")
+                Log.d("BatteryTrackerReceiver", "Battery tracker alarm scheduled (30-min interval)")
             } catch (e: Exception) {
                 Log.e("BatteryTrackerReceiver", "Failed to schedule battery tracker alarm", e)
             }

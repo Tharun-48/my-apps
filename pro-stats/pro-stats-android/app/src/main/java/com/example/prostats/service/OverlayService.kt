@@ -38,11 +38,13 @@ class OverlayService : Service() {
     private var isHzOn = false
     private var isCpuOn = false
     private var isRamOn = false
+    private var isMaOn = false
 
     private var txtTemp: TextView? = null
     private var txtHz: TextView? = null
     private var txtCpu: TextView? = null
     private var txtRam: TextView? = null
+    private var txtMa: TextView? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -60,14 +62,16 @@ class OverlayService : Service() {
             isHzOn = intent.getBooleanExtra(EXTRA_HZ, isHzEnabled(this))
             isCpuOn = intent.getBooleanExtra(EXTRA_CPU, isCpuEnabled(this))
             isRamOn = intent.getBooleanExtra(EXTRA_RAM, isRamEnabled(this))
+            isMaOn = intent.getBooleanExtra(EXTRA_MA, isMaEnabled(this))
         } else {
             isTempOn = isTempEnabled(this)
             isHzOn = isHzEnabled(this)
             isCpuOn = isCpuEnabled(this)
             isRamOn = isRamEnabled(this)
+            isMaOn = isMaEnabled(this)
         }
 
-        if (!isTempOn && !isHzOn && !isCpuOn && !isRamOn) {
+        if (!isTempOn && !isHzOn && !isCpuOn && !isRamOn && !isMaOn) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -96,11 +100,13 @@ class OverlayService : Service() {
         }
 
         txtTemp = createMetricTextView("#FB923C")
+        txtMa = createMetricTextView("#FBBF24")
         txtHz = createMetricTextView("#60A5FA")
         txtCpu = createMetricTextView("#4ADE80")
         txtRam = createMetricTextView("#A78BFA")
 
         overlayView?.addView(txtTemp)
+        overlayView?.addView(txtMa)
         overlayView?.addView(txtHz)
         overlayView?.addView(txtCpu)
         overlayView?.addView(txtRam)
@@ -158,6 +164,7 @@ class OverlayService : Service() {
 
     private fun updateViewVisibility() {
         txtTemp?.visibility = if (isTempOn) View.VISIBLE else View.GONE
+        txtMa?.visibility = if (isMaOn) View.VISIBLE else View.GONE
         txtHz?.visibility = if (isHzOn) View.VISIBLE else View.GONE
         txtCpu?.visibility = if (isCpuOn) View.VISIBLE else View.GONE
         txtRam?.visibility = if (isRamOn) View.VISIBLE else View.GONE
@@ -172,6 +179,16 @@ class OverlayService : Service() {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         val batTemp = systemMonitor.getBatteryTemperature()
                         "${String.format("%.1f", batTemp)}°C"
+                    }
+                } else null
+
+                val maText = if (isMaOn) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val batInfo = systemMonitor.getBatteryInfo()
+                        val currentMa = batInfo.currentMa
+                        if (currentMa == 0) "0 mA"
+                        else if (currentMa < 0) "$currentMa mA"
+                        else "+$currentMa mA"
                     }
                 } else null
 
@@ -197,6 +214,7 @@ class OverlayService : Service() {
 
                 // Update UI on main thread
                 tempText?.let { txtTemp?.text = it }
+                maText?.let { txtMa?.text = it }
                 hzText?.let { txtHz?.text = it }
                 cpuText?.let { txtCpu?.text = it }
                 ramText?.let { txtRam?.text = it }
@@ -264,6 +282,7 @@ class OverlayService : Service() {
 
     companion object {
         const val EXTRA_TEMP = "extra_temp"
+        const val EXTRA_MA = "extra_ma"
         const val EXTRA_HZ = "extra_hz"
         const val EXTRA_CPU = "extra_cpu"
         const val EXTRA_RAM = "extra_ram"
@@ -275,6 +294,12 @@ class OverlayService : Service() {
 
         fun setTempEnabled(context: Context, enabled: Boolean) =
             context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean("overlay_temp", enabled).apply()
+
+        fun isMaEnabled(context: Context): Boolean =
+            context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("overlay_ma", false)
+
+        fun setMaEnabled(context: Context, enabled: Boolean) =
+            context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean("overlay_ma", enabled).apply()
 
         fun isHzEnabled(context: Context): Boolean =
             context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("overlay_hz", false)

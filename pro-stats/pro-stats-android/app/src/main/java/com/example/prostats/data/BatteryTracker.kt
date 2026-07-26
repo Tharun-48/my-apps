@@ -112,6 +112,7 @@ object BatteryTracker {
     private const val PREFS_NAME = "battery_prefs"
     private const val KEY_LAST_FULL_CHARGE = "last_full_charge_ts"
     private const val KEY_LAST_UNPLUG_FROM_FULL = "last_unplug_from_full_ts"
+    private const val KEY_BASELINE_INITIALIZED = "baseline_initialized"
 
     // Legacy — kept for history graph fallback only
     fun getLastFullChargeTimestamp(context: Context): Long {
@@ -139,16 +140,22 @@ object BatteryTracker {
         prefs.edit().putInt(KEY_RESET_BATTERY_LEVEL, levelPct.coerceIn(50, 100)).apply()
     }
 
-    /** Returns the timestamp when charger was last unplugged at target charge level. Initializes to app install/launch time if 0. */
+    /** Returns the timestamp when charger was last unplugged at target charge level.
+     *  Initializes to current time only on the very first app launch (using a dedicated flag).
+     *  Subsequent calls return the stored value without overwriting it. */
     fun getLastUnplugFromFullTimestamp(context: Context): Long {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        var ts = prefs.getLong(KEY_LAST_UNPLUG_FROM_FULL, 0L)
-        if (ts == 0L) {
-            ts = System.currentTimeMillis()
-            prefs.edit().putLong(KEY_LAST_UNPLUG_FROM_FULL, ts).apply()
-            Log.d(TAG, "Initialized SOT baseline to app installation/first-launch time: $ts")
+        val initialized = prefs.getBoolean(KEY_BASELINE_INITIALIZED, false)
+        if (!initialized) {
+            val ts = System.currentTimeMillis()
+            prefs.edit()
+                .putLong(KEY_LAST_UNPLUG_FROM_FULL, ts)
+                .putBoolean(KEY_BASELINE_INITIALIZED, true)
+                .apply()
+            Log.d(TAG, "First launch: SOT baseline initialized to $ts")
+            return ts
         }
-        return ts
+        return prefs.getLong(KEY_LAST_UNPLUG_FROM_FULL, System.currentTimeMillis())
     }
 
     fun updateLastUnplugFromFullTimestamp(context: Context, timestamp: Long = System.currentTimeMillis()) {

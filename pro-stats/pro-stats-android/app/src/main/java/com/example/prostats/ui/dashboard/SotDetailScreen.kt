@@ -45,7 +45,15 @@ fun SotDetailScreen(
 
     // Baseline timestamp (initialized to app install/first run, or last charge >= 90%)
     var lastUnplugTs by remember { mutableLongStateOf(BatteryTracker.getLastUnplugFromFullTimestamp(context)) }
-    val hasData = true
+    var refreshTick by remember { mutableIntStateOf(0) }
+
+    // Periodic refresh loop every 15s for live metrics
+    LaunchedEffect(lastUnplugTs) {
+        while (true) {
+            kotlinx.coroutines.delay(15000)
+            refreshTick++
+        }
+    }
 
     val startDateFormatted = remember(lastUnplugTs) {
         val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
@@ -56,12 +64,23 @@ fun SotDetailScreen(
     var appSort by remember { mutableStateOf("Time") } // Time | Battery | Name
 
     // History points since unplug
-    val points = remember(lastUnplugTs) {
+    val points = remember(lastUnplugTs, refreshTick) {
         BatteryTracker.getHistorySinceLastCharge(context)
     }
 
+    // Screen On Time
+    val totalSotMs = remember(lastUnplugTs, refreshTick) {
+        val now = System.currentTimeMillis()
+        systemMonitor.getScreenOnTimeMs(lastUnplugTs, now)
+    }
+
+    // Dynamic hasData evaluation
+    val hasData = remember(points, totalSotMs) {
+        points.isNotEmpty() || totalSotMs > 0L
+    }
+
     // App usage list
-    val rawAppList = remember(lastUnplugTs) {
+    val rawAppList = remember(lastUnplugTs, refreshTick, hasData) {
         if (!hasData) emptyList()
         else {
             val now = System.currentTimeMillis()
@@ -77,15 +96,6 @@ fun SotDetailScreen(
         }
     }
 
-    // Screen On Time
-    val totalSotMs = remember(lastUnplugTs) {
-        if (!hasData) 0L
-        else {
-            val now = System.currentTimeMillis()
-            systemMonitor.getScreenOnTimeMs(lastUnplugTs, now)
-        }
-    }
-
     val totalSotFormatted = remember(totalSotMs, hasData) {
         if (!hasData) "—"
         else {
@@ -97,7 +107,7 @@ fun SotDetailScreen(
     }
 
     // Screen Off Time
-    val screenOffMs = remember(lastUnplugTs) {
+    val screenOffMs = remember(lastUnplugTs, refreshTick, hasData) {
         if (!hasData) 0L
         else systemMonitor.getScreenOffTimeSinceLastChargeMs()
     }
@@ -113,7 +123,7 @@ fun SotDetailScreen(
     }
 
     // Average daily SOT
-    val avgDailySot = remember {
+    val avgDailySot = remember(lastUnplugTs) {
         val health = BatteryHealthEstimator.getHealthData(context)
         health.avgDailySotMs
     }
@@ -129,7 +139,7 @@ fun SotDetailScreen(
     }
 
     // Wakelocks (via Shizuku when available)
-    val wakelocks = remember { systemMonitor.getWakelockInfo() }
+    val wakelocks = remember(lastUnplugTs, refreshTick) { systemMonitor.getWakelockInfo() }
 
     Scaffold(
         topBar = {

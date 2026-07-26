@@ -210,8 +210,37 @@ class SystemMonitor(private val context: Context) {
     fun getScreenOnTimeMs(startTime: Long, endTime: Long): Long {
         if (!hasUsageStatsPermission()) return 0
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime) ?: return 0
-        return statsMap.values.sumOf { it.totalTimeInForeground }
+        try {
+            val events = usageStatsManager.queryEvents(startTime, endTime) ?: return 0
+            val event = android.app.usage.UsageEvents.Event()
+            var screenOnTime = 0L
+            var lastInteractiveStart = 0L
+
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                when (event.eventType) {
+                    android.app.usage.UsageEvents.Event.SCREEN_INTERACTIVE -> {
+                        lastInteractiveStart = event.timeStamp
+                    }
+                    android.app.usage.UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                        if (lastInteractiveStart > 0L) {
+                            screenOnTime += (event.timeStamp - lastInteractiveStart).coerceAtLeast(0L)
+                            lastInteractiveStart = 0L
+                        }
+                    }
+                }
+            }
+            // If still interactive (screen never went off in this window)
+            if (lastInteractiveStart > 0L) {
+                screenOnTime += (endTime - lastInteractiveStart).coerceAtLeast(0L)
+            }
+            return screenOnTime.coerceAtLeast(0L)
+        } catch (e: Exception) {
+            Log.e("SystemMonitor", "queryEvents failed, falling back to aggregate", e)
+            // Fallback to aggregate stats
+            val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime) ?: return 0
+            return statsMap.values.sumOf { it.totalTimeInForeground }
+        }
     }
 
     fun getBatteryTemperature(): Float {
@@ -345,11 +374,10 @@ class SystemMonitor(private val context: Context) {
 
         val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         val rawCurrentUa = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
-        var rawCurrentMa = kotlin.math.abs(rawCurrentUa / 1000)
-        if (rawCurrentMa == 0) rawCurrentMa = 1250 // reasonable fallback if API returns 0
-
+        val rawCurrentMa = kotlin.math.abs(rawCurrentUa / 1000)
+        // Use 0 when hardware returns 0 — do NOT fake a fallback value
         val currentMa = if (status == "Charging" || status == "Full") rawCurrentMa else -rawCurrentMa
-        val watts = (voltageV * kotlin.math.abs(currentMa)) / 1000f
+        val watts = if (rawCurrentMa > 0) (voltageV * rawCurrentMa) / 1000f else 0f
 
         var capacityMah = 0.0
         try {

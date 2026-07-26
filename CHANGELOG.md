@@ -1,0 +1,39 @@
+# Activity & Change Log — my-apps
+
+This document maintains a historical log of user inputs and corresponding code changes made across the repository.
+
+---
+
+## Log Entries
+
+### [2026-07-26] Log Folder Outside Android Directory & Crash Reporting
+- **User Prompt**: *"need to create a log folder in phone to receive errors when anything happened. it should be outside the android folder"*
+- **Summary of Changes**:
+  - Created `AppLogger.kt` (`com.example.prostats.data.AppLogger`) targeting `/sdcard/ProStats/Logs` (outside the `/Android/` system directory).
+  - Attached a global `Thread.UncaughtExceptionHandler` to log crashes, stack traces, device specs, and OS details to daily and crash-specific text files.
+  - Declared `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, and `MANAGE_EXTERNAL_STORAGE` permissions with `android:requestLegacyExternalStorage="true"` in `AndroidManifest.xml`.
+  - Initialized `AppLogger.init(applicationContext)` in `MainActivity.onCreate()`.
+  - Added a **Log & Error Reporting** card in `SettingsScreen.kt` displaying log path, permission status, and a "Write Test Log" button.
+
+---
+
+### [2026-07-26] Functional Fixes, System Charge Cycles, SOT Reset & Battery mA Overlay
+- **User Prompt**: *"take your time and fix functional errors in this app, needed places are in sot configured to reset after disconnect charger above 90, battery cycleneed to take from system,add overlay to see battery discharge ma"*
+- **User Prompt**: *"check any functionall errors in everywhere and optimise code"*
+- **Summary of Changes**:
+  - **SOT Reset**: Rewrote `BatteryTrackerReceiver.kt` — removed noisy `ACTION_BATTERY_CHANGED` broadcast listener, added explicit 30-minute alarm action, and reset SOT baseline on `ACTION_POWER_DISCONNECTED` when battery level $\ge 90\%$.
+  - **System Charge Cycles**: Updated `BatteryHealthEstimator.kt` to read system cycle count directly from the OS kernel via property `7` (`BATTERY_PROPERTY_CYCLE_COUNT`) on API 34+.
+  - **Battery Current (mA) Overlay**: Added live battery discharge/charge current (mA) HUD overlay in `OverlayService.kt` with toggle controls in `SettingsScreen.kt`.
+  - **SystemMonitor**: Removed hardcoded `1250 mA` fake fallback value. Improved `getScreenOnTimeMs()` using `queryEvents` to track `SCREEN_INTERACTIVE` / `SCREEN_NON_INTERACTIVE` events for accurate SOT.
+  - **SotDetailScreen**: Replaced hardcoded `hasData = true` with dynamic evaluation. Added a periodic 15s refresh loop for live SOT/Screen-Off metrics and updated `remember` keys for `avgDailySot` and `wakelocks`.
+  - **DashboardScreen**: Reduced `getHealthData()` execution frequency to ~9s (down from 1.5s) to save CPU resources. Added `(System)` tag when cycle count comes from OS APIs.
+  - **AppLogger**: Suppressed `thread.id` deprecation warning cleanly.
+
+---
+
+### [2026-07-26] Rule Enforcement, Git Auto-Commit & Changelog Log Setup
+- **User Prompt**: *"before everything do commit. add in agents.md to commit whenever i do changes also do not change version number, also keep a log of previous inputs and changes"*
+- **Summary of Changes**:
+  - Created `CHANGELOG.md` to track all historical user inputs and repository updates.
+  - Updated `.agents/AGENTS.md` with workspace rules for auto-committing changes, maintaining `CHANGELOG.md`, and preserving version numbers.
+  - Staged all changes and created git commit.
