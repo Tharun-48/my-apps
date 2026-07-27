@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -602,7 +602,7 @@ fun SystemLoadCard(
             }
             Spacer(modifier = Modifier.height(16.dp))
             LinearProgressIndicator(
-                progress = progress,
+                progress = { progress },
                 color = color,
                 trackColor = if (colors.isDark) Color(0x22FFFFFF) else Color(0x22000000),
                 modifier = Modifier

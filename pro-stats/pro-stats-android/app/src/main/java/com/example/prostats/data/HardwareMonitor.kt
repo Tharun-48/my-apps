@@ -200,7 +200,7 @@ class HardwareMonitor(private val context: Context) {
                 Sensor.TYPE_LIGHT -> "lx"
                 Sensor.TYPE_PRESSURE -> "hPa"
                 Sensor.TYPE_PROXIMITY -> "cm"
-                Sensor.TYPE_AMBIENT_TEMPERATURE, Sensor.TYPE_TEMPERATURE -> "°C"
+                @Suppress("DEPRECATION") Sensor.TYPE_TEMPERATURE, Sensor.TYPE_AMBIENT_TEMPERATURE -> "°C"
                 Sensor.TYPE_STEP_COUNTER, Sensor.TYPE_STEP_DETECTOR -> "steps"
                 Sensor.TYPE_ROTATION_VECTOR, Sensor.TYPE_GAME_ROTATION_VECTOR -> "rad"
                 Sensor.TYPE_RELATIVE_HUMIDITY -> "%"

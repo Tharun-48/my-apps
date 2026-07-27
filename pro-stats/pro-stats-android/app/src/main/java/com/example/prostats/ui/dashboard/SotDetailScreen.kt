@@ -530,7 +530,7 @@ fun AppSotRow(app: AppBatteryUsage) {
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 LinearProgressIndicator(
-                    progress = (app.batteryUsagePct / 100f).coerceIn(0f, 1f),
+                    progress = { (app.batteryUsagePct / 100f).coerceIn(0f, 1f) },
                     color = colors.accentGreen,
                     trackColor = if (colors.isDark) Color(0x11FFFFFF) else Color(0x11000000),
                     modifier = Modifier.fillMaxWidth().height(4.dp).background(Color.Transparent, RoundedCornerShape(2.dp))

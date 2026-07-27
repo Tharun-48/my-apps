@@ -6,6 +6,16 @@ This document maintains a historical log of user inputs and corresponding code c
 
 ## Log Entries
 
+### [2026-07-27] Deprecation Fixes, Android Q+ Compatibility & Refined Build Release
+- **User Prompt**: *"check and fix every errors in this app, make this app refined, push it to github"*
+- **Summary of Changes**:
+  - Updated `DashboardScreen.kt`, `OnboardingScreen.kt`, `SotDetailScreen.kt`, `MainScreen.kt`, `HardwareMonitor.kt`, and `SystemMonitor.kt` to resolve Kotlin and Compose deprecation warnings (`LocalLifecycleOwner`, `LinearProgressIndicator` lambda overload, `AutoMirrored` arrow icon, `Sensor.TYPE_TEMPERATURE`).
+  - Refactored `SystemMonitor.hasUsageStatsPermission()` to support Android Q+ `unsafeCheckOpNoThrow` with fallback to `noteOpNoThrow`.
+  - Added missing `android.os.Build` import in `SystemMonitor.kt`.
+  - Recompiled Release APK (`ProStats-v2.2.apk`), updated `pro-stats/releases/`, and prepared build artifacts for GitHub push.
+
+---
+
 ### [2026-07-26] Log Folder Outside Android Directory & Crash Reporting
 - **User Prompt**: *"need to create a log folder in phone to receive errors when anything happened. it should be outside the android folder"*
 - **Summary of Changes**:
