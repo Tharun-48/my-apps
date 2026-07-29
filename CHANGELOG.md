@@ -7,9 +7,10 @@ This document maintains a historical log of user inputs and corresponding code c
 ## Log Entries
 
 ### [2026-07-29] Shizuku Provider Integration
-- **User Prompt**: *"correctly integrate shizuku into this app"*
+- **User Prompt**: *"correctly integrate shizuku into this app"* & *"it need to show here if shizuku api is integrated with this app"*
 - **Summary of Changes**:
   - Added `dev.rikka.shizuku:provider:12.2.0` dependency to `app/build.gradle.kts` alongside the existing `api` dependency.
+  - Added `<uses-permission android:name="moe.shizuku.manager.permission.API_V23" />` in `AndroidManifest.xml` to ensure the app appears in Shizuku's Application Management list.
   - Declared `<provider android:name="rikka.shizuku.ShizukuProvider" ... />` inside `AndroidManifest.xml` to correctly expose the Shizuku integration for the application.
   - Recompiled Debug APK (`app-debug.apk`), updated `pro-stats/releases/` as `ProStats-v2.2.apk`, and prepared build artifacts for GitHub push.
 
