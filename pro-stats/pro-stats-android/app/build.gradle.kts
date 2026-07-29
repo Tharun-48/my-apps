@@ -90,6 +90,7 @@ dependencies {
 
   // Shizuku
   implementation("dev.rikka.shizuku:api:12.2.0")
+  implementation("dev.rikka.shizuku:provider:12.2.0")
 
   // Material Icons
   implementation("androidx.compose.material:material-icons-core")

@@ -6,6 +6,15 @@ This document maintains a historical log of user inputs and corresponding code c
 
 ## Log Entries
 
+### [2026-07-29] Shizuku Provider Integration
+- **User Prompt**: *"correctly integrate shizuku into this app"*
+- **Summary of Changes**:
+  - Added `dev.rikka.shizuku:provider:12.2.0` dependency to `app/build.gradle.kts` alongside the existing `api` dependency.
+  - Declared `<provider android:name="rikka.shizuku.ShizukuProvider" ... />` inside `AndroidManifest.xml` to correctly expose the Shizuku integration for the application.
+  - Recompiled Debug APK (`app-debug.apk`), updated `pro-stats/releases/` as `ProStats-v2.2.apk`, and prepared build artifacts for GitHub push.
+
+---
+
 ### [2026-07-27] Deprecation Fixes, Android Q+ Compatibility & Refined Build Release
 - **User Prompt**: *"check and fix every errors in this app, make this app refined, push it to github"*
 - **Summary of Changes**:
