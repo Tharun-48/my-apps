@@ -410,9 +410,12 @@ class SystemMonitor(private val context: Context) {
     fun getScreenOffTimeSinceLastChargeMs(): Long {
         val lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
         if (lastUnplugTs == 0L) return 0L
-        val now = System.currentTimeMillis()
-        val elapsed = (now - lastUnplugTs).coerceAtLeast(0L)
-        val sotMs = getScreenOnTimeMs(lastUnplugTs, now)
+        return getScreenOffTimeMs(lastUnplugTs, System.currentTimeMillis())
+    }
+
+    fun getScreenOffTimeMs(startTime: Long, endTime: Long): Long {
+        val elapsed = (endTime - startTime).coerceAtLeast(0L)
+        val sotMs = getScreenOnTimeMs(startTime, endTime)
         return (elapsed - sotMs).coerceAtLeast(0L)
     }
 

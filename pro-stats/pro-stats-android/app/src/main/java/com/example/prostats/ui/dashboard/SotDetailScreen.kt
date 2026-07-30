@@ -64,22 +64,27 @@ fun SotDetailScreen(
     // Sort state for app list
     var appSort by remember { mutableStateOf("Time") } // Time | Battery | Name
 
-    // Graph range toggle state
-    var graphRange by remember { mutableStateOf("24h") } // "24h" or "7d"
+    // Time range toggle state
+    var timeRange by remember { mutableStateOf("Since Charge") } // "Since Charge" or "7d"
+
+    val startTime = remember(lastUnplugTs, timeRange, refreshTick) {
+        val now = System.currentTimeMillis()
+        if (timeRange == "Since Charge") lastUnplugTs else (now - 7 * 24 * 60 * 60 * 1000L)
+    }
 
     // History points
-    val points = remember(lastUnplugTs, refreshTick, graphRange) {
-        if (graphRange == "24h") {
-            BatteryTracker.getHistory24h(context)
+    val points = remember(startTime, refreshTick) {
+        if (timeRange == "Since Charge") {
+            BatteryTracker.getHistorySinceLastCharge(context)
         } else {
             BatteryTracker.getHistory7d(context)
         }
     }
 
     // Screen On Time
-    val totalSotMs = remember(lastUnplugTs, refreshTick) {
+    val totalSotMs = remember(startTime, refreshTick) {
         val now = System.currentTimeMillis()
-        systemMonitor.getScreenOnTimeMs(lastUnplugTs, now)
+        systemMonitor.getScreenOnTimeMs(startTime, now)
     }
 
     // Dynamic hasData evaluation
@@ -88,11 +93,11 @@ fun SotDetailScreen(
     }
 
     // App usage list
-    val rawAppList = remember(lastUnplugTs, refreshTick, hasData) {
+    val rawAppList = remember(startTime, refreshTick, hasData) {
         if (!hasData) emptyList()
         else {
             val now = System.currentTimeMillis()
-            systemMonitor.getAppBatteryUsageList(lastUnplugTs, now)
+            systemMonitor.getAppBatteryUsageList(startTime, now)
         }
     }
 
@@ -115,9 +120,9 @@ fun SotDetailScreen(
     }
 
     // Screen Off Time
-    val screenOffMs = remember(lastUnplugTs, refreshTick, hasData) {
+    val screenOffMs = remember(startTime, refreshTick, hasData) {
         if (!hasData) 0L
-        else systemMonitor.getScreenOffTimeSinceLastChargeMs()
+        else systemMonitor.getScreenOffTimeMs(startTime, System.currentTimeMillis())
     }
 
     val screenOffTimeFormatted = remember(screenOffMs, hasData) {
@@ -224,8 +229,8 @@ fun SotDetailScreen(
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         modifier = Modifier.background(colors.borderColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(2.dp)
                                     ) {
-                                        listOf("24h", "7d").forEach { range ->
-                                            val active = graphRange == range
+                                        listOf("Since Charge", "7d").forEach { range ->
+                                            val active = timeRange == range
                                             Box(
                                                 modifier = Modifier
                                                     .background(
@@ -233,7 +238,7 @@ fun SotDetailScreen(
                                                         RoundedCornerShape(10.dp)
                                                     )
                                                     .padding(horizontal = 8.dp, vertical = 4.dp)
-                                                    .clickable { graphRange = range },
+                                                    .clickable { timeRange = range },
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
@@ -293,7 +298,7 @@ fun SotDetailScreen(
                                     Text("SCREEN ON TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(totalSotFormatted, fontSize = 18.sp, color = colors.accentPurple, fontWeight = FontWeight.Bold)
-                                    Text("Since unplugged", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
+                                    Text(if (timeRange == "7d") "Last 7 days" else "Since unplugged", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
                                 }
                             }
                             Card(
@@ -305,7 +310,7 @@ fun SotDetailScreen(
                                     Text("SCREEN OFF TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(screenOffTimeFormatted, fontSize = 18.sp, color = colors.accentOrange, fontWeight = FontWeight.Bold)
-                                    Text("Time in background", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
+                                    Text(if (timeRange == "7d") "Last 7 days" else "Time in background", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
                                 }
                             }
                         }
