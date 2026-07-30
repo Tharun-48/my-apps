@@ -63,9 +63,16 @@ fun SotDetailScreen(
     // Sort state for app list
     var appSort by remember { mutableStateOf("Time") } // Time | Battery | Name
 
-    // History points since unplug
-    val points = remember(lastUnplugTs, refreshTick) {
-        BatteryTracker.getHistorySinceLastCharge(context)
+    // Graph range toggle state
+    var graphRange by remember { mutableStateOf("24h") } // "24h" or "7d"
+
+    // History points
+    val points = remember(lastUnplugTs, refreshTick, graphRange) {
+        if (graphRange == "24h") {
+            BatteryTracker.getHistory24h(context)
+        } else {
+            BatteryTracker.getHistory7d(context)
+        }
     }
 
     // Screen On Time
@@ -200,13 +207,44 @@ fun SotDetailScreen(
                             modifier = Modifier.fillMaxWidth().border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "BATTERY CHARGE HISTORY",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = colors.textSecondary,
-                                    letterSpacing = 1.sp
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "BATTERY CHARGE HISTORY",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textSecondary,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.background(colors.borderColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(2.dp)
+                                    ) {
+                                        listOf("24h", "7d").forEach { range ->
+                                            val active = graphRange == range
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        if (active) colors.cardSurface else Color.Transparent,
+                                                        RoundedCornerShape(10.dp)
+                                                    )
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    .clickable { graphRange = range },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = range,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (active) colors.textPrimary else colors.textSecondary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -474,10 +512,13 @@ fun BatteryGraph(
             textAlign = android.graphics.Paint.Align.CENTER
         }
         val step = timeSpan / 4
+        // Calculate dynamic format based on timeSpan
+        val isMultiDay = timeSpan > 24 * 60 * 60 * 1000L
+        val dynamicFormat = if (isMultiDay) SimpleDateFormat("dd/MM", Locale.getDefault()) else labelFormat
         for (i in 0..4) {
             val targetTime = minTime + i * step
             val x = (i / 4f) * width
-            val dateStr = labelFormat.format(Date(targetTime))
+            val dateStr = dynamicFormat.format(Date(targetTime))
             drawContext.canvas.nativeCanvas.drawText(
                 dateStr,
                 x.coerceIn(24.dp.toPx(), width - 24.dp.toPx()),

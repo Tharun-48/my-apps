@@ -625,33 +625,60 @@ class SystemMonitor(private val context: Context) {
         if (!hasUsageStatsPermission()) return list
 
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime) ?: return list
+        
+        val events = try { usageStatsManager.queryEvents(startTime, endTime) } catch (e: Exception) { null }
+        val appForegroundTimes = mutableMapOf<String, Long>()
+        val lastEventTimes = mutableMapOf<String, Long>()
+        
+        if (events != null) {
+            val event = android.app.usage.UsageEvents.Event()
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                val pkg = event.packageName
+                if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
+                    lastEventTimes[pkg] = event.timeStamp
+                } else if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED || event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_STOPPED) {
+                    val start = lastEventTimes.remove(pkg)
+                    if (start != null && event.timeStamp > start) {
+                        appForegroundTimes[pkg] = appForegroundTimes.getOrDefault(pkg, 0L) + (event.timeStamp - start)
+                    }
+                }
+            }
+            // Add lingering open apps
+            lastEventTimes.forEach { (pkg, start) ->
+                if (endTime > start) {
+                    appForegroundTimes[pkg] = appForegroundTimes.getOrDefault(pkg, 0L) + (endTime - start)
+                }
+            }
+        } else {
+            // Fallback to aggregate if queryEvents fails
+            val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime) ?: return list
+            statsMap.values.forEach { stat ->
+                if (stat.totalTimeInForeground > 0) {
+                    appForegroundTimes[stat.packageName] = stat.totalTimeInForeground
+                }
+            }
+        }
 
-        val appUsageData = statsMap.values.filter { it.totalTimeInForeground > 0 }
-        val weightedTimes = mutableMapOf<String, Float>()
         var totalWeightedTime = 0f
-
-        appUsageData.forEach { stat ->
-            val pkg = stat.packageName
+        val weightedTimes = mutableMapOf<String, Float>()
+        
+        appForegroundTimes.filter { it.value > 0 }.forEach { (pkg, timeMs) ->
             val weight = getAppCategoryWeight(pkg)
-            val weightedTime = stat.totalTimeInForeground * weight
+            val weightedTime = timeMs * weight
             weightedTimes[pkg] = weightedTime
             totalWeightedTime += weightedTime
         }
-
-        appUsageData.forEach { stat ->
-            val pkg = stat.packageName
+        
+        appForegroundTimes.filter { it.value > 0 }.forEach { (pkg, timeMs) ->
             val appName = getAppName(pkg)
-
             val weightedTime = weightedTimes[pkg] ?: 0f
-            // Normalized to 100% — each app's share of total drain
             val batteryUsagePct = if (totalWeightedTime > 0) {
                 (weightedTime / totalWeightedTime) * 100f
             } else {
                 0f
             }
-
-            list.add(AppBatteryUsage(pkg, appName, stat.totalTimeInForeground, batteryUsagePct))
+            list.add(AppBatteryUsage(pkg, appName, timeMs, batteryUsagePct))
         }
 
         return list.sortedByDescending { it.batteryUsagePct }
