@@ -508,7 +508,7 @@ class SystemMonitor(private val context: Context) {
     fun getSystemCpuUsage(): Float {
         if (isShizukuRunning() && hasShizukuPermission()) {
             try {
-                val process = Shizuku.newProcess(arrayOf("top", "-b", "-n", "1", "-m", "1"), null, null)
+                val process = Shizuku.newProcess(arrayOf("sh", "-c", "top -b -n 1 -m 1 2>&1"), null, null)
                 val reader = BufferedReader(InputStreamReader(process.inputStream))
                 var line: String?
                 for (i in 0..15) {
@@ -603,7 +603,7 @@ class SystemMonitor(private val context: Context) {
 
     /** Uses Shizuku's dumpsys batterystats for more accurate battery discharge data */
     private fun getShizukuBatteryDischarged(): Float {
-        val process = Shizuku.newProcess(arrayOf("dumpsys", "batterystats", "--charged"), null, null)
+        val process = Shizuku.newProcess(arrayOf("sh", "-c", "dumpsys batterystats --charged 2>&1"), null, null)
         val reader = BufferedReader(InputStreamReader(process.inputStream))
         var discharge = 0f
         reader.useLines { lines ->
@@ -803,7 +803,7 @@ class SystemMonitor(private val context: Context) {
         }
 
         try {
-            val process = Shizuku.newProcess(arrayOf("top", "-b", "-n", "1"), null, null)
+            val process = Shizuku.newProcess(arrayOf("sh", "-c", "top -b -n 1 2>&1"), null, null)
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             var line: String?
             
@@ -907,13 +907,13 @@ class SystemMonitor(private val context: Context) {
         // 2. If Shizuku is running and granted, execute shell commands
         if (isShizukuRunning() && hasShizukuPermission()) {
             try {
-                val p1 = Shizuku.newProcess(arrayOf("am", "force-stop", packageName), null, null)
+                val p1 = Shizuku.newProcess(arrayOf("sh", "-c", "am force-stop $packageName 2>&1"), null, null)
                 val exit1 = p1.waitFor()
                 
-                val p2 = Shizuku.newProcess(arrayOf("am", "force-stop", "--user", "0", packageName), null, null)
+                val p2 = Shizuku.newProcess(arrayOf("sh", "-c", "am force-stop --user 0 $packageName 2>&1"), null, null)
                 val exit2 = p2.waitFor()
 
-                val p3 = Shizuku.newProcess(arrayOf("pkill", "-f", packageName), null, null)
+                val p3 = Shizuku.newProcess(arrayOf("sh", "-c", "pkill -f $packageName 2>&1"), null, null)
                 p3.waitFor()
 
                 if (exit1 == 0 || exit2 == 0) {
@@ -945,10 +945,10 @@ class SystemMonitor(private val context: Context) {
     suspend fun freezeApp(packageName: String): Boolean = kotlinx.coroutines.withContext(Dispatchers.IO) {
         if (isShizukuRunning() && hasShizukuPermission()) {
             return@withContext try {
-                val p1 = Shizuku.newProcess(arrayOf("pm", "disable-user", "--user", "0", packageName), null, null)
+                val p1 = Shizuku.newProcess(arrayOf("sh", "-c", "pm disable-user --user 0 $packageName 2>&1"), null, null)
                 val exit1 = p1.waitFor()
                 if (exit1 == 0) true else {
-                    val p2 = Shizuku.newProcess(arrayOf("pm", "disable", packageName), null, null)
+                    val p2 = Shizuku.newProcess(arrayOf("sh", "-c", "pm disable $packageName 2>&1"), null, null)
                     p2.waitFor() == 0
                 }
             } catch (e: Exception) {
@@ -973,7 +973,7 @@ class SystemMonitor(private val context: Context) {
     suspend fun unfreezeApp(packageName: String): Boolean = kotlinx.coroutines.withContext(Dispatchers.IO) {
         if (!isShizukuRunning() || !hasShizukuPermission()) return@withContext false
         return@withContext try {
-            val process = Shizuku.newProcess(arrayOf("pm", "enable", packageName), null, null)
+            val process = Shizuku.newProcess(arrayOf("sh", "-c", "pm enable $packageName 2>&1"), null, null)
             process.waitFor() == 0
         } catch (e: Exception) {
             Log.e("SystemMonitor", "Error unfreezing app", e)
@@ -988,7 +988,7 @@ class SystemMonitor(private val context: Context) {
         if (!isShizukuRunning() || !hasShizukuPermission()) return emptyList()
         val list = mutableListOf<WakelockInfo>()
         try {
-            val process = Shizuku.newProcess(arrayOf("dumpsys", "power"), null, null)
+            val process = Shizuku.newProcess(arrayOf("sh", "-c", "dumpsys power 2>&1"), null, null)
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             var inWakeLockSection = false
             reader.useLines { lines ->
@@ -1076,7 +1076,7 @@ class SystemMonitor(private val context: Context) {
         // Try Shizuku dumpsys for renderer name
         if (isShizukuRunning() && hasShizukuPermission()) {
             try {
-                val process = Shizuku.newProcess(arrayOf("dumpsys", "SurfaceFlinger", "--list"), null, null)
+                val process = Shizuku.newProcess(arrayOf("sh", "-c", "dumpsys SurfaceFlinger --list 2>&1"), null, null)
                 val reader = BufferedReader(InputStreamReader(process.inputStream))
                 // Just confirm it's accessible; renderer info is limited from dumpsys
                 process.waitFor()

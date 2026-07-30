@@ -82,9 +82,11 @@ fun SotDetailScreen(
     }
 
     // Screen On Time
-    val totalSotMs = remember(startTime, refreshTick) {
+    val totalSotMs by produceState(initialValue = 0L, key1 = startTime, key2 = refreshTick) {
         val now = System.currentTimeMillis()
-        systemMonitor.getScreenOnTimeMs(startTime, now)
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            systemMonitor.getScreenOnTimeMs(startTime, now)
+        }
     }
 
     // Dynamic hasData evaluation
@@ -93,11 +95,14 @@ fun SotDetailScreen(
     }
 
     // App usage list
-    val rawAppList = remember(startTime, refreshTick, hasData) {
-        if (!hasData) emptyList()
-        else {
+    val rawAppList by produceState(initialValue = emptyList<com.example.prostats.data.AppBatteryUsage>(), key1 = startTime, key2 = refreshTick, key3 = hasData) {
+        if (!hasData) {
+            value = emptyList()
+        } else {
             val now = System.currentTimeMillis()
-            systemMonitor.getAppBatteryUsageList(startTime, now)
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                systemMonitor.getAppBatteryUsageList(startTime, now)
+            }
         }
     }
 
@@ -120,9 +125,14 @@ fun SotDetailScreen(
     }
 
     // Screen Off Time
-    val screenOffMs = remember(startTime, refreshTick, hasData) {
-        if (!hasData) 0L
-        else systemMonitor.getScreenOffTimeMs(startTime, System.currentTimeMillis())
+    val screenOffMs by produceState(initialValue = 0L, key1 = startTime, key2 = refreshTick, key3 = hasData) {
+        if (!hasData) {
+            value = 0L
+        } else {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                systemMonitor.getScreenOffTimeMs(startTime, System.currentTimeMillis())
+            }
+        }
     }
 
     val screenOffTimeFormatted = remember(screenOffMs, hasData) {
@@ -152,7 +162,11 @@ fun SotDetailScreen(
     }
 
     // Wakelocks (via Shizuku when available)
-    val wakelocks = remember(lastUnplugTs, refreshTick) { systemMonitor.getWakelockInfo() }
+    val wakelocks by produceState(initialValue = emptyList<com.example.prostats.data.WakelockInfo>(), key1 = lastUnplugTs, key2 = refreshTick) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            systemMonitor.getWakelockInfo()
+        }
+    }
 
     Scaffold(
         topBar = {
