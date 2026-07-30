@@ -4,7 +4,7 @@
 # =============================================
 
 $repoPath = "C:\Users\SoloWanderer\Documents\antigravity\my-apps"
-$git = "C:\Program Files\Git\cmd\git.exe"
+$git = if (Get-Command "git" -ErrorAction SilentlyContinue) { "git" } else { "C:\Program Files\Git\cmd\git.exe" }
 $debounceSeconds = 5   # Wait 5s after last change before committing
 
 Write-Host "========================================" -ForegroundColor Cyan
