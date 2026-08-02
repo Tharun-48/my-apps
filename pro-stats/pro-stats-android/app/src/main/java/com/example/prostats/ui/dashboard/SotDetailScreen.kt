@@ -51,9 +51,23 @@ fun SotDetailScreen(
     // Periodic refresh loop every 15s for live metrics
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(15000)
+            // Actively check and auto-reset if device is fully charged and currently on charger
+            val filter = android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED)
+            val intent = context.registerReceiver(null, filter)
+            val level = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+            val pct = if (level >= 0 && scale > 0) (level * 100) / scale else 0
+            val status = intent?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+            val targetLevel = BatteryTracker.getTargetResetBatteryLevel(context)
+            
+            if (isCharging && pct >= targetLevel) {
+                BatteryTracker.updateLastUnplugFromFullTimestamp(context)
+            }
+            
             lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
             refreshTick++
+            kotlinx.coroutines.delay(15000)
         }
     }
 
