@@ -14,13 +14,15 @@ import java.util.Calendar
 data class HistoryPoint(
     val timestamp: Long,
     val batteryLevel: Int,
-    val sotTodayMs: Long
+    val sotTodayMs: Long,
+    val batteryTemp: Float = 0f
 ) {
     fun toJsonObject(): JSONObject {
         return JSONObject().apply {
             put("timestamp", timestamp)
             put("batteryLevel", batteryLevel)
             put("sotTodayMs", sotTodayMs)
+            put("batteryTemp", batteryTemp.toDouble())
         }
     }
 
@@ -29,7 +31,8 @@ data class HistoryPoint(
             return HistoryPoint(
                 obj.getLong("timestamp"),
                 obj.getInt("batteryLevel"),
-                obj.getLong("sotTodayMs")
+                obj.optLong("sotTodayMs", 0L),
+                obj.optDouble("batteryTemp", 0.0).toFloat()
             )
         }
     }
@@ -58,8 +61,10 @@ object BatteryTracker {
             
             // NOTE: charge-unplug tracking is handled by BatteryTrackerReceiver via ACTION_POWER_DISCONNECTED
 
+            val temp = getBatteryTempNow(context)
+
             // Add new data point
-            points.add(HistoryPoint(now, level, sotToday))
+            points.add(HistoryPoint(now, level, sotToday, temp))
 
             // Keep only last 7 days of history and sort
             val cutOff = now - (MAX_HISTORY_DAYS * 24 * 60 * 60 * 1000L)
@@ -201,6 +206,13 @@ object BatteryTracker {
         val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
         return if (level >= 0 && scale > 0) (level * 100) / scale else 50
+    }
+
+    private fun getBatteryTempNow(context: Context): Float {
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val intent = context.registerReceiver(null, filter)
+        val temp = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
+        return temp / 10.0f
     }
 
     private fun getSotSinceLastCharge(context: Context): Long {

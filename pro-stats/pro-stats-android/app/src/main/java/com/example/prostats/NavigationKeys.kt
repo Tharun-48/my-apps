@@ -7,4 +7,5 @@ import kotlinx.serialization.Serializable
 @Serializable data object Dashboard : NavKey
 @Serializable data object Main : NavKey
 @Serializable data object SotDetail : NavKey
+@Serializable data object BatteryTempDetail : NavKey
 @Serializable data object Settings : NavKey

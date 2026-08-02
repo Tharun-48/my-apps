@@ -44,6 +44,7 @@ fun DashboardScreen(
     systemMonitor: SystemMonitor,
     onNavigateToProcesses: () -> Unit,
     onNavigateToSotDetail: () -> Unit,
+    onNavigateToBatteryTempDetail: () -> Unit,
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -60,7 +61,7 @@ fun DashboardScreen(
                 NavigationBarItem(
                     selected = pagerState.currentPage == 0,
                     onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                        coroutineScope.launch { pagerState.scrollToPage(0) }
                     },
                     icon = { Icon(Icons.Default.Home, contentDescription = "Dashboard") },
                     label = { Text("Dashboard", fontSize = 11.sp) },
@@ -75,7 +76,7 @@ fun DashboardScreen(
                 NavigationBarItem(
                     selected = pagerState.currentPage == 1,
                     onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                        coroutineScope.launch { pagerState.scrollToPage(1) }
                     },
                     icon = { Icon(Icons.Default.Info, contentDescription = "System Info") },
                     label = { Text("System Info", fontSize = 11.sp) },
@@ -90,7 +91,7 @@ fun DashboardScreen(
                 NavigationBarItem(
                     selected = pagerState.currentPage == 2,
                     onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                        coroutineScope.launch { pagerState.scrollToPage(2) }
                     },
                     icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
                     label = { Text("Settings", fontSize = 11.sp) },
@@ -109,6 +110,8 @@ fun DashboardScreen(
     ) { innerPadding ->
         HorizontalPager(
             state = pagerState,
+            key = { page -> page },
+            beyondViewportPageCount = 1,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -118,15 +121,16 @@ fun DashboardScreen(
                     systemMonitor = systemMonitor,
                     onNavigateToProcesses = onNavigateToProcesses,
                     onNavigateToSotDetail = onNavigateToSotDetail,
+                    onNavigateToBatteryTempDetail = onNavigateToBatteryTempDetail,
                     onNavigateToSettings = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                        coroutineScope.launch { pagerState.scrollToPage(2) }
                     }
                 )
                 1 -> SystemInfoScreen()
                 2 -> com.example.prostats.ui.settings.SettingsScreen(
                     systemMonitor = systemMonitor,
                     onNavigateBack = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                        coroutineScope.launch { pagerState.scrollToPage(0) }
                     }
                 )
             }
@@ -140,6 +144,7 @@ fun DashboardContent(
     systemMonitor: SystemMonitor,
     onNavigateToProcesses: () -> Unit,
     onNavigateToSotDetail: () -> Unit,
+    onNavigateToBatteryTempDetail: () -> Unit,
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -270,6 +275,7 @@ fun DashboardContent(
                         value = "${String.format("%.1f", batteryTemp)}°C",
                         subValue = "Thermal: $thermalStatus",
                         color = tempColor,
+                        onClick = onNavigateToBatteryTempDetail,
                         modifier = Modifier.weight(1f)
                     )
                 }

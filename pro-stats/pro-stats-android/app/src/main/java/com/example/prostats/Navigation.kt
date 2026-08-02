@@ -55,6 +55,9 @@ fun MainNavigation() {
             onNavigateToSotDetail = {
               backStack.add(SotDetail)
             },
+            onNavigateToBatteryTempDetail = {
+              backStack.add(BatteryTempDetail)
+            },
             onNavigateToSettings = {
               backStack.add(Settings)
             }
@@ -62,6 +65,14 @@ fun MainNavigation() {
         }
         entry<SotDetail> {
           com.example.prostats.ui.dashboard.SotDetailScreen(
+            systemMonitor = systemMonitor,
+            onNavigateBack = {
+              backStack.removeLastOrNull()
+            }
+          )
+        }
+        entry<BatteryTempDetail> {
+          com.example.prostats.ui.dashboard.BatteryTempDetailScreen(
             systemMonitor = systemMonitor,
             onNavigateBack = {
               backStack.removeLastOrNull()
