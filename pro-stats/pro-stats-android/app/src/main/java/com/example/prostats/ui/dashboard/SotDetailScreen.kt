@@ -49,9 +49,10 @@ fun SotDetailScreen(
     var refreshTick by remember { mutableIntStateOf(0) }
 
     // Periodic refresh loop every 15s for live metrics
-    LaunchedEffect(lastUnplugTs) {
+    LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(15000)
+            lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
             refreshTick++
         }
     }
@@ -409,14 +410,25 @@ fun SotDetailScreen(
 
                     // App list header + sort tabs
                     item {
-                        Text(
-                            text = "APP BATTERY CONSUMPTION",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textSecondary,
-                            modifier = Modifier.padding(top = 4.dp),
-                            letterSpacing = 1.sp
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            Text(
+                                text = "APP BATTERY CONSUMPTION",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textSecondary,
+                                modifier = Modifier.padding(top = 4.dp),
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = if (timeRange == "7d") "Last 7 days" else "Since unplugged",
+                                fontSize = 10.sp,
+                                color = colors.textSecondary.copy(alpha = 0.6f)
+                            )
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("Time" to "Screen Time", "Battery" to "Battery", "Name" to "Name").forEach { (key, label) ->
@@ -582,13 +594,15 @@ fun AppSotRow(app: AppBatteryUsage) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = app.packageName,
-                    color = colors.textSecondary,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (app.appName != app.packageName) {
+                    Text(
+                        text = app.packageName,
+                        color = colors.textSecondary,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 Spacer(modifier = Modifier.height(6.dp))
                 LinearProgressIndicator(
                     progress = { (app.batteryUsagePct / 100f).coerceIn(0f, 1f) },

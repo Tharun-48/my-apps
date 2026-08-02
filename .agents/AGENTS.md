@@ -11,3 +11,6 @@
   2. Copy the newly compiled APK into `pro-stats/releases/` (name it with the current app version, e.g. `ProStats-v2.1.apk`)
   3. Delete `pro-stats/ProStats-Test.apk` if it still exists (old location, no longer used)
 - Ensure `pro-stats/releases/` is updated so that `auto-sync` pushes the newly compiled APK to GitHub.
+
+## Environment Constraints
+- **Hardware Limits**: The host machine is an older laptop (Pentium N3700 processor). Compiling Android applications and running heavy build tasks will take a significant amount of time. Give compilation processes ample time to complete.
