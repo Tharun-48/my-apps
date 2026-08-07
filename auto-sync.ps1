@@ -26,7 +26,7 @@ $ignorePatterns = @("\\\.git\\", "\\build\\", "\\target\\", "\\obj\\", "\\\.grad
 $lastChangeTime = [datetime]::MinValue
 $pendingSync = $false
 
-function Should-Ignore($path) {
+function Test-IsIgnored($path) {
     foreach ($pattern in $ignorePatterns) {
         if ($path -match $pattern) {
             return $true
@@ -76,7 +76,7 @@ function Sync-ToGitHub {
 # Register change events
 $action = {
     $path = $Event.SourceEventArgs.FullPath
-    if (-not (Should-Ignore $path)) {
+    if (-not (Test-IsIgnored $path)) {
         $script:lastChangeTime = [datetime]::Now
         $script:pendingSync = $true
     }
