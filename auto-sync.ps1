@@ -20,8 +20,8 @@ $watcher.Path = $repoPath
 $watcher.IncludeSubdirectories = $true
 $watcher.EnableRaisingEvents = $true
 
-# Ignore .git internals, build folders, temp files
-$ignorePatterns = @("\\\.git\\", "\\build\\", "\\obj\\", "\.class$", "\.tmp$")
+# Ignore .git internals, build folders, temp files, executables, rust target
+$ignorePatterns = @("\\\.git\\", "\\build\\", "\\target\\", "\\obj\\", "\\\.gradle\\", "\\\.idea\\", "\.class$", "\.tmp$", "\.exe$")
 
 $lastChangeTime = [datetime]::MinValue
 $pendingSync = $false

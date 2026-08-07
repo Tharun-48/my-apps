@@ -1,2 +1,15 @@
 # Ignore local workspace scripts
 scripts/
+
+# Build artifacts & executables
+target/
+**/target/
+build/
+**/build/
+.gradle/
+**/.gradle/
+*.exe
+*.tmp
+*.log
+.idea/
+**/.idea/

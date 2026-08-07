@@ -26,6 +26,9 @@ data class BatteryHealthData(
  * Reads system cycle count on API 34+, falls back to charge-counter estimation.
  */
 object BatteryHealthEstimator {
+    init {
+        System.loadLibrary("core_rs")
+    }
 
     private const val PREFS_NAME = "battery_health_prefs"
     private const val KEY_CHARGE_CYCLES = "charge_cycles"
@@ -211,16 +214,12 @@ object BatteryHealthEstimator {
     }
 
     private fun calculateHealthScore(cycles: Int, currentCapacity: Int, designCapacity: Int): Int {
-        val capacityRatio = if (designCapacity > 0) {
-            (currentCapacity.toFloat() / designCapacity).coerceIn(0f, 1.1f)
-        } else 1f
-
-        // Typical Li-ion: ~80% health at 500 cycles
-        val cycleFactor = (1f - (cycles / 1500f)).coerceIn(0.3f, 1f)
-
-        val score = ((capacityRatio * 0.7f + cycleFactor * 0.3f) * 100f).toInt()
-        return score.coerceIn(0, 100)
+        return calculateHealthScoreNative(cycles, currentCapacity, designCapacity)
     }
+
+    @JvmStatic
+    external fun calculateHealthScoreNative(cycles: Int, currentCapacity: Int, designCapacity: Int): Int
+
 
     private fun calculateDischargeRate(context: Context): Float {
         val points = BatteryTracker.getHistorySinceLastCharge(context)
