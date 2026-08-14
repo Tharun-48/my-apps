@@ -1,7 +1,7 @@
 # Workspace Rules for my-apps
 
 ## Git & Versioning Rules
-- **Git Commit on Changes**: Whenever any changes or fixes are made to code or configuration files in the workspace, you MUST perform a `git add` and `git commit` to commit the changes.
+- **Git Commit & Push on Changes**: Whenever any changes or fixes are made to code or configuration files in the workspace, you MUST perform a `git add`, `git commit`, and immediately run `git push origin main` to push the changes to GitHub.
 - **Do Not Change Version Number**: Do NOT increment or modify the application version number (e.g. `versionCode` or `versionName` in `build.gradle.kts`) unless explicitly instructed by the user.
 - **Maintain Change Log**: Keep a detailed historical log of all user inputs/requests and corresponding code modifications in [CHANGELOG.md](file:///c:/Users/SoloWanderer/Documents/antigravity/my-apps/CHANGELOG.md). Always update `CHANGELOG.md` whenever new changes are made.
 
