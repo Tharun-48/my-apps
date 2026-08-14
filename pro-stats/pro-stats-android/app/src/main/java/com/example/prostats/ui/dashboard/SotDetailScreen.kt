@@ -51,20 +51,6 @@ fun SotDetailScreen(
     // Periodic refresh loop every 15s for live metrics
     LaunchedEffect(Unit) {
         while (true) {
-            // Actively check and auto-reset if device is fully charged and currently on charger
-            val filter = android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED)
-            val intent = context.registerReceiver(null, filter)
-            val level = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
-            val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
-            val pct = if (level >= 0 && scale > 0) (level * 100) / scale else 0
-            val status = intent?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
-            val isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
-            val targetLevel = BatteryTracker.getTargetResetBatteryLevel(context)
-            
-            if (isCharging && pct >= targetLevel) {
-                BatteryTracker.updateLastUnplugFromFullTimestamp(context)
-            }
-            
             lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
             refreshTick++
             kotlinx.coroutines.delay(15000)
@@ -80,11 +66,11 @@ fun SotDetailScreen(
     var appSort by remember { mutableStateOf("Time") } // Time | Battery | Name
 
     // Time range toggle state
-    var timeRange by remember { mutableStateOf("Since Charge") } // "Since Charge" or "7d"
+    var timeRange by remember { mutableStateOf("Since Charge") } // "Since Charge" or "24h"
 
     val startTime = remember(lastUnplugTs, timeRange, refreshTick) {
         val now = System.currentTimeMillis()
-        if (timeRange == "Since Charge") lastUnplugTs else (now - 7 * 24 * 60 * 60 * 1000L)
+        if (timeRange == "Since Charge") lastUnplugTs else (now - 24 * 60 * 60 * 1000L)
     }
 
     // History points
@@ -92,7 +78,7 @@ fun SotDetailScreen(
         if (timeRange == "Since Charge") {
             BatteryTracker.getHistorySinceLastCharge(context)
         } else {
-            BatteryTracker.getHistory7d(context)
+            BatteryTracker.getHistory24h(context)
         }
     }
 
@@ -258,7 +244,7 @@ fun SotDetailScreen(
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         modifier = Modifier.background(colors.borderColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(2.dp)
                                     ) {
-                                        listOf("Since Charge", "7d").forEach { range ->
+                                        listOf("Since Charge", "24h").forEach { range ->
                                             val active = timeRange == range
                                             Box(
                                                 modifier = Modifier
@@ -327,7 +313,7 @@ fun SotDetailScreen(
                                     Text("SCREEN ON TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(totalSotFormatted, fontSize = 18.sp, color = colors.accentPurple, fontWeight = FontWeight.Bold)
-                                    Text(if (timeRange == "7d") "Last 7 days" else "Since unplugged", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
+                                    Text(if (timeRange == "24h") "Last 24 hours" else "Since unplugged", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
                                 }
                             }
                             Card(
@@ -339,7 +325,7 @@ fun SotDetailScreen(
                                     Text("SCREEN OFF TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(screenOffTimeFormatted, fontSize = 18.sp, color = colors.accentOrange, fontWeight = FontWeight.Bold)
-                                    Text(if (timeRange == "7d") "Last 7 days" else "Time in background", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
+                                    Text(if (timeRange == "24h") "Last 24 hours" else "Time in background", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
                                 }
                             }
                         }
@@ -438,7 +424,7 @@ fun SotDetailScreen(
                                 letterSpacing = 1.sp
                             )
                             Text(
-                                text = if (timeRange == "7d") "Last 7 days" else "Since unplugged",
+                                text = if (timeRange == "24h") "Last 24 hours" else "Since unplugged",
                                 fontSize = 10.sp,
                                 color = colors.textSecondary.copy(alpha = 0.6f)
                             )

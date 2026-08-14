@@ -53,23 +53,9 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
 
             ALARM_ACTION -> {
                 // Alarm-triggered periodic recording (every 30 minutes)
+                // NOTE: SOT baseline reset is intentionally NOT done here.
+                // It is handled exclusively by ACTION_POWER_DISCONNECTED when charger is unplugged at >= target level.
                 try {
-                    val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-                    val batteryIntent = context.registerReceiver(null, filter)
-                    val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-                    val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-                    val pct = if (level >= 0 && scale > 0) (level * 100) / scale else 0
-                    
-                    val targetResetLevel = BatteryTracker.getTargetResetBatteryLevel(context)
-                    val status = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-                    val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
-                    
-                    // Auto-reset cycle multiple times while device stays at or above target level on charger
-                    if (isCharging && pct >= targetResetLevel) {
-                        BatteryTracker.updateLastUnplugFromFullTimestamp(context)
-                        Log.d("BatteryTrackerReceiver", "Alarm: Battery at $pct% (>= $targetResetLevel%) while charging — auto-resetting SOT baseline")
-                    }
-
                     BatteryTracker.recordDataPoint(context)
                     BatteryHealthEstimator.trackCycleData(context)
                 } catch (e: Exception) {
