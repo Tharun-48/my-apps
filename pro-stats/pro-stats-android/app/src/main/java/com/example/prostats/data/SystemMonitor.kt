@@ -218,38 +218,89 @@ class SystemMonitor(private val context: Context) {
     }
 
     fun getScreenOnTimeMs(startTime: Long, endTime: Long): Long {
-        if (!hasUsageStatsPermission()) return 0
+        if (!hasUsageStatsPermission()) return 0L
+        val totalWindow = (endTime - startTime).coerceAtLeast(0L)
+        if (totalWindow == 0L) return 0L
+
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         try {
-            val events = usageStatsManager.queryEvents(startTime, endTime) ?: return 0
-            val event = android.app.usage.UsageEvents.Event()
+            val events = usageStatsManager.queryEvents(startTime, endTime)
             var screenOnTime = 0L
             var lastInteractiveStart = 0L
+            var sawAnyInteractiveEvent = false
+            var firstEventHandled = false
 
-            while (events.hasNextEvent()) {
-                events.getNextEvent(event)
-                when (event.eventType) {
-                    android.app.usage.UsageEvents.Event.SCREEN_INTERACTIVE -> {
-                        lastInteractiveStart = event.timeStamp
-                    }
-                    android.app.usage.UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
-                        if (lastInteractiveStart > 0L) {
-                            screenOnTime += (event.timeStamp - lastInteractiveStart).coerceAtLeast(0L)
-                            lastInteractiveStart = 0L
+            // Track app foreground intervals as fallback
+            val appResumeTimes = mutableMapOf<String, Long>()
+            var appForegroundAccumulator = 0L
+
+            if (events != null) {
+                val event = android.app.usage.UsageEvents.Event()
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    when (event.eventType) {
+                        android.app.usage.UsageEvents.Event.SCREEN_INTERACTIVE -> {
+                            sawAnyInteractiveEvent = true
+                            lastInteractiveStart = event.timeStamp
+                            firstEventHandled = true
+                        }
+                        android.app.usage.UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                            sawAnyInteractiveEvent = true
+                            if (lastInteractiveStart > 0L) {
+                                screenOnTime += (event.timeStamp - lastInteractiveStart).coerceAtLeast(0L)
+                                lastInteractiveStart = 0L
+                            } else if (!firstEventHandled) {
+                                // Screen was already interactive from startTime up to this non-interactive event
+                                screenOnTime += (event.timeStamp - startTime).coerceAtLeast(0L)
+                            }
+                            firstEventHandled = true
+                        }
+                        android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED -> {
+                            appResumeTimes[event.packageName] = event.timeStamp
+                        }
+                        android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED,
+                        android.app.usage.UsageEvents.Event.ACTIVITY_STOPPED -> {
+                            val start = appResumeTimes.remove(event.packageName)
+                            if (start != null && event.timeStamp > start) {
+                                appForegroundAccumulator += (event.timeStamp - start)
+                            }
                         }
                     }
                 }
+                // If still interactive at end of events
+                if (lastInteractiveStart > 0L) {
+                    screenOnTime += (endTime - lastInteractiveStart).coerceAtLeast(0L)
+                } else if (!sawAnyInteractiveEvent) {
+                    val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                    if (pm?.isInteractive == true && appForegroundAccumulator == 0L && totalWindow <= 60_000L) {
+                        screenOnTime = totalWindow
+                    }
+                }
             }
-            // If still interactive (screen never went off in this window)
-            if (lastInteractiveStart > 0L) {
-                screenOnTime += (endTime - lastInteractiveStart).coerceAtLeast(0L)
+
+            // If interactive events provided valid SOT, use it
+            if (screenOnTime > 0L) {
+                return screenOnTime.coerceIn(0L, totalWindow)
             }
-            return screenOnTime.coerceAtLeast(0L)
+
+            // Fallback 1: Foreground activity accumulation
+            if (appForegroundAccumulator > 0L) {
+                return appForegroundAccumulator.coerceIn(0L, totalWindow)
+            }
+
+            // Fallback 2: Aggregate usage stats
+            val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
+            val aggregateSot = statsMap?.values?.sumOf { it.totalTimeInForeground } ?: 0L
+            return aggregateSot.coerceIn(0L, totalWindow)
         } catch (e: Exception) {
-            Log.e("SystemMonitor", "queryEvents failed, falling back to aggregate", e)
-            // Fallback to aggregate stats
-            val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime) ?: return 0
-            return statsMap.values.sumOf { it.totalTimeInForeground }
+            Log.e("SystemMonitor", "getScreenOnTimeMs error, falling back to aggregate", e)
+            return try {
+                val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
+                val aggregateSot = statsMap?.values?.sumOf { it.totalTimeInForeground } ?: 0L
+                aggregateSot.coerceIn(0L, totalWindow)
+            } catch (ex: Exception) {
+                0L
+            }
         }
     }
 
@@ -414,9 +465,10 @@ class SystemMonitor(private val context: Context) {
     }
 
     fun getScreenOffTimeMs(startTime: Long, endTime: Long): Long {
-        val elapsed = (endTime - startTime).coerceAtLeast(0L)
-        val sotMs = getScreenOnTimeMs(startTime, endTime)
-        return (elapsed - sotMs).coerceAtLeast(0L)
+        val totalElapsed = (endTime - startTime).coerceAtLeast(0L)
+        if (totalElapsed == 0L) return 0L
+        val sotMs = getScreenOnTimeMs(startTime, endTime).coerceIn(0L, totalElapsed)
+        return (totalElapsed - sotMs).coerceIn(0L, totalElapsed)
     }
 
     /** Returns battery % that drained while screen was OFF since charger unplugged from >=90%. */

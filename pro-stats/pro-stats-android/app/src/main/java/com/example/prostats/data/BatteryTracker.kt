@@ -59,9 +59,14 @@ object BatteryTracker {
 
             val points = loadHistory(context).toMutableList()
             
-            // NOTE: charge-unplug tracking is handled by BatteryTrackerReceiver via ACTION_POWER_DISCONNECTED
-
             val temp = getBatteryTempNow(context)
+            val targetResetLevel = getTargetResetBatteryLevel(context)
+
+            // Auto-reset baseline when device is on charger at or above 90%
+            if (isChargingOrFull(context) && level >= targetResetLevel) {
+                updateLastUnplugFromFullTimestamp(context, now)
+                Log.d(TAG, "Device charging at $level% (>= $targetResetLevel%) — SOT baseline auto-reset")
+            }
 
             // Add new data point
             points.add(HistoryPoint(now, level, sotToday, temp))
@@ -213,6 +218,13 @@ object BatteryTracker {
         val intent = context.registerReceiver(null, filter)
         val temp = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
         return temp / 10.0f
+    }
+
+    private fun isChargingOrFull(context: Context): Boolean {
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val intent = context.registerReceiver(null, filter)
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        return status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
     }
 
     private fun getSotSinceLastCharge(context: Context): Long {

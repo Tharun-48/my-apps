@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -398,28 +399,41 @@ fun BatteryTempChart(
 ) {
     val colors = ProStatsColors.current
     val lineColor = colors.accentGreen
-    val gridColor = colors.borderColor.copy(alpha = 0.25f)
-    val labelColor = colors.textSecondary
+    val gridColor = if (colors.isDark) Color(0x1AFFFFFF) else Color(0x1A000000)
+    val labelColor = if (colors.isDark) android.graphics.Color.GRAY else android.graphics.Color.DKGRAY
+
+    val labelFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
     Canvas(modifier = modifier) {
         if (points.isEmpty()) return@Canvas
 
         val width = size.width
-        val height = size.height
+        val height = size.height - 20.dp.toPx() // reserve bottom space for X labels
         val range = (maxVal - minVal).coerceAtLeast(1f)
 
-        // Draw horizontal grid lines for 30°C, 38°C, 42°C
-        val gridLevels = listOf(30f, 38f, 42f)
+        val yLabelPaint = android.graphics.Paint().apply {
+            color = labelColor
+            textSize = 9.dp.toPx()
+            textAlign = android.graphics.Paint.Align.RIGHT
+            isAntiAlias = true
+        }
+
+        // Draw horizontal grid lines and side temperature scale labels
+        val gridLevels = listOf(20f, 25f, 30f, 35f, 38f, 40f, 42f, 45f, 50f).filter { it in minVal..maxVal }
         gridLevels.forEach { lvl ->
-            if (lvl in minVal..maxVal) {
-                val y = height - ((lvl - minVal) / range) * height
-                drawLine(
-                    color = gridColor,
-                    start = Offset(0f, y),
-                    end = Offset(width, y),
-                    strokeWidth = 1.dp.toPx()
-                )
-            }
+            val y = height - ((lvl - minVal) / range) * height
+            drawLine(
+                color = gridColor,
+                start = Offset(0f, y),
+                end = Offset(width, y),
+                strokeWidth = 1.dp.toPx()
+            )
+            drawContext.canvas.nativeCanvas.drawText(
+                "${lvl.toInt()}°C",
+                width - 4.dp.toPx(),
+                y - 4.dp.toPx(),
+                yLabelPaint
+            )
         }
 
         val path = Path()
@@ -462,7 +476,7 @@ fun BatteryTempChart(
         drawPath(
             path = fillPath,
             brush = Brush.verticalGradient(
-                colors = listOf(lineColor.copy(alpha = 0.35f), Color.Transparent)
+                colors = listOf(lineColor.copy(alpha = 0.3f), Color.Transparent)
             )
         )
 
@@ -472,5 +486,34 @@ fun BatteryTempChart(
             color = lineColor,
             style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
         )
+
+        // Bottom X-axis timestamps
+        val sortedPoints = points.sortedBy { it.timestamp }
+        val minTime = sortedPoints.first().timestamp
+        val maxTime = sortedPoints.last().timestamp
+        val timeSpan = (maxTime - minTime).coerceAtLeast(1L)
+        val isMultiDay = timeSpan > 24 * 60 * 60 * 1000L
+        val dynamicFormat = if (isMultiDay) SimpleDateFormat("dd/MM", Locale.getDefault()) else labelFormat
+
+        val xLabelPaint = android.graphics.Paint().apply {
+            color = labelColor
+            textSize = 9.dp.toPx()
+            textAlign = android.graphics.Paint.Align.CENTER
+            isAntiAlias = true
+        }
+
+        val steps = 4
+        val timeStep = timeSpan / steps
+        for (i in 0..steps) {
+            val targetTime = minTime + i * timeStep
+            val x = (i.toFloat() / steps) * width
+            val dateStr = dynamicFormat.format(Date(targetTime))
+            drawContext.canvas.nativeCanvas.drawText(
+                dateStr,
+                x.coerceIn(24.dp.toPx(), width - 24.dp.toPx()),
+                height + 15.dp.toPx(),
+                xLabelPaint
+            )
+        }
     }
 }

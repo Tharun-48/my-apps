@@ -66,19 +66,23 @@ fun SotDetailScreen(
     var appSort by remember { mutableStateOf("Time") } // Time | Battery | Name
 
     // Time range toggle state
-    var timeRange by remember { mutableStateOf("Since Charge") } // "Since Charge" or "24h"
+    var timeRange by remember { mutableStateOf("Since Charge") } // "Since Charge", "24h", or "7d"
 
     val startTime = remember(lastUnplugTs, timeRange, refreshTick) {
         val now = System.currentTimeMillis()
-        if (timeRange == "Since Charge") lastUnplugTs else (now - 24 * 60 * 60 * 1000L)
+        when (timeRange) {
+            "Since Charge" -> lastUnplugTs
+            "7d" -> now - 7 * 24 * 60 * 60 * 1000L
+            else -> now - 24 * 60 * 60 * 1000L
+        }
     }
 
     // History points
-    val points = remember(startTime, refreshTick) {
-        if (timeRange == "Since Charge") {
-            BatteryTracker.getHistorySinceLastCharge(context)
-        } else {
-            BatteryTracker.getHistory24h(context)
+    val points = remember(startTime, refreshTick, timeRange) {
+        when (timeRange) {
+            "Since Charge" -> BatteryTracker.getHistorySinceLastCharge(context)
+            "7d" -> BatteryTracker.getHistory7d(context)
+            else -> BatteryTracker.getHistory24h(context)
         }
     }
 
@@ -244,7 +248,7 @@ fun SotDetailScreen(
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         modifier = Modifier.background(colors.borderColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(2.dp)
                                     ) {
-                                        listOf("Since Charge", "24h").forEach { range ->
+                                        listOf("Since Charge", "24h", "7d").forEach { range ->
                                             val active = timeRange == range
                                             Box(
                                                 modifier = Modifier
@@ -304,6 +308,17 @@ fun SotDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
+                            val sotSubtitle = when (timeRange) {
+                                "7d" -> "Last 7 days"
+                                "24h" -> "Last 24 hours"
+                                else -> "Since unplugged"
+                            }
+                            val screenOffSubtitle = when (timeRange) {
+                                "7d" -> "Last 7 days"
+                                "24h" -> "Last 24 hours"
+                                else -> "Time in background"
+                            }
+
                             Card(
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
@@ -313,7 +328,7 @@ fun SotDetailScreen(
                                     Text("SCREEN ON TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(totalSotFormatted, fontSize = 18.sp, color = colors.accentPurple, fontWeight = FontWeight.Bold)
-                                    Text(if (timeRange == "24h") "Last 24 hours" else "Since unplugged", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
+                                    Text(sotSubtitle, fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
                                 }
                             }
                             Card(
@@ -325,7 +340,7 @@ fun SotDetailScreen(
                                     Text("SCREEN OFF TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(screenOffTimeFormatted, fontSize = 18.sp, color = colors.accentOrange, fontWeight = FontWeight.Bold)
-                                    Text(if (timeRange == "24h") "Last 24 hours" else "Time in background", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
+                                    Text(screenOffSubtitle, fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
                                 }
                             }
                         }
@@ -424,7 +439,11 @@ fun SotDetailScreen(
                                 letterSpacing = 1.sp
                             )
                             Text(
-                                text = if (timeRange == "24h") "Last 24 hours" else "Since unplugged",
+                                text = when (timeRange) {
+                                    "7d" -> "Last 7 days"
+                                    "24h" -> "Last 24 hours"
+                                    else -> "Since unplugged"
+                                },
                                 fontSize = 10.sp,
                                 color = colors.textSecondary.copy(alpha = 0.6f)
                             )
