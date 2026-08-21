@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -87,18 +89,26 @@ fun BatteryTempDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Battery Temperature Stats",
+                        text = "Battery Temperature Stats",
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary,
                         fontSize = 18.sp
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(38.dp)
+                            .background(colors.elevatedSurface, CircleShape)
+                            .border(1.dp, colors.borderColorSubtle, CircleShape)
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = colors.textPrimary
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 },
@@ -114,16 +124,16 @@ fun BatteryTempDetailScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 32.dp)
+            contentPadding = PaddingValues(bottom = 28.dp)
         ) {
-            // Section 1: Time Range Toggle
+            // Section 1: Time Range Segmented Pill
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(colors.cardSurface, RoundedCornerShape(16.dp))
-                        .border(1.dp, colors.borderColor, RoundedCornerShape(16.dp))
+                        .background(colors.elevatedSurface, RoundedCornerShape(14.dp))
+                        .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(14.dp))
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -133,21 +143,21 @@ fun BatteryTempDetailScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .background(
-                                    if (active) colors.accentGreen.copy(alpha = 0.15f) else Color.Transparent,
-                                    RoundedCornerShape(12.dp)
+                                    if (active) colors.accentGreen.copy(alpha = 0.16f) else Color.Transparent,
+                                    RoundedCornerShape(10.dp)
                                 )
                                 .border(
                                     width = if (active) 1.dp else 0.dp,
-                                    color = if (active) colors.accentGreen else Color.Transparent,
-                                    shape = RoundedCornerShape(12.dp)
+                                    color = if (active) colors.accentGreen.copy(alpha = 0.4f) else Color.Transparent,
+                                    shape = RoundedCornerShape(10.dp)
                                 )
                                 .clickable { timeRange = range }
-                                .padding(vertical = 10.dp),
+                                .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = if (range == "Today") "Today (24h)" else "Last 7 Days",
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                                 color = if (active) colors.accentGreen else colors.textSecondary
                             )
@@ -156,36 +166,33 @@ fun BatteryTempDetailScreen(
                 }
             }
 
-            // Section 2: Temperature Metrics Overview Cards (Highest, Normal/Avg, Lowest)
+            // Section 2: Temperature Metrics Overview Symmetrical Cards
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Highest Temp Card
                     TempMetricCard(
                         title = "HIGHEST",
                         value = "${String.format("%.1f", maxTemp)}°C",
-                        subtitle = "Peak Temp",
-                        color = if (maxTemp >= 42f) Color(0xFFFF453A) else Color(0xFFFF9F0A),
+                        subtitle = "Peak Thermal",
+                        color = if (maxTemp >= 42f) Color(0xFFEF4444) else Color(0xFFFB923C),
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Normal / Average Temp Card
                     TempMetricCard(
-                        title = "NORMAL / AVG",
+                        title = "AVERAGE",
                         value = "${String.format("%.1f", avgTemp)}°C",
-                        subtitle = "Average Temp",
+                        subtitle = "Normal Range",
                         color = colors.accentGreen,
                         modifier = Modifier.weight(1f)
                     )
 
-                    // Lowest Temp Card
                     TempMetricCard(
                         title = "LOWEST",
                         value = "${String.format("%.1f", minTemp)}°C",
-                        subtitle = "Coolest Temp",
-                        color = Color(0xFF64D2FF),
+                        subtitle = "Cool Baseline",
+                        color = Color(0xFF38BDF8),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -194,13 +201,13 @@ fun BatteryTempDetailScreen(
             // Section 3: Interactive Temperature Trend Graph Card
             item {
                 Card(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
+                        .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
                 ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
+                    Column(modifier = Modifier.padding(18.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -217,19 +224,26 @@ fun BatteryTempDetailScreen(
                                 Text(
                                     text = if (timeRange == "Today") "Thermal logs for last 24 hours" else "Thermal logs for last 7 days",
                                     fontSize = 11.sp,
-                                    color = colors.textSecondary
+                                    color = colors.textTertiary
                                 )
                             }
-                            Text(
-                                text = "Now: ${String.format("%.1f", currentTemp)}°C",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = when {
-                                    currentTemp >= 42f -> Color(0xFFFF453A)
-                                    currentTemp >= 38f -> Color(0xFFFF9F0A)
-                                    else -> colors.accentGreen
-                                }
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .background(colors.elevatedSurface, RoundedCornerShape(8.dp))
+                                    .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "Now: ${String.format("%.1f", currentTemp)}°C",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = when {
+                                        currentTemp >= 42f -> Color(0xFFEF4444)
+                                        currentTemp >= 38f -> colors.accentOrange
+                                        else -> colors.accentGreen
+                                    }
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -239,7 +253,6 @@ fun BatteryTempDetailScreen(
                             if (historyPoints.size >= 2) {
                                 historyPoints.sortedBy { it.timestamp }
                             } else {
-                                // Demo smoothed historical fallback points for visual richness
                                 val now = System.currentTimeMillis()
                                 val step = if (timeRange == "Today") 3 * 3600 * 1000L else 24 * 3600 * 1000L
                                 val baseTemp = (avgTemp - 2f).coerceAtLeast(25f)
@@ -247,8 +260,8 @@ fun BatteryTempDetailScreen(
                                     val t = now - (6 - i) * step
                                     val tempVariation = when (i) {
                                         2 -> 4.5f
-                                        4 -> 7.0f
-                                        5 -> 3.2f
+                                        4 -> 6.8f
+                                        5 -> 3.0f
                                         else -> 1.0f
                                     }
                                     HistoryPoint(t, 80, 0L, (baseTemp + tempVariation).coerceIn(24f, 45f))
@@ -262,20 +275,20 @@ fun BatteryTempDetailScreen(
                             maxVal = (maxTemp + 3f).coerceAtMost(55f),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(180.dp)
+                                .height(190.dp)
                         )
                     }
                 }
             }
 
-            // Section 4: Temperature Distribution & Thermal Zones Breakdown
+            // Section 4: Thermal Zones Breakdown
             item {
                 Card(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
+                        .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text(
@@ -293,29 +306,29 @@ fun BatteryTempDetailScreen(
                         val warmPct = (validTemps.count { it in 40f..44.9f } / totalCount) * 100f
                         val hotPct = (validTemps.count { it >= 45f } / totalCount) * 100f
 
-                        ThermalZoneRow("❄️ Cool (<35°C)", coolPct, Color(0xFF64D2FF))
+                        ThermalZoneRow("❄️ Cool (<35°C)", coolPct, Color(0xFF38BDF8))
                         Spacer(modifier = Modifier.height(10.dp))
                         ThermalZoneRow("✅ Normal (35°C - 39°C)", if (validTemps.size <= 1) 85f else normalPct, colors.accentGreen)
                         Spacer(modifier = Modifier.height(10.dp))
-                        ThermalZoneRow("⚠️ Warm (40°C - 44°C)", if (validTemps.size <= 1) 15f else warmPct, Color(0xFFFF9F0A))
+                        ThermalZoneRow("⚠️ Warm (40°C - 44°C)", if (validTemps.size <= 1) 15f else warmPct, Color(0xFFFB923C))
                         Spacer(modifier = Modifier.height(10.dp))
-                        ThermalZoneRow("🔥 Hot (≥45°C)", hotPct, Color(0xFFFF453A))
+                        ThermalZoneRow("🔥 Hot (≥45°C)", hotPct, Color(0xFFEF4444))
                     }
                 }
             }
 
-            // Section 5: Current Live Hardware Diagnostics
+            // Section 5: Current Live Hardware Diagnostics & Longevity Tip
             item {
                 Card(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
+                        .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text(
-                            text = "LIVE THERMAL HARDWARE STATE",
+                            text = "HARDWARE THERMAL STATE",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = colors.textSecondary,
@@ -326,13 +339,13 @@ fun BatteryTempDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text("Battery Temp: ${String.format("%.1f", currentTemp)}°C", fontSize = 13.sp, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                                 Text("CPU Temp: ${String.format("%.1f", cpuTemp)}°C", fontSize = 12.sp, color = colors.textSecondary)
                             }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text("Thermal Status: $thermalStatus", fontSize = 13.sp, color = if (thermalStatus != "Normal") Color.Red else colors.accentGreen, fontWeight = FontWeight.SemiBold)
-                                Text("Sampling Rate: Every 5s", fontSize = 11.sp, color = colors.textSecondary)
+                            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Status: $thermalStatus", fontSize = 13.sp, color = if (thermalStatus != "Normal") Color(0xFFEF4444) else colors.accentGreen, fontWeight = FontWeight.Bold)
+                                Text("Sampled: Every 5s", fontSize = 11.sp, color = colors.textTertiary)
                             }
                         }
                     }
@@ -352,16 +365,31 @@ fun TempMetricCard(
 ) {
     val colors = ProStatsColors.current
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-        modifier = modifier.border(1.dp, colors.borderColor, RoundedCornerShape(16.dp))
+        modifier = modifier.border(1.dp, colors.borderColor, RoundedCornerShape(18.dp))
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(title, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = colors.textSecondary, letterSpacing = 0.5.sp)
+            Text(
+                text = title,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textSecondary,
+                letterSpacing = 0.5.sp
+            )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
+            Text(
+                text = value,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(subtitle, fontSize = 10.sp, color = colors.textSecondary)
+            Text(
+                text = subtitle,
+                fontSize = 10.sp,
+                color = colors.textTertiary
+            )
         }
     }
 }
@@ -378,14 +406,15 @@ fun ThermalZoneRow(label: String, pct: Float, color: Color) {
             Text(label, fontSize = 12.sp, color = colors.textPrimary, fontWeight = FontWeight.Medium)
             Text("${pct.toInt()}%", fontSize = 12.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
         }
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         LinearProgressIndicator(
             progress = { (pct / 100f).coerceIn(0f, 1f) },
             color = color,
-            trackColor = colors.borderColor.copy(alpha = 0.2f),
+            trackColor = colors.elevatedSurface,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
         )
     }
 }
@@ -399,7 +428,7 @@ fun BatteryTempChart(
 ) {
     val colors = ProStatsColors.current
     val lineColor = colors.accentGreen
-    val gridColor = if (colors.isDark) Color(0x1AFFFFFF) else Color(0x1A000000)
+    val gridColor = if (colors.isDark) Color(0x18FFFFFF) else Color(0x14000000)
     val labelColor = if (colors.isDark) android.graphics.Color.GRAY else android.graphics.Color.DKGRAY
 
     val labelFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
@@ -408,7 +437,7 @@ fun BatteryTempChart(
         if (points.isEmpty()) return@Canvas
 
         val width = size.width
-        val height = size.height - 20.dp.toPx() // reserve bottom space for X labels
+        val height = size.height - 22.dp.toPx()
         val range = (maxVal - minVal).coerceAtLeast(1f)
 
         val yLabelPaint = android.graphics.Paint().apply {
@@ -438,7 +467,6 @@ fun BatteryTempChart(
 
         val path = Path()
         val fillPath = Path()
-
         val stepX = width / (points.size - 1).coerceAtLeast(1)
 
         points.forEachIndexed { index, pt ->
@@ -463,8 +491,8 @@ fun BatteryTempChart(
             // Draw point dots
             drawCircle(
                 color = when {
-                    temp >= 42f -> Color(0xFFFF453A)
-                    temp >= 38f -> Color(0xFFFF9F0A)
+                    temp >= 42f -> Color(0xFFEF4444)
+                    temp >= 38f -> Color(0xFFFB923C)
                     else -> lineColor
                 },
                 radius = 3.dp.toPx(),
@@ -476,7 +504,7 @@ fun BatteryTempChart(
         drawPath(
             path = fillPath,
             brush = Brush.verticalGradient(
-                colors = listOf(lineColor.copy(alpha = 0.3f), Color.Transparent)
+                colors = listOf(lineColor.copy(alpha = 0.22f), Color.Transparent)
             )
         )
 
@@ -511,7 +539,7 @@ fun BatteryTempChart(
             drawContext.canvas.nativeCanvas.drawText(
                 dateStr,
                 x.coerceIn(24.dp.toPx(), width - 24.dp.toPx()),
-                height + 15.dp.toPx(),
+                height + 16.dp.toPx(),
                 xLabelPaint
             )
         }

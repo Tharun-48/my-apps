@@ -5,23 +5,25 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,7 +57,7 @@ fun SettingsScreen(
     var overlayCpu by remember { mutableStateOf(OverlayService.isCpuEnabled(context)) }
     var overlayRam by remember { mutableStateOf(OverlayService.isRamEnabled(context)) }
 
-    val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+    val prefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
     var currentTheme by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
 
     var latestVersion by remember { mutableStateOf<String?>(null) }
@@ -89,7 +91,7 @@ fun SettingsScreen(
                     var maxVersionNum = 2.2f
                     for (i in 0 until jsonArray.length()) {
                         val obj = jsonArray.getJSONObject(i)
-                        val name = obj.getString("name") // e.g., ProStats-v2.2.apk
+                        val name = obj.getString("name")
                         if (name.endsWith(".apk") && name.contains("-v")) {
                             val vStr = name.substringAfter("-v").substringBefore(".apk")
                             val vNum = vStr.toFloatOrNull()
@@ -152,10 +154,29 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings & Overlays", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
+                title = {
+                    Text(
+                        text = "Settings & Overlays",
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        fontSize = 18.sp
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textPrimary)
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(38.dp)
+                            .background(colors.elevatedSurface, CircleShape)
+                            .border(1.dp, colors.borderColorSubtle, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
@@ -177,11 +198,11 @@ fun SettingsScreen(
 
             // Shizuku Service Integration Card
             Card(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+                    .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(
@@ -190,9 +211,22 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Build, contentDescription = null, tint = colors.accentPurple)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Shizuku Status", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(colors.accentPurple.copy(alpha = 0.15f), CircleShape)
+                                    .border(1.dp, colors.accentPurple.copy(alpha = 0.3f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Build,
+                                    contentDescription = null,
+                                    tint = colors.accentPurple,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Shizuku Wireless ADB", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         }
 
                         val statusText = when {
@@ -206,40 +240,51 @@ fun SettingsScreen(
                             else -> colors.accentOrange
                         }
 
-                        Text(
-                            text = statusText,
-                            color = statusColor,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp,
+                        Box(
                             modifier = Modifier
-                                .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                .background(statusColor.copy(alpha = 0.16f), RoundedCornerShape(8.dp))
+                                .border(1.dp, statusColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                        ) {
+                            Text(
+                                text = statusText,
+                                color = statusColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    // Shizuku benefits explanation & Action buttons
                     if (isShizukuRunning && hasShizukuPerm) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = colors.accentGreen.copy(alpha = 0.1f)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.accentGreen.copy(alpha = 0.1f), RoundedCornerShape(14.dp))
+                                .border(1.dp, colors.accentGreen.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
+                                .padding(14.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column {
                                 Text("Pro Mode Active", color = colors.accentGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("• Real-time CPU & RAM per process via 'top'\n• Force stop & freeze apps via ADB\n• Enhanced battery stats via 'dumpsys'\n• Wakelock monitoring via 'dumpsys power'\n• More accurate battery drain estimation",
-                                    color = colors.textPrimary, fontSize = 12.sp, lineHeight = 18.sp)
+                                Text(
+                                    text = "• Real-time CPU & RAM per process\n• Force stop & freeze background apps\n• Battery stats via dumpsys\n• Wakelock analysis via dumpsys power",
+                                    color = colors.textPrimary,
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp
+                                )
                             }
                         }
                     } else if (isShizukuRunning && !hasShizukuPerm) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = colors.accentYellow.copy(alpha = 0.12f)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.accentYellow.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+                                .border(1.dp, colors.accentYellow.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                                .padding(14.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column {
                                 Text("Shizuku Running — Permission Needed", color = colors.accentYellow, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("Shizuku service is running. Tap below to grant permission to ProStats.", color = colors.textPrimary, fontSize = 12.sp)
@@ -247,23 +292,25 @@ fun SettingsScreen(
                                 Button(
                                     onClick = { systemMonitor.requestShizukuPermission() },
                                     colors = ButtonDefaults.buttonColors(containerColor = colors.accentYellow, contentColor = Color.Black),
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("Grant Shizuku Permission", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("Grant Shizuku Permission", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
                             }
                         }
                     } else {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = colors.accentOrange.copy(alpha = 0.12f)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.accentOrange.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+                                .border(1.dp, colors.accentOrange.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                                .padding(14.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column {
                                 Text("Shizuku Service Not Running", color = colors.accentOrange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("Open Shizuku app to start the service via Wireless Debugging or ADB. If you don't have the app, download it below.", color = colors.textPrimary, fontSize = 12.sp)
+                                Text("Open Shizuku app to start the service via Wireless Debugging or ADB to unlock Pro Mode task management.", color = colors.textPrimary, fontSize = 12.sp)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -282,19 +329,19 @@ fun SettingsScreen(
                                             }
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = colors.accentOrange, contentColor = Color.Black),
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Text("Open App", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                     }
-                                    
+
                                     Button(
                                         onClick = {
                                             val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app"))
                                             context.startActivity(webIntent)
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = colors.elevatedSurface, contentColor = colors.textPrimary),
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Text("Download App", fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -305,8 +352,8 @@ fun SettingsScreen(
                     }
 
                     // Usage Access status
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(color = colors.borderColor)
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = colors.borderColorSubtle)
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier
@@ -318,75 +365,92 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Usage Access", color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text("Usage Stats Access", color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             Text(
-                                text = if (hasUsageAccess) "Granted — improves SOT and battery accuracy" 
-                                       else "Not granted — tap to enable for better accuracy",
-                                color = colors.textSecondary, fontSize = 11.sp
+                                text = if (hasUsageAccess) "Granted — enables SOT & foreground tracking"
+                                else "Not granted — tap to enable for stats",
+                                color = colors.textSecondary,
+                                fontSize = 11.sp
                             )
-                            if (isShizukuRunning && hasShizukuPerm && hasUsageAccess) {
-                                Text(
-                                    text = "✓ Combined with Shizuku for maximum accuracy",
-                                    color = colors.accentGreen, fontSize = 11.sp
-                                )
-                            }
                         }
                         val accessColor = if (hasUsageAccess) colors.accentGreen else colors.accentOrange
-                        Text(
-                            text = if (hasUsageAccess) "GRANTED" else "GRANT",
-                            color = accessColor,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp,
+                        Box(
                             modifier = Modifier
-                                .background(accessColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                .background(accessColor.copy(alpha = 0.16f), RoundedCornerShape(8.dp))
+                                .border(1.dp, accessColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                        ) {
+                            Text(
+                                text = if (hasUsageAccess) "GRANTED" else "GRANT",
+                                color = accessColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
                 }
             }
 
             // App Theme Card
             Card(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+                    .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = colors.accentBlue)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("App Theme", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(colors.accentBlue.copy(alpha = 0.15f), CircleShape)
+                                .border(1.dp, colors.accentBlue.copy(alpha = 0.3f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = colors.accentBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("App Visual Theme", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-                    
-                    val themes = listOf("Material You", "Light", "Dark", "Pure Black (AMOLED)")
-                    themes.forEach { theme ->
+
+                    val themes = listOf(
+                        Triple("Material You", "Dynamic colors from system wallpaper", colors.accentGreen),
+                        Triple("Dark", "Sleek slate dark theme with high contrast", Color(0xFF86EFAC)),
+                        Triple("Pure Black (AMOLED)", "Deep OLED black for power savings", Color.White),
+                        Triple("Light", "Clean bright background with sharp typography", colors.accentBlue)
+                    )
+
+                    themes.forEachIndexed { index, (theme, desc, dotColor) ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable {
                                     currentTheme = theme
                                     prefs.edit().putString("app_theme", theme).apply()
                                 }
-                                .padding(vertical = 12.dp),
+                                .padding(vertical = 10.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column {
-                                Text(theme, color = colors.textPrimary, fontSize = 14.sp)
-                                Text(
-                                    text = when (theme) {
-                                        "Material You" -> "Dynamic colors from your wallpaper"
-                                        "Light" -> "Bright backgrounds with dark text"
-                                        "Dark" -> "Dark backgrounds with light text"
-                                        "Pure Black (AMOLED)" -> "True black for OLED power savings"
-                                        else -> ""
-                                    },
-                                    color = colors.textSecondary,
-                                    fontSize = 11.sp
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(dotColor, CircleShape)
                                 )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(theme, color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text(desc, color = colors.textSecondary, fontSize = 11.sp)
+                                }
                             }
                             RadioButton(
                                 selected = currentTheme == theme,
@@ -394,11 +458,11 @@ fun SettingsScreen(
                                     currentTheme = theme
                                     prefs.edit().putString("app_theme", theme).apply()
                                 },
-                                colors = RadioButtonDefaults.colors(selectedColor = colors.accentBlue, unselectedColor = colors.textSecondary)
+                                colors = RadioButtonDefaults.colors(selectedColor = colors.accentGreen, unselectedColor = colors.textTertiary)
                             )
                         }
-                        if (theme != themes.last()) {
-                            HorizontalDivider(color = colors.borderColor)
+                        if (index < themes.size - 1) {
+                            HorizontalDivider(color = colors.borderColorSubtle)
                         }
                     }
                 }
@@ -406,35 +470,50 @@ fun SettingsScreen(
 
             // Floating Overlays Card
             Card(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+                    .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = colors.accentGreen)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("System Floating HUD Overlays", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(colors.accentGreen.copy(alpha = 0.15f), CircleShape)
+                                .border(1.dp, colors.accentGreen.copy(alpha = 0.3f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.List,
+                                contentDescription = null,
+                                tint = colors.accentGreen,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("System Floating HUD Overlays", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "Display live metrics overlay on top of any application on your screen.",
+                        text = "Display real-time diagnostic indicators over other applications.",
                         color = colors.textSecondary,
-                        fontSize = 13.sp
+                        fontSize = 12.sp
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     if (!canDrawOverlay) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = colors.accentOrange.copy(alpha = 0.13f)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.accentOrange.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                                .border(1.dp, colors.accentOrange.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .padding(12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column {
                                 Text("Display Over Apps Permission Required", color = colors.accentOrange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("Grant overlay permission so ProStats can draw the HUD floating widget.", color = colors.textPrimary, fontSize = 12.sp)
@@ -454,7 +533,7 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                     }
 
                     // Toggles
@@ -469,11 +548,11 @@ fun SettingsScreen(
                         }
                     )
 
-                    HorizontalDivider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = colors.borderColorSubtle, modifier = Modifier.padding(vertical = 6.dp))
 
                     OverlayToggleRow(
                         title = "Battery Current (mA)",
-                        subtitle = "Realtime discharge / charge current rate",
+                        subtitle = "Realtime discharge & charge rate",
                         checked = overlayMa,
                         onCheckedChange = {
                             overlayMa = it
@@ -482,11 +561,11 @@ fun SettingsScreen(
                         }
                     )
 
-                    HorizontalDivider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = colors.borderColorSubtle, modifier = Modifier.padding(vertical = 6.dp))
 
                     OverlayToggleRow(
                         title = "Refresh Rate (Hz)",
-                        subtitle = "Screen display FPS / Hz rate",
+                        subtitle = "Screen display refresh rate",
                         checked = overlayHz,
                         onCheckedChange = {
                             overlayHz = it
@@ -495,7 +574,7 @@ fun SettingsScreen(
                         }
                     )
 
-                    HorizontalDivider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = colors.borderColorSubtle, modifier = Modifier.padding(vertical = 6.dp))
 
                     OverlayToggleRow(
                         title = "CPU Usage (%)",
@@ -508,11 +587,11 @@ fun SettingsScreen(
                         }
                     )
 
-                    HorizontalDivider(color = colors.borderColor, modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = colors.borderColorSubtle, modifier = Modifier.padding(vertical = 6.dp))
 
                     OverlayToggleRow(
                         title = "RAM Usage (%)",
-                        subtitle = "Memory load allocation",
+                        subtitle = "System memory allocation load",
                         checked = overlayRam,
                         onCheckedChange = {
                             overlayRam = it
@@ -529,35 +608,50 @@ fun SettingsScreen(
             val logDir = AppLogger.getLogDirectory(context)
 
             Card(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+                    .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Build, contentDescription = null, tint = colors.accentBlue)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Log & Error Reporting", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(colors.accentBlue.copy(alpha = 0.15f), CircleShape)
+                                .border(1.dp, colors.accentBlue.copy(alpha = 0.3f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Build,
+                                contentDescription = null,
+                                tint = colors.accentBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Log & Error Diagnostics", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "Errors and crash reports are automatically recorded in a log folder on your phone outside the Android system folder.",
+                        text = "Crash dumps and diagnostic traces are logged outside the Android sandbox directory for easy inspection.",
                         color = colors.textSecondary,
-                        fontSize = 13.sp
+                        fontSize = 12.sp
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.elevatedSurface, RoundedCornerShape(12.dp))
+                            .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(12.dp))
+                            .padding(12.dp)
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("Log Folder Path", color = colors.accentBlue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
+                        Column {
+                            Text("Storage Location", color = colors.accentBlue, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = logDir.absolutePath,
                                 color = colors.textPrimary,
@@ -570,20 +664,20 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     if (!hasStoragePermission) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = colors.accentOrange.copy(alpha = 0.13f)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.accentOrange.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                                .border(1.dp, colors.accentOrange.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .padding(12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Storage Access Permission Recommended", color = colors.accentOrange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Column {
+                                Text("Storage Access Recommended", color = colors.accentOrange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("Grant storage access to allow log file writing directly outside the Android system folder.", color = colors.textPrimary, fontSize = 12.sp)
+                                Text("Allow storage access to write log files directly to internal storage.", color = colors.textPrimary, fontSize = 12.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
-                                    onClick = {
-                                        AppLogger.requestStoragePermission(context)
-                                    },
+                                    onClick = { AppLogger.requestStoragePermission(context) },
                                     colors = ButtonDefaults.buttonColors(containerColor = colors.accentOrange, contentColor = Color.Black),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
@@ -594,21 +688,16 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Button(
+                        onClick = {
+                            AppLogger.logError(context, "TestTag", "Manual diagnostic test log generated from Settings")
+                            testLogStatus = "Diagnostic test log written to ${logDir.name}"
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.elevatedSurface, contentColor = colors.textPrimary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Button(
-                            onClick = {
-                                AppLogger.logError(context, "TestTag", "Manual test error log generated from Settings")
-                                testLogStatus = "Test log written to: ${logDir.name}"
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = colors.elevatedSurface, contentColor = colors.textPrimary),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Write Test Log Entry", fontSize = 12.sp)
-                        }
+                        Text("Write Diagnostic Test Log Entry", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     }
 
                     if (testLogStatus != null) {
@@ -617,39 +706,62 @@ fun SettingsScreen(
                     }
                 }
             }
-            
+
             // About & Updates
             Card(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+                    .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = colors.accentYellow)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("About & Updates", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(colors.accentYellow.copy(alpha = 0.15f), CircleShape)
+                                .border(1.dp, colors.accentYellow.copy(alpha = 0.3f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = colors.accentYellow,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("About & Release Status", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Version", color = colors.textSecondary, fontSize = 14.sp)
-                        Text("v2.2", color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Installed Version", color = colors.textSecondary, fontSize = 13.sp)
+                        Box(
+                            modifier = Modifier
+                                .background(colors.elevatedSurface, RoundedCornerShape(8.dp))
+                                .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("v2.2", color = colors.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
-                    
+
                     if (updateAvailable && latestVersion != null) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = colors.accentGreen.copy(alpha = 0.15f)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.accentGreen.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                .border(1.dp, colors.accentGreen.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .padding(12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text("New Update Available: v$latestVersion!", color = colors.accentGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Column {
+                                Text("New Update Available: v$latestVersion!", color = colors.accentGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
                                     onClick = {
@@ -666,7 +778,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Button(
                         onClick = {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Tharun-48/my-apps/tree/main/pro-stats/releases"))
@@ -676,12 +788,12 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Check for Updates on GitHub")
+                        Text("Check Releases on GitHub", fontSize = 13.sp)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -702,7 +814,7 @@ fun OverlayToggleRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(title, color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             Text(subtitle, color = colors.textSecondary, fontSize = 11.sp)
         }
         Switch(

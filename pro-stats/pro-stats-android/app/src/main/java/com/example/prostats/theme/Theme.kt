@@ -20,16 +20,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 /**
- * App-specific colors used throughout all screens.
- * This bridges the hardcoded color system with theme-awareness.
+ * App-specific design tokens combining Material 3 surface containers with
+ * Apple HIG clarity, translucent depth, and vibrant accent contrasts.
  */
 data class AppColors(
     val background: Color,
     val cardSurface: Color,
     val elevatedSurface: Color,
+    val surfaceContainerLow: Color,
+    val surfaceContainerHigh: Color,
     val textPrimary: Color,
     val textSecondary: Color,
+    val textTertiary: Color,
     val borderColor: Color,
+    val borderColorSubtle: Color,
     val accentGreen: Color,
     val accentOrange: Color,
     val accentPurple: Color,
@@ -40,7 +44,7 @@ data class AppColors(
 )
 
 val LocalAppColors = staticCompositionLocalOf {
-    darkAppColors() // default
+    darkAppColors()
 }
 
 // Provide easy access everywhere
@@ -51,83 +55,95 @@ object ProStatsColors {
 }
 
 fun darkAppColors() = AppColors(
-    background = Color(0xFF0A0A0C),
-    cardSurface = Color(0xFF1C1C1E),
-    elevatedSurface = Color(0xFF2C2C2E),
-    textPrimary = Color.White,
-    textSecondary = Color.Gray,
-    borderColor = Color(0x1BFFFFFF),
-    accentGreen = Color(0xFF4ADE80),
+    background = Color(0xFF0C0D10),
+    cardSurface = Color(0xFF16181D),
+    elevatedSurface = Color(0xFF20232A),
+    surfaceContainerLow = Color(0xFF121317),
+    surfaceContainerHigh = Color(0xFF282C34),
+    textPrimary = Color(0xFFF3F4F6),
+    textSecondary = Color(0xFF9CA3AF),
+    textTertiary = Color(0xFF6B7280),
+    borderColor = Color(0x1FFFFFFF), // Hairline translucent border
+    borderColorSubtle = Color(0x0EFFFFFF),
+    accentGreen = Color(0xFF34D399),
     accentOrange = Color(0xFFFB923C),
     accentPurple = Color(0xFFA78BFA),
     accentBlue = Color(0xFF60A5FA),
     accentYellow = Color(0xFFFBBF24),
-    navBarColor = Color(0xFF121214),
+    navBarColor = Color(0xFF101216),
     isDark = true
 )
 
 fun amoledAppColors() = AppColors(
     background = Color.Black,
-    cardSurface = Color(0xFF0D0D0D),
-    elevatedSurface = Color(0xFF1A1A1A),
-    textPrimary = Color.White,
-    textSecondary = Color(0xFFAAAAAA),
-    borderColor = Color(0x11FFFFFF),
+    cardSurface = Color(0xFF0F0F12),
+    elevatedSurface = Color(0xFF1A1A1E),
+    surfaceContainerLow = Color(0xFF070708),
+    surfaceContainerHigh = Color(0xFF24242A),
+    textPrimary = Color(0xFFFFFFFF),
+    textSecondary = Color(0xFFA1A1AA),
+    textTertiary = Color(0xFF71717A),
+    borderColor = Color(0x24FFFFFF),
+    borderColorSubtle = Color(0x12FFFFFF),
     accentGreen = Color(0xFF4ADE80),
     accentOrange = Color(0xFFFB923C),
     accentPurple = Color(0xFFA78BFA),
-    accentBlue = Color(0xFF60A5FA),
+    accentBlue = Color(0xFF38BDF8),
     accentYellow = Color(0xFFFBBF24),
     navBarColor = Color.Black,
     isDark = true
 )
 
 fun lightAppColors() = AppColors(
-    background = Color(0xFFF5F5F7),
-    cardSurface = Color.White,
-    elevatedSurface = Color(0xFFEEEEF0),
-    textPrimary = Color(0xFF1C1C1E),
-    textSecondary = Color(0xFF8E8E93),
-    borderColor = Color(0x15000000),
-    accentGreen = Color(0xFF22C55E),
+    background = Color(0xFFF6F8FA),
+    cardSurface = Color(0xFFFFFFFF),
+    elevatedSurface = Color(0xFFF0F2F5),
+    surfaceContainerLow = Color(0xFFF8F9FA),
+    surfaceContainerHigh = Color(0xFFE4E7EB),
+    textPrimary = Color(0xFF0F172A),
+    textSecondary = Color(0xFF64748B),
+    textTertiary = Color(0xFF94A3B8),
+    borderColor = Color(0x18000000),
+    borderColorSubtle = Color(0x0A000000),
+    accentGreen = Color(0xFF10B981),
     accentOrange = Color(0xFFF97316),
     accentPurple = Color(0xFF8B5CF6),
-    accentBlue = Color(0xFF3B82F6),
-    accentYellow = Color(0xFFF59E0B),
-    navBarColor = Color.White,
+    accentBlue = Color(0xFF2563EB),
+    accentYellow = Color(0xFFD97706),
+    navBarColor = Color(0xFFFFFFFF),
     isDark = false
 )
 
 fun dynamicAppColors(colorScheme: androidx.compose.material3.ColorScheme, isDark: Boolean): AppColors {
     val cardBg = if (isDark) {
         Color(
-            red = (colorScheme.surface.red * 0.4f + colorScheme.surfaceVariant.red * 0.6f),
-            green = (colorScheme.surface.green * 0.4f + colorScheme.surfaceVariant.green * 0.6f),
-            blue = (colorScheme.surface.blue * 0.4f + colorScheme.surfaceVariant.blue * 0.6f),
+            red = (colorScheme.surface.red * 0.35f + colorScheme.surfaceVariant.red * 0.65f),
+            green = (colorScheme.surface.green * 0.35f + colorScheme.surfaceVariant.green * 0.65f),
+            blue = (colorScheme.surface.blue * 0.35f + colorScheme.surfaceVariant.blue * 0.65f),
             alpha = 1.0f
         )
     } else {
         Color(
-            red = (colorScheme.surface.red * 0.7f + colorScheme.surfaceVariant.red * 0.3f),
-            green = (colorScheme.surface.green * 0.7f + colorScheme.surfaceVariant.green * 0.3f),
-            blue = (colorScheme.surface.blue * 0.7f + colorScheme.surfaceVariant.blue * 0.3f),
+            red = (colorScheme.surface.red * 0.75f + colorScheme.surfaceVariant.red * 0.25f),
+            green = (colorScheme.surface.green * 0.75f + colorScheme.surfaceVariant.green * 0.25f),
+            blue = (colorScheme.surface.blue * 0.75f + colorScheme.surfaceVariant.blue * 0.25f),
             alpha = 1.0f
         )
     }
 
-    val elevatedBg = if (isDark) {
-        colorScheme.surfaceVariant
-    } else {
-        colorScheme.surfaceVariant
-    }
+    val elevatedBg = colorScheme.surfaceVariant
 
     return AppColors(
         background = colorScheme.background,
         cardSurface = cardBg,
         elevatedSurface = elevatedBg,
+        surfaceContainerLow = if (isDark) colorScheme.surface else colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        surfaceContainerHigh = if (isDark) colorScheme.surfaceVariant.copy(alpha = 0.9f) else colorScheme.surfaceVariant,
         textPrimary = colorScheme.onBackground,
         textSecondary = colorScheme.onSurfaceVariant,
+        textTertiary = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
         borderColor = colorScheme.outlineVariant.copy(alpha = if (isDark) 0.35f else 0.45f),
+        borderColorSubtle = colorScheme.outlineVariant.copy(alpha = if (isDark) 0.18f else 0.22f),
         accentGreen = colorScheme.primary,
         accentOrange = Color(0xFFFB923C),
         accentPurple = colorScheme.secondary,
@@ -139,87 +155,86 @@ fun dynamicAppColors(colorScheme: androidx.compose.material3.ColorScheme, isDark
 }
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFD0BCFF),
-    secondary = Color(0xFFCCC2DC),
-    tertiary = Color(0xFFEFB8C8),
-    background = Color(0xFF0A0A0C),
-    surface = Color(0xFF121214),
-    surfaceVariant = Color(0xFF2C2C2E),
-    onBackground = Color.White,
-    onSurface = Color.White,
-    onSurfaceVariant = Color.Gray,
-    outlineVariant = Color(0x26FFFFFF)
+    primary = Color(0xFF86EFAC),
+    secondary = Color(0xFFDDD6FE),
+    tertiary = Color(0xFFBAE6FD),
+    background = Color(0xFF0C0D10),
+    surface = Color(0xFF16181D),
+    surfaceVariant = Color(0xFF222630),
+    onBackground = Color(0xFFF3F4F6),
+    onSurface = Color(0xFFF3F4F6),
+    onSurfaceVariant = Color(0xFF9CA3AF),
+    outlineVariant = Color(0x28FFFFFF)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF6650A4),
-    secondary = Color(0xFF625B71),
-    tertiary = Color(0xFF7D5260),
-    background = Color(0xFFF5F5F7),
-    surface = Color.White,
-    surfaceVariant = Color(0xFFEEEEF0),
-    onBackground = Color(0xFF1C1C1E),
-    onSurface = Color(0xFF1C1C1E),
-    onSurfaceVariant = Color(0xFF8E8E93),
-    outlineVariant = Color(0x26000000)
+    primary = Color(0xFF059669),
+    secondary = Color(0xFF7C3AED),
+    tertiary = Color(0xFF0284C7),
+    background = Color(0xFFF6F8FA),
+    surface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFFEDEFF2),
+    onBackground = Color(0xFF0F172A),
+    onSurface = Color(0xFF0F172A),
+    onSurfaceVariant = Color(0xFF64748B),
+    outlineVariant = Color(0x24000000)
 )
 
 @Composable
 fun ProStatsTheme(
-  darkTheme: Boolean = isSystemInDarkTheme(),
-  dynamicColor: Boolean = true,
-  content: @Composable () -> Unit,
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit,
 ) {
-  val context = LocalContext.current
+    val context = LocalContext.current
 
-  // Reactively observe the theme preference so Compose recomposes on change
-  val prefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
-  var themePref by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
+    // Reactively observe the theme preference so Compose recomposes on change
+    val prefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
+    var themePref by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
 
-  // Register a SharedPreferences listener to update state on any theme change
-  DisposableEffect(prefs) {
-    val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-      if (key == "app_theme") {
-        themePref = prefs.getString("app_theme", "Material You") ?: "Material You"
-      }
-    }
-    prefs.registerOnSharedPreferenceChangeListener(listener)
-    onDispose {
-      prefs.unregisterOnSharedPreferenceChangeListener(listener)
-    }
-  }
-
-  val isDark = when (themePref) {
-      "Light" -> false
-      "Dark", "Pure Black (AMOLED)" -> true
-      else -> darkTheme // Material You follows system
-  }
-
-  val colorScheme =
-    when {
-      themePref == "Pure Black (AMOLED)" -> DarkColorScheme.copy(
-          background = Color.Black,
-          surface = Color.Black,
-          surfaceVariant = Color(0xFF141414)
-      )
-      themePref == "Material You" && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-        if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-      }
-      isDark -> DarkColorScheme
-      else -> LightColorScheme
+    // Register a SharedPreferences listener to update state on any theme change
+    DisposableEffect(prefs) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "app_theme") {
+                themePref = prefs.getString("app_theme", "Material You") ?: "Material You"
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
     }
 
-  // Select app-specific color palette based on theme
-  val appColors = when (themePref) {
-      "Pure Black (AMOLED)" -> amoledAppColors()
-      "Light" -> lightAppColors()
-      "Dark" -> darkAppColors()
-      else -> { // Material You — dynamic palette from system Monet ColorScheme
-          dynamicAppColors(colorScheme, isDark)
-      }
-  }
+    val isDark = when (themePref) {
+        "Light" -> false
+        "Dark", "Pure Black (AMOLED)" -> true
+        else -> darkTheme // Material You follows system
+    }
 
-  CompositionLocalProvider(LocalAppColors provides appColors) {
-      MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
-  }
+    val colorScheme = when {
+        themePref == "Pure Black (AMOLED)" -> DarkColorScheme.copy(
+            background = Color.Black,
+            surface = Color.Black,
+            surfaceVariant = Color(0xFF141414)
+        )
+        themePref == "Material You" && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        isDark -> DarkColorScheme
+        else -> LightColorScheme
+    }
+
+    // Select app-specific color palette based on theme
+    val appColors = when (themePref) {
+        "Pure Black (AMOLED)" -> amoledAppColors()
+        "Light" -> lightAppColors()
+        "Dark" -> darkAppColors()
+        else -> { // Material You — dynamic palette from system Monet ColorScheme
+            dynamicAppColors(colorScheme, isDark)
+        }
+    }
+
+    CompositionLocalProvider(LocalAppColors provides appColors) {
+        MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+    }
 }

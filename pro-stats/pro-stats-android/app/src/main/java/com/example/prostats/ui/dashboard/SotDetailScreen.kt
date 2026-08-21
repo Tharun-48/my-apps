@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -14,12 +15,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
@@ -176,10 +177,29 @@ fun SotDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Screen-on Time & Battery", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
+                title = {
+                    Text(
+                        text = "Screen-on Time & Battery",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = colors.textPrimary
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textPrimary)
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(38.dp)
+                            .background(colors.elevatedSurface, CircleShape)
+                            .border(1.dp, colors.borderColorSubtle, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
@@ -201,14 +221,14 @@ fun SotDetailScreen(
                         Text("⚡", fontSize = 48.sp)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "No data yet",
+                            text = "No Data Captured Yet",
                             color = colors.textPrimary,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Charge your device to 90% or above, then unplug the charger to start tracking Screen-on Time and battery drain.",
+                            text = "Charge your device to 90% or above and disconnect charger to establish the baseline and track real-time SOT drain.",
                             color = colors.textSecondary,
                             fontSize = 13.sp,
                             lineHeight = 18.sp
@@ -221,40 +241,51 @@ fun SotDetailScreen(
                         .fillMaxSize()
                         .padding(horizontal = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
+                    contentPadding = PaddingValues(bottom = 28.dp)
                 ) {
                     // Graph card
                     item {
                         Spacer(modifier = Modifier.height(4.dp))
                         Card(
-                            shape = RoundedCornerShape(20.dp),
+                            shape = RoundedCornerShape(22.dp),
                             colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-                            modifier = Modifier.fillMaxWidth().border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
+                            Column(modifier = Modifier.padding(18.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "BATTERY CHARGE HISTORY",
+                                        text = "BATTERY LEVEL TREND",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = colors.textSecondary,
                                         letterSpacing = 1.sp
                                     )
+                                    // Time range segmented pill
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        modifier = Modifier.background(colors.borderColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(2.dp)
+                                        modifier = Modifier
+                                            .background(colors.elevatedSurface, RoundedCornerShape(12.dp))
+                                            .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(12.dp))
+                                            .padding(3.dp)
                                     ) {
                                         listOf("Since Charge", "24h", "7d").forEach { range ->
                                             val active = timeRange == range
                                             Box(
                                                 modifier = Modifier
                                                     .background(
-                                                        if (active) colors.cardSurface else Color.Transparent,
-                                                        RoundedCornerShape(10.dp)
+                                                        if (active) colors.accentPurple.copy(alpha = 0.2f) else Color.Transparent,
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .border(
+                                                        width = if (active) 1.dp else 0.dp,
+                                                        color = if (active) colors.accentPurple.copy(alpha = 0.5f) else Color.Transparent,
+                                                        shape = RoundedCornerShape(8.dp)
                                                     )
                                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                                                     .clickable { timeRange = range },
@@ -264,13 +295,14 @@ fun SotDetailScreen(
                                                     text = range,
                                                     fontSize = 10.sp,
                                                     fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (active) colors.textPrimary else colors.textSecondary
+                                                    color = if (active) colors.accentPurple else colors.textSecondary
                                                 )
                                             }
                                         }
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Spacer(modifier = Modifier.height(10.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -278,7 +310,7 @@ fun SotDetailScreen(
                                 ) {
                                     Column {
                                         Text("Baseline: $startDateFormatted", fontSize = 12.sp, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
-                                        Text("Auto-resets on charger unplug at >= ${BatteryTracker.getTargetResetBatteryLevel(context)}%", fontSize = 10.sp, color = colors.textSecondary)
+                                        Text("Auto-resets on unplug at ≥${BatteryTracker.getTargetResetBatteryLevel(context)}%", fontSize = 10.sp, color = colors.textTertiary)
                                     }
                                     TextButton(
                                         onClick = {
@@ -290,57 +322,72 @@ fun SotDetailScreen(
                                         Text("Reset Cycle", fontSize = 11.sp, color = colors.accentPurple, fontWeight = FontWeight.Bold)
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Spacer(modifier = Modifier.height(14.dp))
                                 BatteryGraph(
                                     points = points,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(180.dp)
+                                        .height(190.dp)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
                             }
                         }
                     }
 
-                    // Stats summary — SCREEN ON TIME + SCREEN OFF DRAIN + AVG DAILY SOT
+                    // SOT & Screen Off Symmetrical Tile Row
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             val sotSubtitle = when (timeRange) {
-                                "7d" -> "Last 7 days"
-                                "24h" -> "Last 24 hours"
-                                else -> "Since unplugged"
+                                "7d" -> "Last 7 days active"
+                                "24h" -> "Last 24 hours active"
+                                else -> "Since disconnected"
                             }
                             val screenOffSubtitle = when (timeRange) {
-                                "7d" -> "Last 7 days"
-                                "24h" -> "Last 24 hours"
-                                else -> "Time in background"
+                                "7d" -> "Last 7 days idle"
+                                "24h" -> "Last 24 hours idle"
+                                else -> "Background standby"
                             }
 
                             Card(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(20.dp),
                                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-                                modifier = Modifier.weight(1f).border(1.dp, colors.borderColor, RoundedCornerShape(16.dp))
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("SCREEN ON TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(totalSotFormatted, fontSize = 18.sp, color = colors.accentPurple, fontWeight = FontWeight.Bold)
-                                    Text(sotSubtitle, fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(modifier = Modifier.size(6.dp).background(colors.accentPurple, CircleShape))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("SCREEN ON", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(totalSotFormatted, fontSize = 22.sp, color = colors.accentPurple, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(sotSubtitle, fontSize = 10.sp, color = colors.textTertiary)
                                 }
                             }
+
                             Card(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(20.dp),
                                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-                                modifier = Modifier.weight(1f).border(1.dp, colors.borderColor, RoundedCornerShape(16.dp))
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("SCREEN OFF TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(screenOffTimeFormatted, fontSize = 18.sp, color = colors.accentOrange, fontWeight = FontWeight.Bold)
-                                    Text(screenOffSubtitle, fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(modifier = Modifier.size(6.dp).background(colors.accentOrange, CircleShape))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("SCREEN OFF", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(screenOffTimeFormatted, fontSize = 22.sp, color = colors.accentOrange, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(screenOffSubtitle, fontSize = 10.sp, color = colors.textTertiary)
                                 }
                             }
                         }
@@ -350,19 +397,23 @@ fun SotDetailScreen(
                     if (avgDailySot > 0) {
                         item {
                             Card(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(20.dp),
                                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-                                modifier = Modifier.fillMaxWidth().border(1.dp, colors.borderColor, RoundedCornerShape(16.dp))
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    modifier = Modifier
+                                        .padding(16.dp)
+                                        .fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column {
-                                        Text("AVG DAILY SCREEN-ON TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold)
+                                        Text("AVG DAILY SCREEN-ON TIME", fontSize = 10.sp, color = colors.textSecondary, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                                         Spacer(modifier = Modifier.height(4.dp))
-                                        Text("Based on last 7 days", fontSize = 10.sp, color = colors.textSecondary.copy(alpha = 0.6f))
+                                        Text("Historical 7-day rolling average", fontSize = 11.sp, color = colors.textTertiary)
                                     }
                                     Text(avgDailySotFormatted, fontSize = 22.sp, color = colors.accentBlue, fontWeight = FontWeight.Bold)
                                 }
@@ -374,22 +425,26 @@ fun SotDetailScreen(
                     if (wakelocks.isNotEmpty()) {
                         item {
                             Text(
-                                text = "TOP WAKELOCKS",
-                                fontSize = 12.sp,
+                                text = "TOP SYSTEM WAKELOCKS",
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.textSecondary,
                                 modifier = Modifier.padding(top = 4.dp),
                                 letterSpacing = 1.sp
                             )
                         }
-                        items(wakelocks.take(10)) { wl ->
+                        items(wakelocks.take(10), key = { it.name }) { wl ->
                             Card(
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-                                modifier = Modifier.fillMaxWidth().border(1.dp, colors.borderColor.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(16.dp))
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(14.dp).fillMaxWidth(),
+                                    modifier = Modifier
+                                        .padding(14.dp)
+                                        .fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -403,14 +458,14 @@ fun SotDetailScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = "Count: ${wl.count}",
+                                            text = "Wake Count: ${wl.count}",
                                             color = colors.textSecondary,
                                             fontSize = 11.sp
                                         )
                                     }
                                     Column(horizontalAlignment = Alignment.End) {
                                         val durationMins = wl.totalDurationMs / 1000 / 60
-                                        val durationText = if (durationMins > 60) "${durationMins/60}h ${durationMins%60}m" else "${durationMins}m"
+                                        val durationText = if (durationMins > 60) "${durationMins / 60}h ${durationMins % 60}m" else "${durationMins}m"
                                         Text(
                                             text = durationText,
                                             color = colors.accentOrange,
@@ -428,44 +483,50 @@ fun SotDetailScreen(
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Bottom
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "APP BATTERY CONSUMPTION",
-                                fontSize = 12.sp,
+                                text = "APP BATTERY DRAIN",
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.textSecondary,
-                                modifier = Modifier.padding(top = 4.dp),
                                 letterSpacing = 1.sp
                             )
                             Text(
                                 text = when (timeRange) {
                                     "7d" -> "Last 7 days"
                                     "24h" -> "Last 24 hours"
-                                    else -> "Since unplugged"
+                                    else -> "Since charge"
                                 },
-                                fontSize = 10.sp,
-                                color = colors.textSecondary.copy(alpha = 0.6f)
+                                fontSize = 11.sp,
+                                color = colors.textTertiary
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("Time" to "Screen Time", "Battery" to "Battery", "Name" to "Name").forEach { (key, label) ->
+                            listOf("Time" to "Active Time", "Battery" to "Drain %", "Name" to "App Name").forEach { (key, label) ->
                                 val active = appSort == key
-                                Button(
-                                    onClick = { appSort = key },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (active) colors.cardSurface else Color.Transparent,
-                                        contentColor = if (active) colors.accentGreen else colors.textSecondary
-                                    ),
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp, if (active) colors.accentGreen.copy(alpha = 0.2f) else colors.borderColor
-                                    ),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                    modifier = Modifier.height(34.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            if (active) colors.accentGreen.copy(alpha = 0.16f) else colors.elevatedSurface,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (active) colors.accentGreen.copy(alpha = 0.4f) else colors.borderColorSubtle,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable { appSort = key }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        text = label,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (active) colors.accentGreen else colors.textSecondary
+                                    )
                                 }
                             }
                         }
@@ -474,10 +535,12 @@ fun SotDetailScreen(
                     if (appUsageList.isEmpty()) {
                         item {
                             Box(
-                                modifier = Modifier.fillMaxWidth().height(100.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("No SOT usage stats recorded", color = colors.textSecondary, fontSize = 13.sp)
+                                Text("No application usage captured in this interval", color = colors.textSecondary, fontSize = 13.sp)
                             }
                         }
                     } else {
@@ -510,13 +573,12 @@ fun BatteryGraph(
     val timeSpan = (maxTime - minTime).coerceAtLeast(1L)
 
     val labelFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-
     val labelColor = if (colors.isDark) android.graphics.Color.GRAY else android.graphics.Color.DKGRAY
-    val gridColor = if (colors.isDark) Color(0x0CFFFFFF) else Color(0x0C000000)
+    val gridColor = if (colors.isDark) Color(0x12FFFFFF) else Color(0x10000000)
 
     Canvas(modifier = modifier) {
         val width = size.width
-        val height = size.height - 20.dp.toPx()
+        val height = size.height - 22.dp.toPx()
 
         val paint = android.graphics.Paint().apply {
             color = labelColor
@@ -524,6 +586,7 @@ fun BatteryGraph(
             textAlign = android.graphics.Paint.Align.RIGHT
         }
 
+        // Draw horizontal grid lines & labels
         for (pct in listOf(25, 50, 75, 100)) {
             val y = height * (1f - pct / 100f)
             drawLine(color = gridColor, start = Offset(0f, y), end = Offset(width, y), strokeWidth = 1.dp.toPx())
@@ -532,7 +595,7 @@ fun BatteryGraph(
 
         val coords = sortedPoints.map { pt ->
             val xRatio = (pt.timestamp - minTime).toFloat() / timeSpan
-            val yRatio = pt.batteryLevel / 100f
+            val yRatio = (pt.batteryLevel / 100f).coerceIn(0f, 1f)
             Offset(xRatio * width, height * (1f - yRatio))
         }
 
@@ -544,7 +607,12 @@ fun BatteryGraph(
                 lineTo(coords.first().x, height)
                 close()
             }
-            drawPath(path = fillPath, brush = Brush.verticalGradient(colors = listOf(colors.accentPurple.copy(alpha = 0.15f), Color.Transparent)))
+            drawPath(
+                path = fillPath,
+                brush = Brush.verticalGradient(
+                    colors = listOf(colors.accentPurple.copy(alpha = 0.22f), Color.Transparent)
+                )
+            )
 
             val linePath = Path().apply {
                 moveTo(coords[0].x, coords[0].y)
@@ -563,7 +631,6 @@ fun BatteryGraph(
             textAlign = android.graphics.Paint.Align.CENTER
         }
         val step = timeSpan / 4
-        // Calculate dynamic format based on timeSpan
         val isMultiDay = timeSpan > 24 * 60 * 60 * 1000L
         val dynamicFormat = if (isMultiDay) SimpleDateFormat("dd/MM", Locale.getDefault()) else labelFormat
         for (i in 0..4) {
@@ -573,7 +640,7 @@ fun BatteryGraph(
             drawContext.canvas.nativeCanvas.drawText(
                 dateStr,
                 x.coerceIn(24.dp.toPx(), width - 24.dp.toPx()),
-                height + 15.dp.toPx(),
+                height + 16.dp.toPx(),
                 xLabelPaint
             )
         }
@@ -591,9 +658,11 @@ fun AppSotRow(app: AppBatteryUsage) {
     }
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-        modifier = Modifier.fillMaxWidth().border(1.dp, colors.borderColor.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, colors.borderColor, RoundedCornerShape(18.dp))
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -601,7 +670,7 @@ fun AppSotRow(app: AppBatteryUsage) {
         ) {
             AppIcon(
                 packageName = app.packageName,
-                modifier = Modifier.size(40.dp).background(colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(10.dp))
+                modifier = Modifier.size(42.dp)
             )
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -626,11 +695,14 @@ fun AppSotRow(app: AppBatteryUsage) {
                 LinearProgressIndicator(
                     progress = { (app.batteryUsagePct / 100f).coerceIn(0f, 1f) },
                     color = colors.accentGreen,
-                    trackColor = if (colors.isDark) Color(0x11FFFFFF) else Color(0x11000000),
-                    modifier = Modifier.fillMaxWidth().height(4.dp).background(Color.Transparent, RoundedCornerShape(2.dp))
+                    trackColor = colors.elevatedSurface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
                 )
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(14.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = String.format(Locale.US, "%.1f%%", app.batteryUsagePct),

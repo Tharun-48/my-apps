@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -29,7 +30,7 @@ fun SystemInfoScreen() {
     val colors = ProStatsColors.current
     val hardwareMonitor = remember { HardwareMonitor(context) }
     val systemMonitor = remember { SystemMonitor(context) }
-    
+
     var deviceInfo by remember { mutableStateOf<DeviceInfo?>(null) }
     var cpuInfo by remember { mutableStateOf<CpuInfo?>(null) }
     var batteryInfo by remember { mutableStateOf<HwBatteryInfo?>(null) }
@@ -51,11 +52,10 @@ fun SystemInfoScreen() {
         onDispose { sensorReader.stop() }
     }
 
-    // Refresh live readings every 1000ms — uses getSnapshot() for a new map reference
+    // Refresh live readings every 1000ms
     LaunchedEffect(Unit) {
         while (true) {
             liveReadings = sensorReader.getSnapshot()
-            // Also refresh battery info for real-time readings
             batteryInfo = hardwareMonitor.getBatteryInfo()
             kotlinx.coroutines.delay(1000)
         }
@@ -73,7 +73,7 @@ fun SystemInfoScreen() {
             val nInfo = systemMonitor.getNetworkInfo()
             val stInfo = systemMonitor.getStorageInfo()
             val memInfo = systemMonitor.getMemoryDetailInfo()
-            
+
             deviceInfo = dInfo
             cpuInfo = cInfo
             batteryInfo = bInfo
@@ -91,45 +91,51 @@ fun SystemInfoScreen() {
         modifier = Modifier
             .fillMaxSize()
             .background(colors.background)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(top = 24.dp, bottom = 32.dp)
     ) {
         item {
-            Text(
-                text = "System Info",
-                color = colors.textPrimary,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp, top = 32.dp)
-            )
+            Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                Text(
+                    text = "System Information",
+                    color = colors.textPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Hardware diagnostics and system specifications",
+                    color = colors.textSecondary,
+                    fontSize = 12.sp
+                )
+            }
         }
 
         deviceInfo?.let { di ->
             item {
-                InfoCard(title = "Device", icon = Icons.Default.Phone) {
+                InfoCard(title = "Device Identity", icon = Icons.Default.Phone, iconColor = colors.accentBlue) {
                     InfoRow("Manufacturer", di.manufacturer)
                     InfoRow("Model", di.model)
                     InfoRow("Board", di.board)
-                    InfoRow("Hardware", di.hardware)
-                    InfoRow("Android Version", di.androidVersion)
+                    InfoRow("Hardware Platform", di.hardware)
+                    InfoRow("Android OS Version", di.androidVersion)
                 }
             }
         }
 
         cpuInfo?.let { cpu ->
             item {
-                InfoCard(title = "CPU & SoC", icon = Icons.Default.Build) {
+                InfoCard(title = "SoC & CPU Architecture", icon = Icons.Default.Build, iconColor = colors.accentPurple) {
                     InfoRow("Architecture", cpu.architecture)
-                    InfoRow("Cores", cpu.cores.toString())
-                    InfoRow("Max Frequency", if (cpu.maxFreqGhz > 0) String.format(java.util.Locale.US, "%.2f GHz", cpu.maxFreqGhz) else "Unknown")
+                    InfoRow("Core Count", "${cpu.cores} Cores")
+                    InfoRow("Max Clock Frequency", if (cpu.maxFreqGhz > 0) String.format(java.util.Locale.US, "%.2f GHz", cpu.maxFreqGhz) else "Unknown")
                 }
             }
         }
 
-        // GPU Info (NEW — DevCheck inspired)
         gpuInfo?.let { gpu ->
             item {
-                InfoCard(title = "GPU", icon = Icons.Default.Build) {
+                InfoCard(title = "Graphics Processing Unit (GPU)", icon = Icons.Default.Build, iconColor = colors.accentGreen) {
                     InfoRow("Renderer", gpu.renderer)
                     InfoRow("Vendor", gpu.vendor)
                     if (gpu.maxFreqMhz > 0) InfoRow("Max Frequency", "${gpu.maxFreqMhz} MHz")
@@ -140,10 +146,10 @@ fun SystemInfoScreen() {
 
         batteryInfo?.let { bat ->
             item {
-                InfoCard(title = "Battery", icon = Icons.Default.Info) {
-                    InfoRow("Level", "${bat.level}%")
-                    InfoRow("Health", bat.health)
-                    InfoRow("Technology", bat.technology)
+                InfoCard(title = "Battery Hardware", icon = Icons.Default.Info, iconColor = colors.accentOrange) {
+                    InfoRow("Current Level", "${bat.level}%")
+                    InfoRow("Health State", bat.health)
+                    InfoRow("Chemistry Technology", bat.technology)
                     if (bat.capacityMah > 0) {
                         InfoRow("Design Capacity", "${bat.capacityMah.toInt()} mAh")
                     }
@@ -155,41 +161,39 @@ fun SystemInfoScreen() {
 
         displayInfo?.let { disp ->
             item {
-                InfoCard(title = "Display", icon = Icons.Default.Info) {
+                InfoCard(title = "Display Panel", icon = Icons.Default.Info, iconColor = colors.accentBlue) {
                     InfoRow("Resolution", disp.resolution)
                     InfoRow("Refresh Rate", "${disp.refreshRate} Hz")
-                    InfoRow("Density", "${disp.densityDpi} DPI")
+                    InfoRow("Pixel Density", "${disp.densityDpi} DPI")
                 }
             }
         }
 
-        // Memory Details (NEW)
         memoryDetail?.let { mem ->
             item {
-                InfoCard(title = "Memory Details", icon = Icons.Default.Info) {
+                InfoCard(title = "Memory & Paging Details", icon = Icons.Default.Info, iconColor = colors.accentPurple) {
                     InfoRow("Total RAM", "${mem.totalRamMb} MB")
                     InfoRow("Used RAM", "${mem.usedRamMb} MB")
                     InfoRow("Available RAM", "${mem.availRamMb} MB")
-                    InfoRow("Low Memory", if (mem.lowMemory) "Yes ⚠️" else "No")
+                    InfoRow("Low Memory Flag", if (mem.lowMemory) "Active ⚠️" else "Normal")
                     if (mem.zramTotalMb > 0) {
                         InfoRow("ZRAM Total", "${mem.zramTotalMb} MB")
-                        InfoRow("ZRAM Used", "${mem.zramUsedMb} MB")
+                        InfoRow("ZRAM In-Use", "${mem.zramUsedMb} MB")
                     }
                     if (mem.swapTotalMb > 0) {
                         InfoRow("Swap Total", "${mem.swapTotalMb} MB")
-                        InfoRow("Swap Used", "${mem.swapUsedMb} MB")
+                        InfoRow("Swap In-Use", "${mem.swapUsedMb} MB")
                     }
                 }
             }
         }
 
-        // Storage (NEW)
         storageInfo?.let { storage ->
             item {
-                InfoCard(title = "Storage", icon = Icons.Default.Info) {
+                InfoCard(title = "Storage Partitions", icon = Icons.Default.Info, iconColor = colors.accentGreen) {
                     InfoRow("Internal Total", String.format(java.util.Locale.US, "%.1f GB", storage.internalTotalGb))
                     InfoRow("Internal Used", String.format(java.util.Locale.US, "%.1f GB", storage.internalUsedGb))
-                    InfoRow("Internal Free", String.format(java.util.Locale.US, "%.1f GB", storage.internalTotalGb - storage.internalUsedGb))
+                    InfoRow("Internal Available", String.format(java.util.Locale.US, "%.1f GB", (storage.internalTotalGb - storage.internalUsedGb).coerceAtLeast(0f)))
                     if (storage.externalTotalGb > 0) {
                         InfoRow("External Total", String.format(java.util.Locale.US, "%.1f GB", storage.externalTotalGb))
                         InfoRow("External Used", String.format(java.util.Locale.US, "%.1f GB", storage.externalUsedGb))
@@ -198,14 +202,13 @@ fun SystemInfoScreen() {
             }
         }
 
-        // Network (NEW)
         networkInfo?.let { net ->
             item {
-                InfoCard(title = "Network", icon = Icons.Default.Info) {
+                InfoCard(title = "Network Interfaces", icon = Icons.Default.Info, iconColor = colors.accentBlue) {
                     InfoRow("Connection Type", net.connectionType)
                     if (net.wifiSsid.isNotBlank() && net.wifiSsid != "<unknown ssid>") {
                         InfoRow("Wi-Fi SSID", net.wifiSsid)
-                        InfoRow("Signal Strength", "${net.wifiSignalStrength}/4")
+                        InfoRow("Signal Quality", "${net.wifiSignalStrength}/4 bars")
                         InfoRow("Link Speed", "${net.linkSpeedMbps} Mbps")
                     }
                     if (net.ipAddress.isNotBlank() && net.ipAddress != "0.0.0.0") {
@@ -217,48 +220,86 @@ fun SystemInfoScreen() {
 
         cameraInfo?.let { cam ->
             item {
-                InfoCard(title = "Camera", icon = Icons.Default.Search) {
-                    InfoRow("Rear Sensor", cam.rearMegapixels?.let { "$it MP" } ?: "Unknown")
-                    InfoRow("Front Sensor", cam.frontMegapixels?.let { "$it MP" } ?: "Unknown")
+                InfoCard(title = "Camera Modules", icon = Icons.Default.Search, iconColor = colors.accentOrange) {
+                    InfoRow("Primary Rear Sensor", cam.rearMegapixels?.let { "$it MP" } ?: "Not detected")
+                    InfoRow("Front Selfie Sensor", cam.frontMegapixels?.let { "$it MP" } ?: "Not detected")
                 }
             }
         }
 
         if (sensorInfoList.isNotEmpty()) {
             item {
-                Text(
-                    text = "Sensors (${sensorInfoList.size})",
-                    color = colors.textPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Hardware Sensors (${sensorInfoList.size})",
+                        color = colors.textPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "LIVE STREAM",
+                        color = colors.accentPurple,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
 
-            items(sensorInfoList) { sensor ->
+            items(sensorInfoList, key = { it.typeInt }) { sensor ->
                 SensorRow(sensor = sensor, liveReading = liveReadings[sensor.typeInt])
-            }
-            
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
 }
 
 @Composable
-fun InfoCard(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
+fun InfoCard(
+    title: String,
+    icon: ImageVector,
+    iconColor: Color,
+    content: @Composable ColumnScope.() -> Unit
+) {
     val colors = ProStatsColors.current
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                Icon(icon, contentDescription = null, tint = colors.accentPurple, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = title, color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 14.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(iconColor.copy(alpha = 0.14f), CircleShape)
+                        .border(1.dp, iconColor.copy(alpha = 0.3f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    color = colors.textPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
             }
             content()
         }
@@ -271,41 +312,68 @@ fun InfoRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(vertical = 5.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, color = colors.textSecondary, fontSize = 14.sp)
-        Text(text = value, color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(text = label, color = colors.textSecondary, fontSize = 13.sp)
+        Text(text = value, color = colors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
 }
 
 @Composable
 fun SensorRow(sensor: SensorInfo, liveReading: FloatArray? = null) {
     val colors = ProStatsColors.current
-    Row(
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .background(colors.cardSurface, RoundedCornerShape(12.dp))
-            .border(1.dp, colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(16.dp))
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = sensor.name, color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(text = "${sensor.vendor} • ${sensor.type}", color = colors.textSecondary, fontSize = 11.sp)
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            // Live sensor value — primary axis (values[0])
-            val valueText = if (liveReading != null && liveReading.isNotEmpty()) {
-                val v = liveReading[0]
-                val formatted = if (v % 1f == 0f) v.toInt().toString()
-                                else String.format(java.util.Locale.US, "%.3f", v)
-                "$formatted ${sensor.unit}".trim()
-            } else {
-                "-- ${sensor.unit}".trim()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = sensor.name,
+                    color = colors.textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${sensor.vendor} • ${sensor.type}",
+                    color = colors.textSecondary,
+                    fontSize = 11.sp
+                )
             }
-            Text(text = valueText, color = colors.accentPurple, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Spacer(modifier = Modifier.width(10.dp))
+            Box(
+                modifier = Modifier
+                    .background(colors.elevatedSurface, RoundedCornerShape(8.dp))
+                    .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                val valueText = if (liveReading != null && liveReading.isNotEmpty()) {
+                    val v = liveReading[0]
+                    val formatted = if (v % 1f == 0f) v.toInt().toString()
+                    else String.format(java.util.Locale.US, "%.2f", v)
+                    "$formatted ${sensor.unit}".trim()
+                } else {
+                    "-- ${sensor.unit}".trim()
+                }
+                Text(
+                    text = valueText,
+                    color = colors.accentPurple,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
         }
     }
 }

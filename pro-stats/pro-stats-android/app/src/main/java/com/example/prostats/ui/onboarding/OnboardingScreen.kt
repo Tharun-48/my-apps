@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -17,13 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.prostats.data.SystemMonitor
 import com.example.prostats.theme.ProStatsColors
 
@@ -66,14 +67,14 @@ fun OnboardingScreen(
             .fillMaxSize()
             .background(colors.background)
     ) {
-        // Ambient background glow (only on dark themes)
+        // Subtle ambient background glow (dark mode)
         if (colors.isDark) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.radialGradient(
-                            colors = listOf(colors.accentGreen.copy(alpha = 0.15f), Color.Transparent),
+                            colors = listOf(colors.accentGreen.copy(alpha = 0.12f), Color.Transparent),
                             radius = 800f
                         )
                     )
@@ -88,42 +89,58 @@ fun OnboardingScreen(
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Text(
-                text = "STEP 2/3: CONFIGURE PRO STATS ACCESS",
-                color = colors.textSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Step Indicator Badge
+            Box(
+                modifier = Modifier
+                    .background(colors.elevatedSurface, RoundedCornerShape(10.dp))
+                    .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "STEP 2 OF 3: PERMISSIONS",
+                    color = colors.textSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             Text(
-                text = "These permissions enable live process tracking, battery optimization analyses, and background statistics.",
+                text = "Configure ProStats Access",
                 color = colors.textPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Light,
-                lineHeight = 22.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "These permissions enable real-time process monitoring, Screen-on Time tracking, and battery health analytics.",
+                color = colors.textSecondary,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
 
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // Permission Card 1: Battery stats
                 PermissionCard(
-                    title = "BATTERY USAGE STATS (Required)",
-                    description = "Access per-app power consumption data and Screen-On Time (SOT) history.",
+                    title = "Battery Optimization Whitelist",
+                    subtitle = "Required for continuous background logging",
+                    description = "Prevents Android from killing the background tracker for Screen-On Time (SOT) and temperature logs.",
                     isGranted = hasBatteryOptimizations,
                     onClick = {
                         if (!hasBatteryOptimizations) {
@@ -134,8 +151,9 @@ fun OnboardingScreen(
 
                 // Permission Card 2: Usage Stats
                 PermissionCard(
-                    title = "USAGE ACCESS (Required)",
-                    description = "Allow Pro Stats to monitor running processes and real-time CPU/RAM usage statistics.",
+                    title = "Usage Access Permission",
+                    subtitle = "Required for per-app battery & process stats",
+                    description = "Allows ProStats to monitor running processes, foreground app durations, and system load.",
                     isGranted = hasUsageAccess,
                     onClick = {
                         if (!hasUsageAccess) {
@@ -146,11 +164,12 @@ fun OnboardingScreen(
 
                 // Permission Card 3: Shizuku
                 PermissionCard(
-                    title = "SHIZUKU AUTHORIZATION (Optional)",
+                    title = "Shizuku Wireless ADB Authorization",
+                    subtitle = "Optional for Pro Mode features",
                     description = if (isShizukuRunning) {
-                        "Tap to grant wireless ADB permissions for PC-grade task monitoring."
+                        "Tap to grant wireless ADB permissions for PC-grade task monitoring and freeze/force-stop."
                     } else {
-                        "Shizuku service is not running. Tap to open Shizuku app or install it."
+                        "Shizuku service is not running. Tap to launch Shizuku manager or install."
                     },
                     isGranted = hasShizukuPermission,
                     isOptional = true,
@@ -160,12 +179,12 @@ fun OnboardingScreen(
                                 systemMonitor.requestShizukuPermission()
                             }
                         } else {
-                            // Launch Shizuku app
                             val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+                                ?: context.packageManager.getLaunchIntentForPackage("moe.shizuku.manager")
+                                ?: context.packageManager.getLaunchIntentForPackage("rikka.shizuku.manager")
                             if (launchIntent != null) {
                                 context.startActivity(launchIntent)
                             } else {
-                                // Redirect to play store or site
                                 systemMonitor.requestShizukuPermission()
                             }
                         }
@@ -177,23 +196,27 @@ fun OnboardingScreen(
             Button(
                 onClick = onStartMonitoring,
                 enabled = isReadyToStart,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isReadyToStart) colors.accentGreen else colors.cardSurface,
-                    contentColor = Color.Black,
-                    disabledContainerColor = colors.cardSurface,
-                    disabledContentColor = colors.textSecondary
+                    containerColor = if (isReadyToStart) (if (colors.isDark) Color(0xFFF3F4F6) else Color(0xFF0F172A)) else colors.elevatedSurface,
+                    contentColor = if (isReadyToStart) (if (colors.isDark) Color(0xFF0C0D10) else Color.White) else colors.textTertiary,
+                    disabledContainerColor = colors.elevatedSurface,
+                    disabledContentColor = colors.textTertiary
                 ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .height(54.dp)
             ) {
                 Text(
                     text = if (isReadyToStart) "START MONITORING" else "GRANT REQUIRED PERMISSIONS",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    fontSize = 14.sp,
+                    letterSpacing = 1.sp
                 )
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
@@ -201,6 +224,7 @@ fun OnboardingScreen(
 @Composable
 fun PermissionCard(
     title: String,
+    subtitle: String,
     description: String,
     isGranted: Boolean,
     isOptional: Boolean = false,
@@ -209,21 +233,19 @@ fun PermissionCard(
     val colors = ProStatsColors.current
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = colors.cardSurface
-        ),
+        colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
         modifier = Modifier
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = if (isGranted) colors.accentGreen else colors.borderColor,
+                color = if (isGranted) colors.accentGreen.copy(alpha = 0.4f) else colors.borderColor,
                 shape = RoundedCornerShape(20.dp)
             )
             .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
-                .padding(20.dp)
+                .padding(18.dp)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -231,8 +253,15 @@ fun PermissionCard(
                 Text(
                     text = title,
                     color = if (isGranted) colors.accentGreen else colors.textPrimary,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    color = colors.textTertiary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -242,38 +271,39 @@ fun PermissionCard(
                     lineHeight = 16.sp
                 )
             }
-            
-            Spacer(modifier = Modifier.width(16.dp))
+
+            Spacer(modifier = Modifier.width(14.dp))
 
             // State Indicator
             if (isGranted) {
                 Box(
                     modifier = Modifier
-                        .size(24.dp)
-                        .background(colors.accentGreen, RoundedCornerShape(12.dp)),
+                        .size(30.dp)
+                        .background(colors.accentGreen, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = "Granted",
                         tint = Color.Black,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             } else {
-                Text(
-                    text = if (isOptional) "OPTIONAL" else "GRANT",
-                    color = if (isOptional) colors.accentPurple else colors.accentOrange,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
+                val chipColor = if (isOptional) colors.accentPurple else colors.accentOrange
+                Box(
                     modifier = Modifier
-                        .border(
-                            width = 1.dp,
-                            color = if (isOptional) colors.accentPurple else colors.accentOrange,
-                            shape = RoundedCornerShape(6.dp)
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                )
+                        .background(chipColor.copy(alpha = 0.16f), RoundedCornerShape(8.dp))
+                        .border(1.dp, chipColor.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = if (isOptional) "OPTIONAL" else "GRANT",
+                        color = chipColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
             }
         }
     }

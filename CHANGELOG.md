@@ -4,6 +4,48 @@ This document maintains a historical log of user inputs and corresponding code c
 
 ---
 
+### [2026-08-21] Comprehensive UI/UX Redesign Using Skills (Material 3, Material You Monet & Apple HIG)
+- **User Prompt**: *"redesign app using skills."*
+- **Summary of Changes**:
+  - **Typography & Theme System**:
+    - `Type.kt`: Implemented full modern Material 3 typography scale with tight letter spacing, clean font weights, and distinct line heights.
+    - `Theme.kt`: Enhanced `AppColors` data class with refined surface container roles (`surfaceContainerLow`, `surfaceContainerHigh`, `surfaceBorderSubtle`, `textTertiary`), subtle translucent hairline borders, and harmonious dynamic Monet theming.
+  - **Main Dashboard (`DashboardScreen.kt`)**:
+    - Redesigned TopBar with live status indicator dot and glass settings action.
+    - Transformed SOT and Temperature into hero squircle tiles (`22.dp`) with colored category badges.
+    - Elevated Battery Health card with large health readout, condition subtitle, system cycle tag, design vs current capacity, and real-time charging/discharging wattage chip.
+    - Battery Diagnostics tile with technical specs (voltage, current, power, health, thermal throttle state).
+    - CPU Cluster multi-core frequency monitor with real-time scaling visual active meter bars.
+    - Dual-track rounded progress bars for CPU load and RAM allocation.
+    - Apple HIG inspired high-contrast pill CTA button for process management.
+  - **Running Processes (`MainScreen.kt`)**:
+    - Sleek Pro Mode ADB vs Basic Mode banner with colored border accents.
+    - Segmented horizontal sorting tabs (`CPU Load`, `RAM Usage`, `Recently Active`, `App Name`).
+    - Squircle app icons with high-visibility CPU/RAM usage chips and fast action dialogs.
+    - Stable list keys for optimal Compose runtime performance.
+  - **Screen-On Time Detail (`SotDetailScreen.kt`)**:
+    - Segmented pill selector for time ranges (`Since Charge`, `24h`, `7d`).
+    - Smooth Bezier Canvas timeline chart with gradient area shading, reference percentage lines ($25\%, 50\%, 75\%, 100\%$), and dynamic bottom timestamps.
+    - Symmetrical 2-tile row for Screen-On vs Screen-Off time.
+    - Per-app battery consumption list with squircle icons, duration labels, and slim progress bars.
+  - **Battery Temperature Detail (`BatteryTempDetailScreen.kt`)**:
+    - Symmetrical 3-tile summary cards for Highest, Average, and Lowest temperatures with distinct accent colors.
+    - Live temperature badge and smooth Canvas temperature trend graph with side Y-axis labels and bottom timestamps.
+    - Thermal zones breakdown card with progress bars (Cool, Normal, Warm, Hot).
+  - **System Information (`SystemInfoScreen.kt`)**:
+    - Grouped category cards with leading colored icon badges (Device, SoC, GPU, Battery, Display, Memory, Storage, Network, Cameras).
+    - Real-time sensor stream with dynamic live value chips.
+  - **Settings & Overlays (`SettingsScreen.kt`)**:
+    - Theme selector with palette preview dots (Material You, Dark, AMOLED, Light).
+    - Inset toggle switches for floating HUD overlays (Temp, Current mA, Refresh Rate Hz, CPU%, RAM%).
+    - Shizuku wireless ADB status card with connection state pills and direct action buttons.
+  - **Onboarding (`OnboardingScreen.kt`)**:
+    - Redesigned with step badge, glassmorphic permission cards with checkmarks/action pills, and high-contrast start button.
+  - **Build & Release**:
+    - Recompiled Release APK `ProStats-v2.2.apk` and updated `pro-stats/releases/`.
+
+---
+
 ### [2026-08-20] Material You Dynamic Theming, UI/UX Skills, SOT Auto-Reset & Graph Side Labels
 - **User Prompt**: *"add this in skill and [GitHub - android/skills · GitHub](https://github.com/android/skills) , [skills/README.md at main · google/skills · GitHub](https://github.com/google/skills/blob/main/README.md) and reevaluate and review code and check for errors. things need to be fixed: 1. android material ui not working, ui doesnt adopt google material ui colour 2.get independent skills for improving ui like apple design and other design skills 3. app sure will remain lightweight as like other google apps 4.in screen on time, fix since charge needs to reset auto when its >=90, and 7days will be there 5.screen off time its in glitch, in battery temperature stats graph. show temp in side in the lines you make."*
 - **Summary of Changes**:

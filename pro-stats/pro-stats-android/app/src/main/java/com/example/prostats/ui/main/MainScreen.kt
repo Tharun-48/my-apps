@@ -3,15 +3,16 @@ package com.example.prostats.ui.main
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -21,8 +22,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -61,18 +62,20 @@ fun AppIcon(packageName: String, modifier: Modifier = Modifier) {
         Image(
             bitmap = iconBitmap,
             contentDescription = "App Icon",
-            modifier = modifier
+            modifier = modifier.clip(RoundedCornerShape(12.dp))
         )
     } else {
         Box(
-            modifier = modifier.background(colors.elevatedSurface, RoundedCornerShape(8.dp)),
+            modifier = modifier
+                .background(colors.elevatedSurface, RoundedCornerShape(12.dp))
+                .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = packageName.take(2).uppercase(),
                 color = colors.textPrimary,
                 fontWeight = FontWeight.Bold,
-                fontSize = 11.sp
+                fontSize = 12.sp
             )
         }
     }
@@ -89,7 +92,7 @@ fun MainScreen(
 ) {
     val colors = ProStatsColors.current
     var sortBy by remember { mutableStateOf("CPU") }
-    
+
     val isShizuku = when (uiState) {
         is MainScreenUiState.Success -> uiState.data.firstOrNull()?.isShizukuMode ?: false
         else -> false
@@ -103,19 +106,41 @@ fun MainScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Running Processes", fontWeight = FontWeight.Bold, color = colors.textPrimary) },
+                title = {
+                    Column {
+                        Text(
+                            text = "Running Processes",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = colors.textPrimary
+                        )
+                        if (uiState is MainScreenUiState.Success) {
+                            Text(
+                                text = "${uiState.data.size} processes active",
+                                fontSize = 11.sp,
+                                color = colors.textSecondary
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(38.dp)
+                            .background(colors.elevatedSurface, CircleShape)
+                            .border(1.dp, colors.borderColorSubtle, CircleShape)
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = colors.textPrimary
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colors.background
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
             )
         },
         containerColor = colors.background,
@@ -135,7 +160,7 @@ fun MainScreen(
                 is MainScreenUiState.Error -> {
                     Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Warning, contentDescription = "Error", tint = Color.Red, modifier = Modifier.size(48.dp))
+                            Icon(Icons.Default.Warning, contentDescription = "Error", tint = Color(0xFFEF4444), modifier = Modifier.size(48.dp))
                             Spacer(modifier = Modifier.height(16.dp))
                             Text("Failed to query processes: ${uiState.throwable.message}", color = colors.textPrimary)
                         }
@@ -147,14 +172,14 @@ fun MainScreen(
                     // Current Mode Banner
                     ModeBanner(isShizuku)
 
-                    // Sorting Header
+                    // Sorting Header Tabs
                     SortingHeader(
                         isShizuku = isShizuku,
                         selectedSort = sortBy,
                         onSortChange = { sortBy = it }
                     )
 
-                    // Sort Data
+                    // Sorted Process List
                     val sortedList = remember(processes, sortBy) {
                         when (sortBy) {
                             "CPU" -> processes.sortedByDescending { it.cpuUsage }
@@ -175,7 +200,7 @@ fun MainScreen(
                                 .weight(1f)
                                 .fillMaxWidth(),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             items(sortedList, key = { "${it.pid}-${it.packageName}" }) { item ->
                                 ProcessRow(
@@ -197,22 +222,28 @@ fun MainScreen(
 fun ModeBanner(isShizuku: Boolean) {
     val colors = ProStatsColors.current
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isShizuku) colors.accentGreen.copy(alpha = 0.1f) else colors.accentOrange.copy(alpha = 0.1f)
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .border(
+                1.dp,
+                if (isShizuku) colors.accentGreen.copy(alpha = 0.25f) else colors.accentOrange.copy(alpha = 0.25f),
+                RoundedCornerShape(16.dp)
+            )
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Default.Info,
                 contentDescription = "Mode info",
-                tint = if (isShizuku) colors.accentGreen else colors.accentOrange
+                tint = if (isShizuku) colors.accentGreen else colors.accentOrange,
+                modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
@@ -220,11 +251,12 @@ fun ModeBanner(isShizuku: Boolean) {
                     text = if (isShizuku) "Pro Mode Active (Shizuku)" else "Basic Mode Active (Usage Access)",
                     color = if (isShizuku) colors.accentGreen else colors.accentOrange,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
+                    fontSize = 13.sp
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = if (isShizuku) "Displaying real-time CPU/RAM stats. System management commands enabled."
-                    else "Real-time CPU/RAM is disabled. To upgrade to Pro Mode, set up Shizuku and relaunch.",
+                    text = if (isShizuku) "Real-time CPU/RAM metrics and privileged system controls enabled."
+                    else "Real-time CPU/RAM is disabled. Set up Shizuku to unlock PC-grade task monitoring.",
                     color = colors.textPrimary,
                     fontSize = 11.sp,
                     lineHeight = 15.sp
@@ -240,51 +272,47 @@ fun SortingHeader(
     selectedSort: String,
     onSortChange: (String) -> Unit
 ) {
-    val colors = ProStatsColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isShizuku) {
-            SortTab(title = "Sort by CPU", active = selectedSort == "CPU", onClick = { onSortChange("CPU") })
-            SortTab(title = "Sort by RAM", active = selectedSort == "RAM", onClick = { onSortChange("RAM") })
+            SortTab(title = "CPU Load", active = selectedSort == "CPU", onClick = { onSortChange("CPU") })
+            SortTab(title = "RAM Usage", active = selectedSort == "RAM", onClick = { onSortChange("RAM") })
         }
-        SortTab(title = "Recently Used", active = selectedSort == "Recent", onClick = { onSortChange("Recent") })
-        SortTab(title = "Sort by Name", active = selectedSort == "Name", onClick = { onSortChange("Name") })
+        SortTab(title = "Recently Active", active = selectedSort == "Recent", onClick = { onSortChange("Recent") })
+        SortTab(title = "App Name", active = selectedSort == "Name", onClick = { onSortChange("Name") })
     }
 }
 
 @Composable
 fun SortTab(title: String, active: Boolean, onClick: () -> Unit) {
     val colors = ProStatsColors.current
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (active) colors.cardSurface else Color.Transparent,
-            contentColor = if (active) colors.accentGreen else colors.textSecondary
-        ),
-        border = androidx.compose.foundation.BorderStroke(1.dp, if (active) colors.accentGreen.copy(alpha = 0.2f) else colors.borderColor),
-        shape = RoundedCornerShape(10.dp),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-        modifier = Modifier.height(36.dp)
+    Box(
+        modifier = Modifier
+            .background(
+                if (active) colors.accentGreen.copy(alpha = 0.16f) else colors.elevatedSurface,
+                RoundedCornerShape(12.dp)
+            )
+            .border(
+                1.dp,
+                if (active) colors.accentGreen.copy(alpha = 0.4f) else colors.borderColorSubtle,
+                RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-fun formatSot(timeMs: Long): String {
-    val totalSeconds = timeMs / 1000
-    val totalMinutes = totalSeconds / 60
-    val hours = totalMinutes / 60
-    val minutes = totalMinutes % 60
-    return if (hours > 0) {
-        "${hours}h ${minutes}m"
-    } else {
-        "${minutes}m"
+        Text(
+            text = title,
+            fontSize = 12.sp,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+            color = if (active) colors.accentGreen else colors.textSecondary
+        )
     }
 }
 
@@ -319,31 +347,27 @@ fun ProcessRow(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(color, RoundedCornerShape(16.dp))
+                    .background(color, RoundedCornerShape(18.dp))
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Button(
-                        onClick = {
-                            onFreeze(item.packageName)
-                        },
+                        onClick = { onFreeze(item.packageName) },
                         colors = ButtonDefaults.buttonColors(containerColor = colors.accentPurple, contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(32.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp)
                     ) {
                         Text("Freeze", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = {
-                            onForceStop(item.packageName)
-                        },
+                        onClick = { onForceStop(item.packageName) },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Red),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(32.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp)
                     ) {
                         Text("Force Stop", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
@@ -352,39 +376,35 @@ fun ProcessRow(
         }
     ) {
         Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = colors.cardSurface
-            ),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable {
-                    showDialog = true
-                }
+                .border(1.dp, colors.borderColor, RoundedCornerShape(18.dp))
+                .clickable { showDialog = true }
         ) {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // App Icon
                 AppIcon(
                     packageName = item.packageName,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(colors.borderColor.copy(alpha = 0.07f), RoundedCornerShape(10.dp))
+                    modifier = Modifier.size(42.dp)
                 )
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.name,
                         color = colors.textPrimary,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = item.packageName,
                         color = colors.textSecondary,
@@ -394,7 +414,7 @@ fun ProcessRow(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Column(horizontalAlignment = Alignment.End) {
                     when (sortBy) {
@@ -403,10 +423,10 @@ fun ProcessRow(
                                 text = "${item.cpuUsage}% CPU",
                                 color = if (item.cpuUsage > 15f) colors.accentOrange else colors.accentGreen,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             )
                             Text(
-                                text = "RAM: ${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
+                                text = "${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
                                 color = colors.textSecondary,
                                 fontSize = 11.sp
                             )
@@ -416,7 +436,7 @@ fun ProcessRow(
                                 text = "${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
                                 color = colors.accentOrange,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             )
                             if (item.isShizukuMode) {
                                 Text(
@@ -438,7 +458,7 @@ fun ProcessRow(
                                 text = timeStr,
                                 color = colors.accentPurple,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             )
                             Text(
                                 text = String.format(java.util.Locale.US, "Drained: %.1f%%", item.batteryUsagePct),
@@ -447,12 +467,11 @@ fun ProcessRow(
                             )
                         }
                         "Name" -> {
-                            // Show drained battery % for Name sort too
                             Text(
                                 text = String.format(java.util.Locale.US, "%.1f%%", item.batteryUsagePct),
                                 color = colors.accentPurple,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             )
                             if (item.isShizukuMode) {
                                 Text(
@@ -474,10 +493,10 @@ fun ProcessRow(
                                     text = "${item.cpuUsage}% CPU",
                                     color = if (item.cpuUsage > 15f) colors.accentOrange else colors.accentGreen,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
+                                    fontSize = 13.sp
                                 )
                                 Text(
-                                    text = "RAM: ${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
+                                    text = "${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
                                     color = colors.textSecondary,
                                     fontSize = 11.sp
                                 )
@@ -493,7 +512,7 @@ fun ProcessRow(
                                     text = timeStr,
                                     color = colors.accentPurple,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
+                                    fontSize = 13.sp
                                 )
                                 Text(
                                     text = String.format(java.util.Locale.US, "Drained: %.1f%%", item.batteryUsagePct),
@@ -511,8 +530,22 @@ fun ProcessRow(
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("Manage Process") },
-            text = { Text("What action would you like to take on '${item.name}'?") },
+            shape = RoundedCornerShape(22.dp),
+            containerColor = colors.cardSurface,
+            title = {
+                Text(
+                    text = "Manage Process",
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "Select an action to apply to '${item.name}' (${item.packageName}).",
+                    color = colors.textSecondary,
+                    fontSize = 14.sp
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -520,7 +553,7 @@ fun ProcessRow(
                         showDialog = false
                     }
                 ) {
-                    Text("Force Stop", color = Color.Red)
+                    Text("Force Stop", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -530,7 +563,7 @@ fun ProcessRow(
                         showDialog = false
                     }
                 ) {
-                    Text("Freeze App", color = colors.accentPurple)
+                    Text("Freeze App", color = colors.accentPurple, fontWeight = FontWeight.Bold)
                 }
             }
         )
