@@ -174,6 +174,16 @@ fun SotDetailScreen(
         }
     }
 
+    // Deep Sleep & Screen-Off idle drain analytics
+    val deepSleepStats = remember(lastUnplugTs, refreshTick) {
+        BatteryTracker.getDeepSleepStats(context)
+    }
+
+    // Charging session history
+    val chargingSessions = remember(refreshTick) {
+        BatteryTracker.getChargingSessions(context)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -472,6 +482,195 @@ fun SotDetailScreen(
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
                                         )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Section: Deep Sleep & Screen-Off Idle Drain Analytics (Battery Guru Feature)
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(22.dp),
+                            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
+                        ) {
+                            Column(modifier = Modifier.padding(20.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .background(colors.accentBlue, CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "DEEP SLEEP & IDLE DRAIN",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = colors.textSecondary,
+                                            letterSpacing = 1.sp
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .background(colors.accentBlue.copy(alpha = 0.16f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = String.format(Locale.US, "%.1f%% Deep Sleep", deepSleepStats.deepSleepPct),
+                                            color = colors.accentBlue,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    val dsMins = deepSleepStats.deepSleepTimeMs / 1000 / 60
+                                    val dsHrs = dsMins / 60
+                                    val dsRem = dsMins % 60
+                                    val dsFormatted = if (dsHrs > 0) "${dsHrs}h ${dsRem}m" else "${dsRem}m"
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(colors.elevatedSurface, RoundedCornerShape(14.dp))
+                                            .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(14.dp))
+                                            .padding(14.dp)
+                                    ) {
+                                        Column {
+                                            Text("Deep Sleep", color = colors.textSecondary, fontSize = 11.sp)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(dsFormatted, color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(colors.elevatedSurface, RoundedCornerShape(14.dp))
+                                            .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(14.dp))
+                                            .padding(14.dp)
+                                    ) {
+                                        Column {
+                                            Text("Screen-Off Drain", color = colors.textSecondary, fontSize = 11.sp)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                String.format(Locale.US, "%.2f%% / hr", deepSleepStats.screenOffDrainRatePctPerHour),
+                                                color = colors.accentGreen,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 16.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Section: Recent Charging Sessions (Battery Guru & AccuBattery Feature)
+                    if (chargingSessions.isNotEmpty()) {
+                        item {
+                            Card(
+                                shape = RoundedCornerShape(22.dp),
+                                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
+                            ) {
+                                Column(modifier = Modifier.padding(20.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(10.dp)
+                                                    .background(colors.accentGreen, CircleShape)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "RECENT CHARGING SESSIONS",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = colors.textSecondary,
+                                                letterSpacing = 1.sp
+                                            )
+                                        }
+                                        Text(
+                                            text = "${chargingSessions.size} recorded",
+                                            fontSize = 11.sp,
+                                            color = colors.textTertiary
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(14.dp))
+
+                                    chargingSessions.take(4).forEachIndexed { idx, session ->
+                                        if (idx > 0) {
+                                            HorizontalDivider(color = colors.borderColorSubtle, modifier = Modifier.padding(vertical = 10.dp))
+                                        }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = "${session.startLevel}% → ${session.endLevel}%",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 14.sp,
+                                                        color = colors.textPrimary
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = "(+${session.levelGained}%)",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 12.sp,
+                                                        color = colors.accentGreen
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = "${session.chargerType} • ${session.durationMs / 60000} mins",
+                                                    color = colors.textSecondary,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+
+                                            Column(horizontalAlignment = Alignment.End) {
+                                                if (session.energyAddedMah > 0) {
+                                                    Text(
+                                                        text = "+${session.energyAddedMah} mAh",
+                                                        color = colors.accentGreen,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp
+                                                    )
+                                                }
+                                                if (session.peakTempC > 0f) {
+                                                    Text(
+                                                        text = "Peak ${String.format(Locale.US, "%.1f°C", session.peakTempC)}",
+                                                        color = colors.textTertiary,
+                                                        fontSize = 11.sp
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

@@ -326,6 +326,7 @@ fun ProcessRow(
 ) {
     val colors = ProStatsColors.current
     var showDialog by remember { mutableStateOf(false) }
+    @Suppress("DEPRECATION")
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { dismissValue ->
             if (dismissValue == SwipeToDismissBoxValue.EndToStart) {

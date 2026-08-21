@@ -32,10 +32,15 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import android.content.Intent
+import android.net.Uri
 import com.example.prostats.data.BatteryHealthData
 import com.example.prostats.data.BatteryHealthEstimator
 import com.example.prostats.data.BatteryInfo
+import com.example.prostats.data.BatteryTracker
 import com.example.prostats.data.SystemMonitor
+import com.example.prostats.data.UpdateChecker
+import com.example.prostats.data.UpdateInfo
 import com.example.prostats.theme.ProStatsColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -167,6 +172,18 @@ fun DashboardContent(
     var thermalStatus by remember { mutableStateOf("Normal") }
     var coreFreqs by remember { mutableStateOf<List<Long>>(emptyList()) }
     var healthData by remember { mutableStateOf<BatteryHealthData?>(null) }
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+
+    // Automatic GitHub release update check on launch
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                updateInfo = UpdateChecker.checkForUpdates(context, notifyUserIfAvailable = true)
+            } catch (e: Exception) {
+                // Ignore network errors
+            }
+        }
+    }
 
     // Live update loop for CPU, RAM, Battery, and Health data
     LaunchedEffect(Unit) {
@@ -286,6 +303,90 @@ fun DashboardContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(modifier = Modifier.height(4.dp))
+
+                // GitHub In-App Update Banner (when new version pushed to GitHub)
+                updateInfo?.let { update ->
+                    if (update.isAvailable) {
+                        Card(
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, colors.accentGreen, RoundedCornerShape(18.dp))
+                                .clickable {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(intent)
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(colors.accentGreen.copy(alpha = 0.16f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = colors.accentGreen,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "New Update: v${update.remoteVersion}",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = colors.textPrimary
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .background(colors.accentGreen, RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "GITHUB",
+                                                color = Color.Black,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 9.sp
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "Tap to download and install the latest APK release.",
+                                        fontSize = 12.sp,
+                                        color = colors.textSecondary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)).apply {
+                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                        }
+                                        context.startActivity(intent)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentGreen, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text("Install", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Section 1: Hero Metric Grid (SOT & Battery Temp)
                 Row(

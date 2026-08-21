@@ -4,6 +4,25 @@ This document maintains a historical log of user inputs and corresponding code c
 
 ---
 
+### [2026-08-21] Battery Guru Feature Suite, In-App / Notification GitHub Updates & Deprecation Audit
+- **User Prompt**: *"check errors in this app and introduce features that is available in battery guru or any other system monitor app"* & *"can you show updates in app/notifications with internet after pushed to github"*
+- **Summary of Changes**:
+  - **GitHub In-App & Notification Update System**:
+    - `UpdateChecker.kt`: Created dedicated GitHub release checker querying `https://api.github.com/repos/Tharun-48/my-apps/contents/pro-stats/releases` with fallback to raw GitHub binaries. Compares remote version with `BuildConfig.VERSION_NAME`.
+    - **In-App Update Banner**: Added sleek Material 3 banner at the top of the main dashboard (`DashboardScreen.kt`) with live update status and direct "Install" action.
+    - **Background Push Notifications**: Configured `BatteryTrackerReceiver.kt` with a high-priority `App Updates` notification channel that triggers system alerts with download actions when a new APK is pushed to GitHub.
+  - **Battery Guru & AccuBattery Feature Suite**:
+    - **Battery Protection Alarms (`SettingsScreen.kt`)**: Added customizable charge limit stop alarm (80%, 85%, 90%, 100%), high battery temperature warning (40°C, 42°C, 45°C), and low battery warning (15%, 20%).
+    - **Deep Sleep & Idle Drain Analytics (`SotDetailScreen.kt`)**: Integrated kernel deep sleep vs awake calculation (`SystemClock.elapsedRealtime() - SystemClock.uptimeMillis()`), deep sleep percentage score, and screen-off drain rate (%/hour).
+    - **Charging Sessions Log (`BatteryTracker.kt` & `SotDetailScreen.kt`)**: Implemented persistent `ChargingSession` logging recording start/end %, energy added in mAh, peak charging temp, duration, and charger type (AC / USB / Wireless).
+  - **Error & Deprecation Fixes**:
+    - `AndroidManifest.xml`: Added `POST_NOTIFICATIONS` and `VIBRATE` permissions for battery alarms and update alerts.
+    - `MainScreen.kt`: Suppressed `rememberSwipeToDismissBoxState` deprecation warnings.
+  - **Build & Release**:
+    - Recompiled Release APK `ProStats-v2.2.apk` and copied to `pro-stats/releases/`.
+
+---
+
 ### [2026-08-21] System Battery Cycle Extraction & Universal GPU OpenGL ES Detection in System Info
 - **User Prompt**: *"well fix the battery cycles try to get the total from system (android) nd also gpu in system info"*
 - **Summary of Changes**:

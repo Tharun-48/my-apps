@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.prostats.data.AppLogger
+import com.example.prostats.data.BatteryTracker
 import com.example.prostats.data.SystemMonitor
 import com.example.prostats.service.OverlayService
 import com.example.prostats.theme.ProStatsColors
@@ -44,8 +45,9 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val colors = ProStatsColors.current
     val context = LocalContext.current
+    val colors = ProStatsColors.current
+
     var isShizukuRunning by remember { mutableStateOf(systemMonitor.isShizukuRunning()) }
     var hasShizukuPerm by remember { mutableStateOf(systemMonitor.hasShizukuPermission()) }
     var hasUsageAccess by remember { mutableStateOf(systemMonitor.hasUsageStatsPermission()) }
@@ -56,6 +58,13 @@ fun SettingsScreen(
     var overlayHz by remember { mutableStateOf(OverlayService.isHzEnabled(context)) }
     var overlayCpu by remember { mutableStateOf(OverlayService.isCpuEnabled(context)) }
     var overlayRam by remember { mutableStateOf(OverlayService.isRamEnabled(context)) }
+
+    var chargeAlarmEnabled by remember { mutableStateOf(BatteryTracker.isChargeAlarmEnabled(context)) }
+    var chargeAlarmLevel by remember { mutableIntStateOf(BatteryTracker.getChargeAlarmLevel(context)) }
+    var tempAlarmEnabled by remember { mutableStateOf(BatteryTracker.isTempAlarmEnabled(context)) }
+    var tempAlarmLimit by remember { mutableIntStateOf(BatteryTracker.getTempAlarmLimit(context)) }
+    var lowBatteryAlarmEnabled by remember { mutableStateOf(BatteryTracker.isLowBatteryAlarmEnabled(context)) }
+    var lowBatteryAlarmLevel by remember { mutableIntStateOf(BatteryTracker.getLowBatteryAlarmLevel(context)) }
 
     val prefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
     var currentTheme by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
@@ -463,6 +472,254 @@ fun SettingsScreen(
                         }
                         if (index < themes.size - 1) {
                             HorizontalDivider(color = colors.borderColorSubtle)
+                        }
+                    }
+                }
+            }
+
+            // Battery Health Protection Alarms Card (Battery Guru Feature)
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(colors.accentOrange.copy(alpha = 0.15f), CircleShape)
+                                .border(1.dp, colors.accentOrange.copy(alpha = 0.3f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = colors.accentOrange,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Battery Protection Alarms", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Set smart charging and temperature alert thresholds to extend Li-ion battery health.",
+                        color = colors.textSecondary,
+                        fontSize = 12.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 1. Charge Limit Alarm
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Charge Limit Stop Alarm", color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text(
+                                "Notify when charging reaches target level",
+                                color = colors.textSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = chargeAlarmEnabled,
+                            onCheckedChange = {
+                                chargeAlarmEnabled = it
+                                BatteryTracker.setChargeAlarmEnabled(context, it)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colors.accentGreen,
+                                checkedTrackColor = colors.accentGreen.copy(alpha = 0.3f),
+                                uncheckedThumbColor = colors.textSecondary,
+                                uncheckedTrackColor = colors.elevatedSurface
+                            )
+                        )
+                    }
+
+                    if (chargeAlarmEnabled) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(80, 85, 90, 100).forEach { level ->
+                                val selected = chargeAlarmLevel == level
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(
+                                            if (selected) colors.accentGreen.copy(alpha = 0.2f) else colors.elevatedSurface,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (selected) colors.accentGreen else colors.borderColorSubtle,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable {
+                                            chargeAlarmLevel = level
+                                            BatteryTracker.setChargeAlarmLevel(context, level)
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$level%",
+                                        color = if (selected) colors.accentGreen else colors.textPrimary,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = colors.borderColorSubtle)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // 2. High Temperature Alarm
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("High Temperature Warning", color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text(
+                                "Alert when battery exceeds thermal threshold",
+                                color = colors.textSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = tempAlarmEnabled,
+                            onCheckedChange = {
+                                tempAlarmEnabled = it
+                                BatteryTracker.setTempAlarmEnabled(context, it)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colors.accentOrange,
+                                checkedTrackColor = colors.accentOrange.copy(alpha = 0.3f),
+                                uncheckedThumbColor = colors.textSecondary,
+                                uncheckedTrackColor = colors.elevatedSurface
+                            )
+                        )
+                    }
+
+                    if (tempAlarmEnabled) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(40, 42, 45).forEach { temp ->
+                                val selected = tempAlarmLimit == temp
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(
+                                            if (selected) colors.accentOrange.copy(alpha = 0.2f) else colors.elevatedSurface,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (selected) colors.accentOrange else colors.borderColorSubtle,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable {
+                                            tempAlarmLimit = temp
+                                            BatteryTracker.setTempAlarmLimit(context, temp)
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$temp°C",
+                                        color = if (selected) colors.accentOrange else colors.textPrimary,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = colors.borderColorSubtle)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // 3. Low Battery Warning
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Low Battery Warning", color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text(
+                                "Remind to plug in before deep discharge",
+                                color = colors.textSecondary,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = lowBatteryAlarmEnabled,
+                            onCheckedChange = {
+                                lowBatteryAlarmEnabled = it
+                                BatteryTracker.setLowBatteryAlarmEnabled(context, it)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colors.accentYellow,
+                                checkedTrackColor = colors.accentYellow.copy(alpha = 0.3f),
+                                uncheckedThumbColor = colors.textSecondary,
+                                uncheckedTrackColor = colors.elevatedSurface
+                            )
+                        )
+                    }
+
+                    if (lowBatteryAlarmEnabled) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(15, 20).forEach { lvl ->
+                                val selected = lowBatteryAlarmLevel == lvl
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(
+                                            if (selected) colors.accentYellow.copy(alpha = 0.2f) else colors.elevatedSurface,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (selected) colors.accentYellow else colors.borderColorSubtle,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable {
+                                            lowBatteryAlarmLevel = lvl
+                                            BatteryTracker.setLowBatteryAlarmLevel(context, lvl)
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$lvl%",
+                                        color = if (selected) colors.accentYellow else colors.textPrimary,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 }
