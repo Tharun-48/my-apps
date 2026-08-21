@@ -11,6 +11,12 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.opengl.EGL14
+import android.opengl.EGLConfig
+import android.opengl.EGLContext
+import android.opengl.EGLDisplay
+import android.opengl.EGLSurface
+import android.opengl.GLES20
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
@@ -72,7 +78,8 @@ data class GpuInfo(
     val renderer: String,
     val vendor: String,
     val maxFreqMhz: Long,
-    val currentFreqMhz: Long
+    val currentFreqMhz: Long,
+    val openGlVersion: String = ""
 )
 
 data class NetworkInfo(
@@ -1077,67 +1084,150 @@ class SystemMonitor(private val context: Context) {
         return list.sortedByDescending { it.totalDurationMs }
     }
 
-    /** Get GPU info from sysfs or Shizuku */
+    private data class EglGpuDetails(val renderer: String, val vendor: String, val openGlVersion: String)
+
+    private fun getGpuEglDetails(): EglGpuDetails? {
+        try {
+            val display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+            if (display == EGL14.EGL_NO_DISPLAY) return null
+            val version = IntArray(2)
+            if (!EGL14.eglInitialize(display, version, 0, version, 1)) return null
+
+            val configAttribs = intArrayOf(
+                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_SURFACE_TYPE, EGL14.EGL_PBUFFER_BIT,
+                EGL14.EGL_NONE
+            )
+            val configs = arrayOfNulls<EGLConfig>(1)
+            val numConfigs = IntArray(1)
+            if (!EGL14.eglChooseConfig(display, configAttribs, 0, configs, 0, 1, numConfigs, 0) || numConfigs[0] == 0) {
+                EGL14.eglTerminate(display)
+                return null
+            }
+            val config = configs[0]
+
+            val contextAttribs = intArrayOf(
+                EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
+                EGL14.EGL_NONE
+            )
+            val eglContext = EGL14.eglCreateContext(display, config, EGL14.EGL_NO_CONTEXT, contextAttribs, 0)
+            if (eglContext == EGL14.EGL_NO_CONTEXT) {
+                EGL14.eglTerminate(display)
+                return null
+            }
+
+            val surfaceAttribs = intArrayOf(
+                EGL14.EGL_WIDTH, 1,
+                EGL14.EGL_HEIGHT, 1,
+                EGL14.EGL_NONE
+            )
+            val surface = EGL14.eglCreatePbufferSurface(display, config, surfaceAttribs, 0)
+            if (surface == EGL14.EGL_NO_SURFACE) {
+                EGL14.eglDestroyContext(display, eglContext)
+                EGL14.eglTerminate(display)
+                return null
+            }
+
+            EGL14.eglMakeCurrent(display, surface, surface, eglContext)
+
+            val renderer = GLES20.glGetString(GLES20.GL_RENDERER) ?: "Unknown"
+            val vendor = GLES20.glGetString(GLES20.GL_VENDOR) ?: "Unknown"
+            val glVersion = GLES20.glGetString(GLES20.GL_VERSION) ?: "Unknown"
+
+            EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+            EGL14.eglDestroySurface(display, surface)
+            EGL14.eglDestroyContext(display, eglContext)
+            EGL14.eglTerminate(display)
+
+            return EglGpuDetails(renderer, vendor, glVersion)
+        } catch (e: Exception) {
+            Log.d("SystemMonitor", "Error querying EGL GPU info: ${e.message}")
+            return null
+        }
+    }
+
+    /** Get GPU info with reliable headless OpenGL ES query & hardware frequency checks */
     fun getGpuInfo(): GpuInfo {
         var renderer = "Unknown"
         var vendor = "Unknown"
+        var openGlVersion = ""
         var maxFreqMhz = 0L
         var currentFreqMhz = 0L
 
-        // Try Qualcomm Adreno path
-        val kgslDir = File("/sys/class/kgsl/kgsl-3d0/")
-        if (kgslDir.exists()) {
-            vendor = "Qualcomm Adreno"
-            try {
-                val maxFreqFile = File(kgslDir, "max_gpuclk")
-                val curFreqFile = File(kgslDir, "gpuclk")
-                if (maxFreqFile.exists()) maxFreqMhz = (maxFreqFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
-                if (curFreqFile.exists()) currentFreqMhz = (curFreqFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
-            } catch (e: Exception) {}
+        // 1. Direct Headless EGL / OpenGL Query (Universal on all Android devices)
+        val eglDetails = getGpuEglDetails()
+        if (eglDetails != null) {
+            renderer = eglDetails.renderer
+            vendor = eglDetails.vendor
+            openGlVersion = eglDetails.openGlVersion
         }
 
-        // Try Mali path
-        if (maxFreqMhz == 0L) {
-            val maliDir = File("/sys/devices/platform/").listFiles()?.find { it.name.contains("mali") || it.name.contains("gpu") }
-            if (maliDir != null) {
-                vendor = "ARM Mali"
-                try {
-                    val maxFreqFile = File(maliDir, "max_freq")
-                    val curFreqFile = File(maliDir, "cur_freq")
-                    if (maxFreqFile.exists()) maxFreqMhz = (maxFreqFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
-                    if (curFreqFile.exists()) currentFreqMhz = (curFreqFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
-                } catch (e: Exception) {}
-            }
-        }
+        // 2. Query Clock Frequencies from sysfs
+        val sysfsPaths = listOf(
+            // Qualcomm Adreno paths
+            Pair("/sys/class/kgsl/kgsl-3d0/max_gpuclk", "/sys/class/kgsl/kgsl-3d0/gpuclk"),
+            Pair("/sys/class/kgsl/kgsl-3d0/devfreq/max_freq", "/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq"),
+            Pair("/sys/devices/platform/soc/soc:qcom,kgsl-3d0/kgsl/kgsl-3d0/max_gpuclk", "/sys/devices/platform/soc/soc:qcom,kgsl-3d0/kgsl/kgsl-3d0/gpuclk"),
+            Pair("/sys/devices/platform/kgsl-3d0.0/kgsl/kgsl-3d0/max_gpuclk", "/sys/devices/platform/kgsl-3d0.0/kgsl/kgsl-3d0/gpuclk"),
+            // ARM Mali / Devfreq paths
+            Pair("/sys/devices/platform/gpusysfs/gpu_max_clock", "/sys/devices/platform/gpusysfs/gpu_clock"),
+            Pair("/sys/devices/platform/13040000.mali/devfreq/13040000.mali/max_freq", "/sys/devices/platform/13040000.mali/devfreq/13040000.mali/cur_freq"),
+            Pair("/sys/class/devfreq/gpufreq/max_freq", "/sys/class/devfreq/gpufreq/cur_freq"),
+            Pair("/sys/class/devfreq/13040000.mali/max_freq", "/sys/class/devfreq/13040000.mali/cur_freq"),
+            Pair("/sys/class/devfreq/13000000.mali/max_freq", "/sys/class/devfreq/13000000.mali/cur_freq"),
+            Pair("/sys/class/devfreq/1c500000.mali/max_freq", "/sys/class/devfreq/1c500000.mali/cur_freq")
+        )
 
-        // Try devfreq path (common for Mali/IMG)
-        if (maxFreqMhz == 0L) {
+        for ((maxPath, curPath) in sysfsPaths) {
             try {
-                val devfreqDir = File("/sys/class/devfreq/")
-                val gpuDev = devfreqDir.listFiles()?.find { it.name.contains("gpu") || it.name.contains("mali") || it.name.contains("13000000") }
-                if (gpuDev != null) {
-                    val maxFile = File(gpuDev, "max_freq")
-                    val curFile = File(gpuDev, "cur_freq")
-                    if (maxFile.exists()) maxFreqMhz = (maxFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
-                    if (curFile.exists()) currentFreqMhz = (curFile.readText().trim().toLongOrNull() ?: 0L) / 1000000
-                    if (vendor == "Unknown") vendor = "GPU"
+                val maxF = File(maxPath)
+                val curF = File(curPath)
+                if (maxF.exists() && maxF.canRead() && maxFreqMhz == 0L) {
+                    val raw = maxF.readText().trim().toLongOrNull() ?: 0L
+                    maxFreqMhz = if (raw > 1000000) raw / 1000000 else if (raw > 1000) raw / 1000 else raw
+                }
+                if (curF.exists() && curF.canRead() && currentFreqMhz == 0L) {
+                    val raw = curF.readText().trim().toLongOrNull() ?: 0L
+                    currentFreqMhz = if (raw > 1000000) raw / 1000000 else if (raw > 1000) raw / 1000 else raw
                 }
             } catch (e: Exception) {}
         }
 
-        // Try Shizuku dumpsys for renderer name
-        if (isShizukuRunning() && hasShizukuPermission()) {
-            try {
-                val process = Shizuku.newProcess(arrayOf("sh", "-c", "dumpsys SurfaceFlinger --list 2>&1"), null, null)
-                val reader = BufferedReader(InputStreamReader(process.inputStream))
-                // Just confirm it's accessible; renderer info is limited from dumpsys
-                process.waitFor()
-            } catch (e: Exception) {}
+        // 3. Try Shizuku if sysfs is blocked
+        if (maxFreqMhz == 0L && isShizukuRunning() && hasShizukuPermission()) {
+            for ((maxPath, curPath) in sysfsPaths) {
+                try {
+                    val p = Shizuku.newProcess(arrayOf("sh", "-c", "cat $maxPath 2>/dev/null; cat $curPath 2>/dev/null"), null, null)
+                    val r = BufferedReader(InputStreamReader(p.inputStream))
+                    val maxLine = r.readLine()?.trim()?.toLongOrNull() ?: 0L
+                    val curLine = r.readLine()?.trim()?.toLongOrNull() ?: 0L
+                    p.waitFor()
+                    if (maxLine > 0L) {
+                        maxFreqMhz = if (maxLine > 1000000) maxLine / 1000000 else if (maxLine > 1000) maxLine / 1000 else maxLine
+                    }
+                    if (curLine > 0L) {
+                        currentFreqMhz = if (curLine > 1000000) curLine / 1000000 else if (curLine > 1000) curLine / 1000 else curLine
+                    }
+                    if (maxFreqMhz > 0L) break
+                } catch (e: Exception) {}
+            }
         }
 
-        renderer = vendor
+        // Vendor inference fallback if EGL vendor string is generic
+        if (vendor == "Unknown" || vendor.isBlank()) {
+            val rLower = renderer.lowercase()
+            vendor = when {
+                rLower.contains("adreno") -> "Qualcomm"
+                rLower.contains("mali") || rLower.contains("immortalis") -> "ARM"
+                rLower.contains("powervr") || rLower.contains("rogue") -> "Imagination Technologies"
+                rLower.contains("intel") || rLower.contains("hd graphics") -> "Intel"
+                rLower.contains("geforce") || rLower.contains("nvidia") || rLower.contains("tegra") -> "NVIDIA"
+                rLower.contains("angle") || rLower.contains("google") || rLower.contains("swiftshader") -> "Google"
+                else -> "Unknown"
+            }
+        }
 
-        return GpuInfo(renderer, vendor, maxFreqMhz, currentFreqMhz)
+        return GpuInfo(renderer, vendor, maxFreqMhz, currentFreqMhz, openGlVersion)
     }
 
     /** Get network connection details */

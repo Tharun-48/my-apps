@@ -38,7 +38,9 @@ data class HwBatteryInfo(
     val voltageMv: Int,
     val temperatureC: Float,
     val level: Int,
-    val capacityMah: Double = 0.0
+    val capacityMah: Double = 0.0,
+    val cycleCount: Int = -1,
+    val cycleSource: String = ""
 )
 
 data class DisplayInfo(
@@ -142,7 +144,21 @@ class HardwareMonitor(private val context: Context) {
             capacityMah = 0.0
         }
 
-        return HwBatteryInfo(healthString, technology, voltage, temperature, level, capacityMah)
+        var cycleCount = -1
+        var cycleSource = ""
+        try {
+            val sysCycles = BatteryHealthEstimator.getSystemCycleCount(context)
+            if (sysCycles > 0) {
+                cycleCount = sysCycles
+                cycleSource = "System"
+            } else {
+                val healthData = BatteryHealthEstimator.getHealthData(context)
+                cycleCount = healthData.chargeCycles
+                cycleSource = if (healthData.cycleSourceIsSystem) "System" else "Estimated"
+            }
+        } catch (e: Exception) {}
+
+        return HwBatteryInfo(healthString, technology, voltage, temperature, level, capacityMah, cycleCount, cycleSource)
     }
 
     fun getDisplayInfo(): DisplayInfo {

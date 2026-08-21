@@ -138,6 +138,9 @@ fun SystemInfoScreen() {
                 InfoCard(title = "Graphics Processing Unit (GPU)", icon = Icons.Default.Build, iconColor = colors.accentGreen) {
                     InfoRow("Renderer", gpu.renderer)
                     InfoRow("Vendor", gpu.vendor)
+                    if (gpu.openGlVersion.isNotBlank()) {
+                        InfoRow("OpenGL ES", gpu.openGlVersion)
+                    }
                     if (gpu.maxFreqMhz > 0) InfoRow("Max Frequency", "${gpu.maxFreqMhz} MHz")
                     if (gpu.currentFreqMhz > 0) InfoRow("Current Frequency", "${gpu.currentFreqMhz} MHz")
                 }
@@ -149,6 +152,9 @@ fun SystemInfoScreen() {
                 InfoCard(title = "Battery Hardware", icon = Icons.Default.Info, iconColor = colors.accentOrange) {
                     InfoRow("Current Level", "${bat.level}%")
                     InfoRow("Health State", bat.health)
+                    if (bat.cycleCount >= 0) {
+                        InfoRow("Charge Cycles", "${bat.cycleCount} (${bat.cycleSource})")
+                    }
                     InfoRow("Chemistry Technology", bat.technology)
                     if (bat.capacityMah > 0) {
                         InfoRow("Design Capacity", "${bat.capacityMah.toInt()} mAh")

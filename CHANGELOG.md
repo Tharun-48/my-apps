@@ -4,6 +4,30 @@ This document maintains a historical log of user inputs and corresponding code c
 
 ---
 
+### [2026-08-21] System Battery Cycle Extraction & Universal GPU OpenGL ES Detection in System Info
+- **User Prompt**: *"well fix the battery cycles try to get the total from system (android) nd also gpu in system info"*
+- **Summary of Changes**:
+  - **System Battery Cycle Extraction**:
+    - `BatteryHealthEstimator.kt`: Upgraded `getSystemCycleCount(context)` with a 4-layer fallback strategy:
+      1. Android 14+ (API 34+) `BatteryManager.getIntProperty(BATTERY_PROPERTY_CYCLE_COUNT)`.
+      2. Proprietary OEM extras from `Intent.ACTION_BATTERY_CHANGED` (`android.os.extra.CYCLE_COUNT`, `battery_cycle`, `cycle_count`, `cycle`, `charge_cycle`, `total_cycle`, `battery_cycle_count`).
+      3. Linux kernel sysfs power supply nodes (`/sys/class/power_supply/battery/cycle_count`, `/sys/class/power_supply/bms/cycle_count`, `/sys/class/power_supply/battery/battery_cycle`, etc.).
+      4. Shizuku privileged `dumpsys battery` output parsing (`mCycleCount`, `Cycle count`, `cycle_count`) and privileged sysfs reads.
+      5. Persistent caching in `SharedPreferences` as `KEY_LAST_SYSTEM_CYCLES` for reliable baseline tracking.
+    - `HardwareMonitor.kt`: Added `cycleCount` and `cycleSource` (`System` vs `Estimated`) to `HwBatteryInfo`.
+  - **Universal GPU Detection via Headless OpenGL ES / EGL Context**:
+    - `SystemMonitor.kt`: Added headless EGL/OpenGL ES 2.0 pbuffer surface initialization (`EGL14.eglGetDisplay`, `eglInitialize`, `eglCreateContext`, `eglCreatePbufferSurface`) to extract exact hardware GPU `GL_RENDERER`, `GL_VENDOR`, and `GL_VERSION` reliably across all Android devices (Qualcomm Adreno, ARM Mali, Imagination PowerVR, Google ANGLE, etc.) without requiring a visible SurfaceView or root.
+    - Added multi-platform GPU clock frequency readers across Qualcomm `/sys/class/kgsl/`, ARM Mali `/sys/class/devfreq/`, and Shizuku privileged shell fallback.
+    - Updated `GpuInfo` data class to include `openGlVersion`.
+  - **System Info UI Updates**:
+    - `SystemInfoScreen.kt`:
+      - GPU Card: Displays real hardware Renderer, Vendor, OpenGL ES version, Max Frequency, and Current Frequency.
+      - Battery Hardware Card: Displays Charge Cycles with source badge (e.g. `142 (System)`) alongside Level, Health, Tech, Design Capacity, Voltage, and Temp.
+  - **Build & Release**:
+    - Recompiled Release APK `ProStats-v2.2.apk` and copied to `pro-stats/releases/`.
+
+---
+
 ### [2026-08-21] Comprehensive UI/UX Redesign Using Skills (Material 3, Material You Monet & Apple HIG)
 - **User Prompt**: *"redesign app using skills."*
 - **Summary of Changes**:

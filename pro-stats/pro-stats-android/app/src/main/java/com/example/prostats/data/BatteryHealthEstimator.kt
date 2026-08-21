@@ -3,9 +3,14 @@ package com.example.prostats.data
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.os.BatteryManager
 import android.os.Build
 import android.util.Log
+import rikka.shizuku.Shizuku
+import java.io.BufferedReader
+import java.io.File
+import java.io.InputStreamReader
 
 data class BatteryHealthData(
     val healthScore: Int,           // 0-100 estimated health score
@@ -18,12 +23,13 @@ data class BatteryHealthData(
     val estimatedBatteryLife: Long, // ms of battery life remaining (0 if charging)
     val dischargeRatePctPerHour: Float, // Average % drain per hour
     val avgDailySotMs: Long,        // Average daily screen-on time from history
-    val cycleSourceIsSystem: Boolean = false // true if cycle count came from system API
+    val cycleSourceIsSystem: Boolean = false // true if cycle count came from system API/sysfs/dumpsys
 )
 
 /**
- * Battery health estimation engine.
- * Reads system cycle count on API 34+, falls back to charge-counter estimation.
+ * Comprehensive battery health estimation engine.
+ * Reads system cycle count from Android APIs, sysfs nodes, and Shizuku dumpsys,
+ * falling back to cumulative charge-counter estimation.
  */
 object BatteryHealthEstimator {
     init {
@@ -36,6 +42,7 @@ object BatteryHealthEstimator {
     private const val KEY_DESIGN_CAPACITY = "design_capacity"
     private const val KEY_LAST_LEVEL = "last_level"
     private const val KEY_LAST_CHARGING = "last_charging"
+    private const val KEY_LAST_SYSTEM_CYCLES = "last_system_cycles"
     private const val TAG = "BatteryHealthEstimator"
 
     /**
@@ -72,23 +79,137 @@ object BatteryHealthEstimator {
     }
 
     /**
-     * Attempt to read system-provided cycle count.
-     * Returns -1 if unavailable (API < 34 or device doesn't expose it).
+     * Attempt to read system-provided cycle count from all available hardware and OS sources:
+     * 1. Android 14+ (API 34+) BatteryManager (BATTERY_PROPERTY_CYCLE_COUNT = 7)
+     * 2. Intent.ACTION_BATTERY_CHANGED proprietary OEM extras
+     * 3. Linux kernel sysfs power supply nodes across Qualcomm, MTK, Exynos, Google Tensor
+     * 4. Shizuku privileged dumpsys battery & sysfs execution
      */
-    private fun getSystemCycleCount(context: Context): Int {
-        return if (Build.VERSION.SDK_INT >= 34) {
+    fun getSystemCycleCount(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        // 1. Android 14+ (API 34+) BatteryManager
+        if (Build.VERSION.SDK_INT >= 34) {
             try {
                 val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-                // Property ID 7 represents BATTERY_PROPERTY_CYCLE_COUNT (API 34+)
-                val cycles = bm.getIntProperty(7)
-                if (cycles > 0) cycles else -1
+                val cycles = bm.getIntProperty(7) // BATTERY_PROPERTY_CYCLE_COUNT = 7
+                if (cycles > 0) {
+                    prefs.edit().putInt(KEY_LAST_SYSTEM_CYCLES, cycles).apply()
+                    return cycles
+                }
             } catch (e: Exception) {
-                Log.d(TAG, "System cycle count property unavailable: ${e.message}")
-                -1
+                Log.d(TAG, "BatteryManager cycle count property unavailable: ${e.message}")
             }
-        } else {
-            -1
         }
+
+        // 2. Battery Changed Intent OEM Extras (Samsung, Xiaomi, Pixel, OnePlus, Motorola)
+        try {
+            val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            val intent = context.registerReceiver(null, filter)
+            if (intent != null) {
+                val candidateKeys = listOf(
+                    "android.os.extra.CYCLE_COUNT",
+                    "battery_cycle",
+                    "cycle_count",
+                    "cycle",
+                    "charge_cycle",
+                    "total_cycle",
+                    "battery_cycle_count",
+                    "charge_counter_cycle",
+                    "mCycleCount"
+                )
+                for (key in candidateKeys) {
+                    val c = intent.getIntExtra(key, -1)
+                    if (c > 0) {
+                        prefs.edit().putInt(KEY_LAST_SYSTEM_CYCLES, c).apply()
+                        return c
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Intent cycle extra check failed: ${e.message}")
+        }
+
+        // 3. Sysfs power_supply nodes (World-readable on various kernel builds)
+        val sysfsPaths = listOf(
+            "/sys/class/power_supply/battery/cycle_count",
+            "/sys/class/power_supply/battery/battery_cycle",
+            "/sys/class/power_supply/battery/cycle",
+            "/sys/class/power_supply/battery/total_cycle",
+            "/sys/class/power_supply/battery/charge_cycle",
+            "/sys/class/power_supply/battery/cycle_count_raw",
+            "/sys/class/power_supply/bms/cycle_count",
+            "/sys/class/power_supply/bms/battery_cycle",
+            "/sys/class/power_supply/maxfg/cycle_count",
+            "/sys/class/power_supply/qcom-battery/cycle_count",
+            "/sys/class/power_supply/battery/device/cycle_count",
+            "/sys/class/power_supply/device/cycle_count",
+            "/sys/class/power_supply/battery/fg_cycle",
+            "/sys/class/power_supply/fg_cycle",
+            "/sys/devices/platform/battery/power_supply/battery/cycle_count",
+            "/sys/devices/soc/soc:qcom,pmic/power_supply/battery/cycle_count",
+            "/sys/class/power_supply/battery/soh"
+        )
+        for (path in sysfsPaths) {
+            try {
+                val file = File(path)
+                if (file.exists() && file.canRead()) {
+                    val text = file.readText().trim()
+                    val c = text.toIntOrNull()
+                    if (c != null && c > 0) {
+                        prefs.edit().putInt(KEY_LAST_SYSTEM_CYCLES, c).apply()
+                        return c
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+
+        // 4. Shizuku / Privileged shell execution if accessible
+        try {
+            if (Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+                // Try dumpsys battery
+                val process = Shizuku.newProcess(arrayOf("sh", "-c", "dumpsys battery 2>&1"), null, null)
+                val reader = BufferedReader(InputStreamReader(process.inputStream))
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    val l = line!!.trim()
+                    if (l.contains("Cycle count", ignoreCase = true) || 
+                        l.contains("mCycleCount", ignoreCase = true) ||
+                        l.contains("cycle_count", ignoreCase = true) ||
+                        l.contains("battery_cycle", ignoreCase = true)) {
+                        val num = l.substringAfter(":").trim().toIntOrNull()
+                        if (num != null && num > 0) {
+                            process.destroy()
+                            prefs.edit().putInt(KEY_LAST_SYSTEM_CYCLES, num).apply()
+                            return num
+                        }
+                    }
+                }
+                process.waitFor()
+
+                // Try reading kernel sysfs files via Shizuku shell
+                for (path in sysfsPaths) {
+                    val shProcess = Shizuku.newProcess(arrayOf("sh", "-c", "cat $path 2>/dev/null"), null, null)
+                    val shReader = BufferedReader(InputStreamReader(shProcess.inputStream))
+                    val out = shReader.readLine()?.trim()?.toIntOrNull()
+                    shProcess.waitFor()
+                    if (out != null && out > 0) {
+                        prefs.edit().putInt(KEY_LAST_SYSTEM_CYCLES, out).apply()
+                        return out
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Shizuku cycle query error: ${e.message}")
+        }
+
+        // Fallback: Check if we previously found a valid system cycle count
+        val cachedSystemCycles = prefs.getInt(KEY_LAST_SYSTEM_CYCLES, -1)
+        if (cachedSystemCycles > 0) {
+            return cachedSystemCycles
+        }
+
+        return -1
     }
 
     /**
@@ -98,7 +219,7 @@ object BatteryHealthEstimator {
     fun getHealthData(context: Context): BatteryHealthData {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // 1. Try system cycle count first (API 34+)
+        // 1. Try system cycle count first (Android API 34+, sysfs, or Shizuku dumpsys)
         val systemCycles = getSystemCycleCount(context)
         val cycleSourceIsSystem = systemCycles >= 0
         val chargeCycles = if (cycleSourceIsSystem) {
@@ -219,7 +340,6 @@ object BatteryHealthEstimator {
 
     @JvmStatic
     external fun calculateHealthScoreNative(cycles: Int, currentCapacity: Int, designCapacity: Int): Int
-
 
     private fun calculateDischargeRate(context: Context): Float {
         val points = BatteryTracker.getHistorySinceLastCharge(context)
