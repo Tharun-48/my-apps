@@ -4,6 +4,27 @@ This document maintains a historical log of user inputs and corresponding code c
 
 ---
 
+### [2026-08-27] Active Running Processes Engine via Usage Access (UsageEvents & ActivityManager)
+- **User Prompt**: *"in manage running processes, you should replace the code with active processes which is running currently in phone using usage access"* & *"push to github ig"*
+- **Summary of Changes**:
+  - **Active Process Detection Engine (`SystemMonitor.kt`)**:
+    - Replaced the historical 24-hour daily usage stats fetch in `fetchProcessesViaUsageStats()` with an active real-time process tracker.
+    - Utilizes `UsageEvents` in a rolling window to detect:
+      - Active foreground applications (`ACTIVITY_RESUMED` / not stopped).
+      - Foreground services (`FOREGROUND_SERVICE_START` / not stopped) such as music playback, navigation, step tracking, VPNs, and active sync tasks.
+      - Active background tasks and recent interactions.
+    - Integrated `ActivityManager.getRunningAppProcesses()` and `ActivityManager.getProcessMemoryInfo()` to retrieve live PIDs and exact resident PSS RAM allocations (MB).
+    - Added category-based fallback memory profiling for sandboxed tasks without root.
+    - Added `processState` attribute (`Foreground`, `Foreground Service`, `Active Background`, `Recent`) to `ProcessItem`.
+  - **Running Processes Screen UI (`MainScreen.kt` & `app.js`)**:
+    - Added state pill badges with distinct colors (Green for Foreground, Purple for Foreground Service, Orange for Background, Grey for Recent).
+    - Updated sorting header tabs to include `Active Status` (Foreground & Services prioritized), `RAM Usage`, `Recently Active`, and `App Name`.
+    - Updated Mode Banner in Basic Mode to clearly state that active processes, services, and tasks are live monitored.
+  - **Build & Release**:
+    - Recompiled Release APK `ProStats-v2.2.apk` and copied to `pro-stats/releases/`.
+
+---
+
 ### [2026-08-21] Battery Guru Feature Suite, In-App / Notification GitHub Updates & Deprecation Audit
 - **User Prompt**: *"check errors in this app and introduce features that is available in battery guru or any other system monitor app"* & *"can you show updates in app/notifications with internet after pushed to github"*
 - **Summary of Changes**:

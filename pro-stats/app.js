@@ -10,12 +10,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let shizukuGranted = false;
 
     const mockProcesses = [
-        { name: "system_server", pkg: "android", cpu: 4.2, ram: 184.2, isSystem: true },
-        { name: "System UI", pkg: "com.android.systemui", cpu: 2.1, ram: 112.5, isSystem: true },
-        { name: "Chrome", pkg: "com.android.chrome", cpu: 12.8, ram: 342.0, isSystem: false },
-        { name: "WhatsApp", pkg: "com.whatsapp", cpu: 0.5, ram: 98.4, isSystem: false },
-        { name: "YouTube", pkg: "com.google.android.youtube", cpu: 18.4, ram: 256.1, isSystem: false },
-        { name: "ProStats (Active)", pkg: "com.example.prostats", cpu: 1.5, ram: 45.2, isSystem: false }
+        { name: "ProStats", pkg: "com.example.prostats", cpu: 1.5, ram: 45.2, isSystem: false, state: "Foreground" },
+        { name: "Chrome", pkg: "com.android.chrome", cpu: 12.8, ram: 342.0, isSystem: false, state: "Foreground" },
+        { name: "Spotify", pkg: "com.spotify.music", cpu: 2.4, ram: 145.8, isSystem: false, state: "Foreground Service" },
+        { name: "System UI", pkg: "com.android.systemui", cpu: 2.1, ram: 112.5, isSystem: true, state: "Foreground Service" },
+        { name: "WhatsApp", pkg: "com.whatsapp", cpu: 0.5, ram: 98.4, isSystem: false, state: "Active Background" },
+        { name: "YouTube", pkg: "com.google.android.youtube", cpu: 18.4, ram: 256.1, isSystem: false, state: "Recent (< 2m ago)" },
+        { name: "system_server", pkg: "android", cpu: 4.2, ram: 184.2, isSystem: true, state: "Active Background" }
     ];
 
     const mockCores = [1820, 2040, 2040, 2040, 2420, 2420, 2840, 2840];
@@ -269,17 +270,17 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="summary-box" style="margin-bottom: 20px;">
                 <div style="background: ${isShizuku ? 'rgba(74,222,128,0.1)' : 'rgba(251,146,60,0.1)'}; border: 1px solid ${isShizuku ? 'var(--accent)' : 'var(--accent-orange)'}; border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px;">
                     <div style="color: ${isShizuku ? 'var(--accent)' : 'var(--accent-orange)'}; font-weight: bold; font-size: 0.9rem;">
-                        ${isShizuku ? 'Pro Mode (Shizuku)' : 'Basic Mode (Usage Access)'}
+                        ${isShizuku ? 'Pro Mode (Shizuku)' : 'Active Processes (Usage Access)'}
                     </div>
                     <div style="color: var(--text-secondary); font-size: 0.8rem; flex: 1;">
-                        ${isShizuku ? 'Real-time CPU/RAM stats active.' : 'To see live CPU/RAM stats, enable Shizuku.'}
+                        ${isShizuku ? 'Real-time CPU/RAM stats active.' : 'Monitoring active foreground apps, foreground services, and active background tasks.'}
                     </div>
                 </div>
             </div>
 
             <!-- Sorting tabs -->
             <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-                <button id="sort-cpu" style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: var(--accent); border: none; border-radius: 8px; font-size: 0.8rem; cursor: pointer; font-weight: 600;">CPU</button>
+                <button id="sort-cpu" style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: var(--accent); border: none; border-radius: 8px; font-size: 0.8rem; cursor: pointer; font-weight: 600;">${isShizuku ? 'CPU' : 'Active'}</button>
                 <button id="sort-ram" style="flex: 1; padding: 8px; background: transparent; color: var(--text-secondary); border: none; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">RAM</button>
                 <button id="sort-name" style="flex: 1; padding: 8px; background: transparent; color: var(--text-secondary); border: none; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">Name</button>
             </div>
@@ -308,14 +309,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div>
                             <div style="font-weight: 600; font-size: 0.95rem; color: white;">${p.name}</div>
                             <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">${p.pkg}</div>
+                            <div style="display: inline-block; font-size: 0.65rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-top: 4px; background: ${p.state.includes('Foreground') ? 'rgba(74,222,128,0.15)' : p.state.includes('Service') ? 'rgba(167,139,250,0.18)' : 'rgba(251,146,60,0.15)'}; color: ${p.state.includes('Foreground') ? 'var(--accent)' : p.state.includes('Service') ? '#a78bfa' : 'var(--accent-orange)'};">
+                                ${p.state.toUpperCase()}
+                            </div>
                         </div>
                     </div>
                     <div style="text-align: right;">
                         <div style="font-weight: 600; font-size: 0.9rem; color: ${p.cpu > 10 ? 'var(--accent-orange)' : 'var(--accent)'};">
-                            ${isShizuku ? p.cpu.toFixed(1) + '%' : 'Active'}
+                            ${isShizuku ? p.cpu.toFixed(1) + '%' : p.state}
                         </div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">
-                            ${isShizuku ? p.ram.toFixed(1) + ' MB' : 'Background'}
+                            ${p.ram.toFixed(1)} MB
                         </div>
                     </div>
                 </div>

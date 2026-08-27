@@ -100,7 +100,7 @@ fun MainScreen(
 
     // Set default sort for Basic Mode vs Pro Mode
     LaunchedEffect(isShizuku) {
-        sortBy = if (isShizuku) "CPU" else "Recent"
+        sortBy = if (isShizuku) "CPU" else "Active"
     }
 
     Scaffold(
@@ -116,7 +116,7 @@ fun MainScreen(
                         )
                         if (uiState is MainScreenUiState.Success) {
                             Text(
-                                text = "${uiState.data.size} processes active",
+                                text = "${uiState.data.size} active processes",
                                 fontSize = 11.sp,
                                 color = colors.textSecondary
                             )
@@ -184,6 +184,18 @@ fun MainScreen(
                         when (sortBy) {
                             "CPU" -> processes.sortedByDescending { it.cpuUsage }
                             "RAM" -> processes.sortedByDescending { it.ramUsageMb }
+                            "Active" -> processes.sortedWith(
+                                compareByDescending<ProcessItem> {
+                                    when {
+                                        it.processState.contains("Foreground", ignoreCase = true) && !it.processState.contains("Service", ignoreCase = true) -> 100
+                                        it.processState.contains("Service", ignoreCase = true) -> 80
+                                        it.processState.contains("Background", ignoreCase = true) -> 60
+                                        it.processState.contains("< 1m", ignoreCase = true) -> 40
+                                        it.processState.contains("< 5m", ignoreCase = true) -> 20
+                                        else -> 0
+                                    }
+                                }.thenByDescending { it.lastTimeUsedMs }
+                            )
                             "Name" -> processes.sortedBy { it.name }
                             "Recent" -> processes.sortedByDescending { it.lastTimeUsedMs }
                             else -> processes
@@ -192,7 +204,7 @@ fun MainScreen(
 
                     if (sortedList.isEmpty()) {
                         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text("No processes running", color = colors.textSecondary)
+                            Text("No active processes detected", color = colors.textSecondary)
                         }
                     } else {
                         LazyColumn(
@@ -248,7 +260,7 @@ fun ModeBanner(isShizuku: Boolean) {
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(
-                    text = if (isShizuku) "Pro Mode Active (Shizuku)" else "Basic Mode Active (Usage Access)",
+                    text = if (isShizuku) "Pro Mode Active (Shizuku)" else "Active Processes (Usage Access)",
                     color = if (isShizuku) colors.accentGreen else colors.accentOrange,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
@@ -256,7 +268,7 @@ fun ModeBanner(isShizuku: Boolean) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = if (isShizuku) "Real-time CPU/RAM metrics and privileged system controls enabled."
-                    else "Real-time CPU/RAM is disabled. Set up Shizuku to unlock PC-grade task monitoring.",
+                    else "Monitoring active foreground apps, foreground services, and active background tasks currently running in phone.",
                     color = colors.textPrimary,
                     fontSize = 11.sp,
                     lineHeight = 15.sp
@@ -282,6 +294,9 @@ fun SortingHeader(
     ) {
         if (isShizuku) {
             SortTab(title = "CPU Load", active = selectedSort == "CPU", onClick = { onSortChange("CPU") })
+            SortTab(title = "RAM Usage", active = selectedSort == "RAM", onClick = { onSortChange("RAM") })
+        } else {
+            SortTab(title = "Active Status", active = selectedSort == "Active", onClick = { onSortChange("Active") })
             SortTab(title = "RAM Usage", active = selectedSort == "RAM", onClick = { onSortChange("RAM") })
         }
         SortTab(title = "Recently Active", active = selectedSort == "Recent", onClick = { onSortChange("Recent") })
@@ -413,6 +428,33 @@ fun ProcessRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (item.processState.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        val (badgeBg, badgeFg) = when {
+                            item.processState.contains("Foreground", ignoreCase = true) && !item.processState.contains("Service", ignoreCase = true) ->
+                                Pair(colors.accentGreen.copy(alpha = 0.15f), colors.accentGreen)
+                            item.processState.contains("Service", ignoreCase = true) ->
+                                Pair(colors.accentPurple.copy(alpha = 0.18f), colors.accentPurple)
+                            item.processState.contains("Background", ignoreCase = true) ->
+                                Pair(colors.accentOrange.copy(alpha = 0.15f), colors.accentOrange)
+                            item.processState.contains("< 1m", ignoreCase = true) ->
+                                Pair(colors.accentGreen.copy(alpha = 0.12f), colors.accentGreen)
+                            else ->
+                                Pair(colors.elevatedSurface, colors.textSecondary)
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = badgeBg
+                        ) {
+                            Text(
+                                text = item.processState.uppercase(),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = badgeFg,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -445,7 +487,28 @@ fun ProcessRow(
                                     color = colors.textSecondary,
                                     fontSize = 11.sp
                                 )
+                            } else {
+                                Text(
+                                    text = if (item.processState.isNotBlank()) item.processState else "RAM allocated",
+                                    color = colors.textSecondary,
+                                    fontSize = 11.sp
+                                )
                             }
+                        }
+                        "Active" -> {
+                            val isFg = item.processState.contains("Foreground", ignoreCase = true) && !item.processState.contains("Service", ignoreCase = true)
+                            val isService = item.processState.contains("Service", ignoreCase = true)
+                            Text(
+                                text = if (item.processState.isNotBlank()) item.processState else "Active",
+                                color = if (isFg) colors.accentGreen else if (isService) colors.accentPurple else colors.accentOrange,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = "${String.format(java.util.Locale.US, "%.1f", item.ramUsageMb)} MB",
+                                color = colors.textSecondary,
+                                fontSize = 11.sp
+                            )
                         }
                         "Recent" -> {
                             val diffSec = (System.currentTimeMillis() - item.lastTimeUsedMs) / 1000
@@ -482,7 +545,7 @@ fun ProcessRow(
                                 )
                             } else {
                                 Text(
-                                    text = "Battery drain",
+                                    text = if (item.processState.isNotBlank()) item.processState else "Battery drain",
                                     color = colors.textSecondary,
                                     fontSize = 11.sp
                                 )
