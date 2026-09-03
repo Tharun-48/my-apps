@@ -298,27 +298,13 @@ fun SystemInfoScreen() {
 
         if (sensorInfoList.isNotEmpty()) {
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Hardware Sensors (${sensorInfoList.size})",
-                        color = colors.textPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "HARDWARE SOURCED",
-                        color = colors.accentPurple,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                }
+                Text(
+                    text = "Sensors (${sensorInfoList.size})",
+                    color = colors.textPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                )
             }
 
             itemsIndexed(sensorInfoList, key = { index, sensor -> "${sensor.typeInt}_${sensor.name}_$index" }) { _, sensor ->

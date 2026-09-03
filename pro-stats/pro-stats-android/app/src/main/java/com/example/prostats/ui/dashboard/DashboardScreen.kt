@@ -442,11 +442,10 @@ fun DashboardContent(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "BATTERY HEALTH & POWER",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = colors.textSecondary,
-                                    letterSpacing = 0.8.sp
+                                    text = "Battery Health & Power",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textPrimary
                                 )
                                 val cycleSource = if (hd.cycleSourceIsSystem) "System" else "Calc"
                                 Box(
@@ -781,24 +780,11 @@ fun RadialTelemetryHeroCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "SYSTEM TELEMETRY HUB",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textSecondary,
-                    letterSpacing = 0.8.sp
+                    text = "System Overview",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textPrimary
                 )
-                Box(
-                    modifier = Modifier
-                        .background(colors.accentGreen.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = "LIVE",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = colors.accentGreen
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

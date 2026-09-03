@@ -2,6 +2,17 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-04] UI Polish & Artificial Badge Removal
+- **User Prompt**: *"why somewhere the ui looks ai ish like the live,live stream word near system telemetry and hardware sensor not needed"*
+- **Summary of Changes**:
+  - **Clean Typography & Badge Removal (`DashboardScreen.kt` & `SystemInfoScreen.kt`)**:
+    - Removed tacky `"LIVE"`, `"HARDWARE SOURCED"`, and uppercase `"SYSTEM TELEMETRY HUB"` badges.
+    - Replaced with clean native titles: `"System Overview"`, `"Battery Health & Power"`, and `"Sensors (N)"`.
+  - **Build & Packaging**:
+    - Recompiled and verified `ProStats-v2.3.apk` in `pro-stats/releases/`.
+
+---
+
 ### [2026-09-04] MediaTek & Snapdragon CPU Thermal Probes, Hardware Sensor Sourcing & Real-time Protection Alarms
 - **User Prompt**: *"check the system info network interface try to fix it also in hardware sensors try to source every sensors based on the processor and model. try to make improvements in high temperation warning and battery protection alarm. try to get cpu temp reading also it is hard in mediatek, even through they have sensor many apps cant find it. also in snapdragon its easy but in mediatek its hard"*
 - **Summary of Changes**:
