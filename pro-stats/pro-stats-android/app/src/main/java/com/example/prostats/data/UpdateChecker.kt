@@ -42,10 +42,7 @@ object UpdateChecker {
      */
     suspend fun checkForUpdates(context: Context, notifyUserIfAvailable: Boolean = false): UpdateInfo = withContext(Dispatchers.IO) {
         val currentVersionStr = BuildConfig.VERSION_NAME
-        val currentVersionNum = parseVersionNumber(currentVersionStr)
-
         var highestVersionStr = currentVersionStr
-        var highestVersionNum = currentVersionNum
         var downloadUrl = ""
 
         try {
@@ -68,9 +65,7 @@ object UpdateChecker {
                     val fileName = obj.optString("name", "")
                     if (fileName.endsWith(".apk") && fileName.contains("-v", ignoreCase = true)) {
                         val verStr = fileName.substringAfter("-v").substringBefore(".apk").trim()
-                        val verNum = parseVersionNumber(verStr)
-                        if (verNum > highestVersionNum) {
-                            highestVersionNum = verNum
+                        if (isNewerVersion(verStr, highestVersionStr)) {
                             highestVersionStr = verStr
                             downloadUrl = obj.optString("download_url", "$GITHUB_RAW_BASE/$fileName")
                         }
@@ -81,7 +76,7 @@ object UpdateChecker {
             Log.d(TAG, "GitHub API update check failed: ${e.message}")
         }
 
-        val updateAvailable = highestVersionNum > currentVersionNum
+        val updateAvailable = isNewerVersion(highestVersionStr, currentVersionStr)
 
         if (updateAvailable && downloadUrl.isBlank()) {
             downloadUrl = "$GITHUB_RAW_BASE/ProStats-v$highestVersionStr.apk"
@@ -102,18 +97,21 @@ object UpdateChecker {
         return@withContext info
     }
 
-    private fun parseVersionNumber(versionStr: String): Float {
-        return try {
-            val clean = versionStr.replace(Regex("[^0-9.]"), "")
-            val parts = clean.split(".")
-            if (parts.size >= 2) {
-                "${parts[0]}.${parts[1]}".toFloatOrNull() ?: 0f
-            } else {
-                clean.toFloatOrNull() ?: 0f
+    fun isNewerVersion(remote: String, current: String): Boolean {
+        try {
+            val rParts = remote.replace(Regex("[^0-9.]"), "").split(".").filter { it.isNotBlank() }.map { it.toIntOrNull() ?: 0 }
+            val cParts = current.replace(Regex("[^0-9.]"), "").split(".").filter { it.isNotBlank() }.map { it.toIntOrNull() ?: 0 }
+            val maxLen = maxOf(rParts.size, cParts.size)
+            for (i in 0 until maxLen) {
+                val r = rParts.getOrElse(i) { 0 }
+                val c = cParts.getOrElse(i) { 0 }
+                if (r > c) return true
+                if (r < c) return false
             }
         } catch (e: Exception) {
-            0f
+            return false
         }
+        return false
     }
 
     private fun postUpdateNotification(context: Context, info: UpdateInfo) {

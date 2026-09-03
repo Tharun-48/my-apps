@@ -189,22 +189,30 @@ fun DashboardContent(
     LaunchedEffect(Unit) {
         var loopCount = 0
         while (true) {
-            withContext(Dispatchers.IO) {
-                cpuUsage = systemMonitor.getSystemCpuUsage()
-                val ramInfo = systemMonitor.getRamInfo()
-                ramUsedGb = ramInfo.usedGb
-                ramTotalGb = ramInfo.totalGb
-                batteryInfo = systemMonitor.getBatteryInfo()
-                thermalStatus = systemMonitor.getThermalStatus()
-                coreFreqs = systemMonitor.getCpuCoreFrequencies()
-                cpuTemp = systemMonitor.getCpuTemperature()
-                batteryTemp = systemMonitor.getBatteryTemperature()
-                sotMs = systemMonitor.getScreenOnTimeSinceLastChargeMs()
-                if (loopCount % 6 == 0) {
-                    healthData = BatteryHealthEstimator.getHealthData(context)
-                }
-                loopCount++
-            }
+            val cpu = withContext(Dispatchers.IO) { systemMonitor.getSystemCpuUsage() }
+            val ramInfo = withContext(Dispatchers.IO) { systemMonitor.getRamInfo() }
+            val bat = withContext(Dispatchers.IO) { systemMonitor.getBatteryInfo() }
+            val thermal = withContext(Dispatchers.IO) { systemMonitor.getThermalStatus() }
+            val freqs = withContext(Dispatchers.IO) { systemMonitor.getCpuCoreFrequencies() }
+            val cTemp = withContext(Dispatchers.IO) { systemMonitor.getCpuTemperature() }
+            val bTemp = withContext(Dispatchers.IO) { systemMonitor.getBatteryTemperature() }
+            val sot = withContext(Dispatchers.IO) { systemMonitor.getScreenOnTimeSinceLastChargeMs() }
+            val health = if (loopCount % 6 == 0) {
+                withContext(Dispatchers.IO) { BatteryHealthEstimator.getHealthData(context) }
+            } else null
+
+            cpuUsage = cpu
+            ramUsedGb = ramInfo.usedGb
+            ramTotalGb = ramInfo.totalGb
+            batteryInfo = bat
+            thermalStatus = thermal
+            coreFreqs = freqs
+            cpuTemp = cTemp
+            batteryTemp = bTemp
+            sotMs = sot
+            if (health != null) healthData = health
+            loopCount++
+
             delay(1500)
         }
     }

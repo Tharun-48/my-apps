@@ -265,19 +265,24 @@ class OverlayService : Service() {
             .setOngoing(true)
             .build()
 
-        startForeground(1002, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(1002, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(1002, notification)
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
-        if (overlayView != null) {
+        overlayView?.let { view ->
             try {
-                windowManager?.removeView(overlayView)
+                windowManager?.removeView(view)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
+        overlayView = null
     }
 
     companion object {

@@ -319,3 +319,47 @@ input:checked + .slider:before {
         opacity: 0;
     }
 }
+
+/* Settings Button (Click-to-Settings CTA) */
+.settings-btn {
+    background: transparent;
+    border: 1px solid var(--accent-orange);
+    color: var(--accent-orange);
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+}
+
+.settings-btn:hover {
+    background: rgba(251, 146, 60, 0.1);
+}
+
+.settings-btn.granted {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(74, 222, 128, 0.1);
+}
+
+.settings-btn.granted:hover {
+    background: rgba(74, 222, 128, 0.2);
+}
+
+#item-shizuku .settings-btn {
+    border-color: var(--accent-purple);
+    color: var(--accent-purple);
+}
+
+#item-shizuku .settings-btn:hover {
+    background: rgba(167, 139, 250, 0.1);
+}
+
+#item-shizuku .settings-btn.granted {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(74, 222, 128, 0.1);
+}
+

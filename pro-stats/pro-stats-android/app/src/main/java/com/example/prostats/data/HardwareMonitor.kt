@@ -139,7 +139,8 @@ class HardwareMonitor(private val context: Context) {
         try {
             val powerProfileClass = "com.android.internal.os.PowerProfile"
             val mPowerProfile = Class.forName(powerProfileClass).getConstructor(Context::class.java).newInstance(context)
-            capacityMah = Class.forName(powerProfileClass).getMethod("getBatteryCapacity").invoke(mPowerProfile) as Double
+            val capResult = Class.forName(powerProfileClass).getMethod("getBatteryCapacity").invoke(mPowerProfile)
+            capacityMah = (capResult as? Number)?.toDouble() ?: 0.0
         } catch (e: Exception) {
             capacityMah = 0.0
         }

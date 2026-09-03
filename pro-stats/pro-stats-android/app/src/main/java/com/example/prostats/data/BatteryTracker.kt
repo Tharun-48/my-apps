@@ -205,7 +205,8 @@ object BatteryTracker {
                 0
             }
             val gainedPct = endLevel - currentChargeStartLevel
-            val designCap = 4500
+            val prefs = context.getSharedPreferences("battery_health_prefs", Context.MODE_PRIVATE)
+            val designCap = prefs.getInt("design_capacity", 4500)
             val energyMah = (designCap * gainedPct) / 100
 
             val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)

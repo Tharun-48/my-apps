@@ -2,6 +2,21 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-03] Comprehensive Bug Fixes, Modern Android 14+ Compliance & Stability Hardening
+- **User Prompt**: *"try to fix errors in my app"*
+- **Summary of Changes**:
+  - **UpdateChecker (`UpdateChecker.kt`)**: Replaced float-based version comparison with multi-part semantic version comparator (`isNewerVersion`) to accurately compare patch and minor versions without precision loss.
+  - **BatteryTracker (`BatteryTracker.kt`)**: Replaced hardcoded battery capacity with dynamic user/system design capacity in charging session energy calculations.
+  - **HardwareMonitor (`HardwareMonitor.kt`)**: Protected PowerProfile battery capacity reflection with safe Number casting to avoid OEM type mismatches.
+  - **OverlayService (`OverlayService.kt`)**: Added Android 14+ `FOREGROUND_SERVICE_TYPE_SPECIAL_USE` to `startForeground()` and hardened floating overlay view detach logic in `onDestroy()`.
+  - **BatteryTrackerReceiver (`BatteryTrackerReceiver.kt`)**: Added `goAsync()` to safeguard asynchronous background update checks from premature receiver termination.
+  - **DashboardScreen (`DashboardScreen.kt`)**: Synchronized state mutations cleanly from IO coroutines to the Main thread snapshot state.
+  - **Web Assets (`app.js`, `index.html`, `style.css`)**: Resolved unclosed interval timer closure in `app.js` and synchronized the latest web assets into the Android assets directory.
+  - **Build & Release**:
+    - Recompiled Release APK `ProStats-v2.2.apk` and copied to `pro-stats/releases/`.
+
+---
+
 ### [2026-09-03] Connected RuFlo (Claude-Flow V3) MCP Integration
 - **User Prompt**: *"isnt you connect to ruflo"*, *"my another workspace connected with ruflo"*, *"try to out it"*, *"try to connect this also"*
 - **Summary of Changes**:

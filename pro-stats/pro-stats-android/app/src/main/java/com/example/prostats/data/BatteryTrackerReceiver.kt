@@ -50,12 +50,19 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
                     BatteryHealthEstimator.trackCycleData(context)
                     checkBatteryProtectionAlarms(context)
                     
+                    val pendingResult = goAsync()
                     // Periodically check GitHub for new releases
                     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                         try {
                             UpdateChecker.checkForUpdates(context, notifyUserIfAvailable = true)
                         } catch (e: Exception) {
                             Log.d("BatteryTrackerReceiver", "Update check failed: ${e.message}")
+                        } finally {
+                            try {
+                                pendingResult.finish()
+                            } catch (e: Exception) {
+                                // Ignore finish errors if already finalized
+                            }
                         }
                     }
                 } catch (e: Exception) {
