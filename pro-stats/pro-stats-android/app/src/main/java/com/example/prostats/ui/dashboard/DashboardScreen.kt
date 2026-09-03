@@ -1,8 +1,15 @@
 package com.example.prostats.ui.dashboard
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,8 +30,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,8 +43,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import android.content.Intent
-import android.net.Uri
 import com.example.prostats.data.BatteryHealthData
 import com.example.prostats.data.BatteryHealthEstimator
 import com.example.prostats.data.BatteryInfo
@@ -47,7 +56,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(
     systemMonitor: SystemMonitor,
@@ -66,7 +74,7 @@ fun DashboardScreen(
             NavigationBar(
                 containerColor = colors.navBarColor,
                 contentColor = colors.textPrimary,
-                tonalElevation = 0.dp
+                tonalElevation = 2.dp
             ) {
                 NavigationBarItem(
                     selected = pagerState.currentPage == 0,
@@ -80,7 +88,7 @@ fun DashboardScreen(
                         selectedTextColor = colors.accentGreen,
                         unselectedIconColor = colors.textSecondary,
                         unselectedTextColor = colors.textSecondary,
-                        indicatorColor = colors.accentGreen.copy(alpha = 0.14f)
+                        indicatorColor = colors.accentGreen.copy(alpha = 0.16f)
                     )
                 )
                 NavigationBarItem(
@@ -95,7 +103,7 @@ fun DashboardScreen(
                         selectedTextColor = colors.accentGreen,
                         unselectedIconColor = colors.textSecondary,
                         unselectedTextColor = colors.textSecondary,
-                        indicatorColor = colors.accentGreen.copy(alpha = 0.14f)
+                        indicatorColor = colors.accentGreen.copy(alpha = 0.16f)
                     )
                 )
                 NavigationBarItem(
@@ -110,7 +118,7 @@ fun DashboardScreen(
                         selectedTextColor = colors.accentGreen,
                         unselectedIconColor = colors.textSecondary,
                         unselectedTextColor = colors.textSecondary,
-                        indicatorColor = colors.accentGreen.copy(alpha = 0.14f)
+                        indicatorColor = colors.accentGreen.copy(alpha = 0.16f)
                     )
                 )
             }
@@ -213,7 +221,7 @@ fun DashboardContent(
             if (health != null) healthData = health
             loopCount++
 
-            delay(1500)
+            delay(1200)
         }
     }
 
@@ -239,24 +247,30 @@ fun DashboardContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(10.dp)
                                 .background(colors.accentGreen, CircleShape)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "ProStats",
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.ExtraBold,
                             fontSize = 20.sp,
-                            color = colors.textPrimary
+                            color = colors.textPrimary,
+                            letterSpacing = (-0.5).sp
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "DASHBOARD",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = colors.textTertiary,
-                            letterSpacing = 1.sp
-                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(colors.accentGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "v2.3",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.accentGreen
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -288,31 +302,17 @@ fun DashboardContent(
                 .padding(paddingValues)
                 .background(colors.background)
         ) {
-            // Subtle ambient dark glow
-            if (colors.isDark) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(colors.accentGreen.copy(alpha = 0.08f), Color.Transparent),
-                                radius = 800f
-                            )
-                        )
-                )
-            }
-
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = 18.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
-                // GitHub In-App Update Banner (when new version pushed to GitHub)
+                // GitHub In-App Update Banner (when new version available)
                 updateInfo?.let { update ->
                     if (update.isAvailable) {
                         Card(
@@ -331,12 +331,12 @@ fun DashboardContent(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .padding(14.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(34.dp)
                                         .background(colors.accentGreen.copy(alpha = 0.16f), CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -344,40 +344,23 @@ fun DashboardContent(
                                         imageVector = Icons.Default.Info,
                                         contentDescription = null,
                                         tint = colors.accentGreen,
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = "New Update: v${update.remoteVersion}",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp,
-                                            color = colors.textPrimary
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .background(colors.accentGreen, RoundedCornerShape(6.dp))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = "GITHUB",
-                                                color = Color.Black,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 9.sp
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "Tap to download and install the latest APK release.",
-                                        fontSize = 12.sp,
+                                        text = "New Update: v${update.remoteVersion}",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = colors.textPrimary
+                                    )
+                                    Text(
+                                        text = "Tap to update to latest build",
+                                        fontSize = 11.sp,
                                         color = colors.textSecondary
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(8.dp))
                                 Button(
                                     onClick = {
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)).apply {
@@ -387,19 +370,32 @@ fun DashboardContent(
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = colors.accentGreen, contentColor = Color.Black),
                                     shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                                 ) {
-                                    Text("Install", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text("Install", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                 }
                             }
                         }
                     }
                 }
 
-                // Section 1: Hero Metric Grid (SOT & Battery Temp)
+                // Dynamic Hero Multi-Arc Radial Telemetry Hub
+                val ramRatio = if (ramTotalGb > 0) (ramUsedGb / ramTotalGb).coerceIn(0f, 1f) else 0f
+                RadialTelemetryHeroCard(
+                    cpuUsage = cpuUsage,
+                    ramUsageRatio = ramRatio,
+                    ramUsedGb = ramUsedGb,
+                    ramTotalGb = ramTotalGb,
+                    batteryMa = batteryInfo.currentMa,
+                    batteryWatts = batteryInfo.watts,
+                    batteryStatus = batteryInfo.status,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Quick Metric Tiles: Screen Time & Temperature
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     val minutes = (sotMs / 1000 / 60)
                     val sotHours = minutes / 60
@@ -430,7 +426,7 @@ fun DashboardContent(
                     )
                 }
 
-                // Section 2: Elevated Battery Health Score Card
+                // Battery Health & Live Energy Flow Card
                 healthData?.let { hd ->
                     Card(
                         shape = RoundedCornerShape(22.dp),
@@ -439,37 +435,36 @@ fun DashboardContent(
                             .fillMaxWidth()
                             .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
                     ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
+                        Column(modifier = Modifier.padding(18.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "BATTERY HEALTH",
+                                    text = "BATTERY HEALTH & POWER",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = colors.textSecondary,
-                                    letterSpacing = 1.sp
+                                    letterSpacing = 0.8.sp
                                 )
-                                // System cycle tag pill
-                                val cycleSource = if (hd.cycleSourceIsSystem) "System" else "Calculated"
+                                val cycleSource = if (hd.cycleSourceIsSystem) "System" else "Calc"
                                 Box(
                                     modifier = Modifier
-                                        .background(colors.elevatedSurface, RoundedCornerShape(10.dp))
-                                        .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(10.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        .background(colors.elevatedSurface, RoundedCornerShape(8.dp))
+                                        .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
                                 ) {
                                     Text(
                                         text = "$cycleSource Cycles: ${hd.chargeCycles}",
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         color = colors.textPrimary,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -482,42 +477,40 @@ fun DashboardContent(
                                     else -> Color(0xFFEF4444)
                                 }
 
-                                // Visual health score pill
                                 Column {
                                     Row(verticalAlignment = Alignment.Bottom) {
                                         Text(
                                             text = "${hd.healthScore}",
-                                            fontSize = 38.sp,
-                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 36.sp,
+                                            fontWeight = FontWeight.ExtraBold,
                                             color = healthColor,
-                                            lineHeight = 38.sp
+                                            lineHeight = 36.sp
                                         )
                                         Text(
                                             text = "%",
-                                            fontSize = 20.sp,
-                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Bold,
                                             color = healthColor.copy(alpha = 0.8f),
-                                            modifier = Modifier.padding(bottom = 4.dp, start = 2.dp)
+                                            modifier = Modifier.padding(bottom = 3.dp, start = 2.dp)
                                         )
                                     }
                                     Text(
                                         text = when {
-                                            hd.healthScore >= 85 -> "Excellent Condition"
+                                            hd.healthScore >= 85 -> "Optimal Condition"
                                             hd.healthScore >= 75 -> "Good Health"
                                             hd.healthScore >= 60 -> "Fair Condition"
                                             else -> "Needs Attention"
                                         },
-                                        fontSize = 12.sp,
+                                        fontSize = 11.sp,
                                         color = colors.textSecondary,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
 
-                                // Capacity details
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
                                         text = "${hd.currentCapacityMah} mAh",
-                                        fontSize = 15.sp,
+                                        fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = colors.textPrimary
                                     )
@@ -530,26 +523,26 @@ fun DashboardContent(
                                         val avgSotMins = hd.avgDailySotMs / 1000 / 60
                                         val avgSotH = avgSotMins / 60
                                         val avgSotM = avgSotMins % 60
-                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Spacer(modifier = Modifier.height(3.dp))
                                         Text(
                                             text = "Avg SOT: ${avgSotH}h ${avgSotM}m",
-                                            fontSize = 11.sp,
+                                            fontSize = 10.sp,
                                             color = colors.accentPurple,
-                                            fontWeight = FontWeight.Medium
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
                                 }
                             }
 
-                            // Dynamic Charge / Discharge Status Banner
-                            Spacer(modifier = Modifier.height(16.dp))
+                            // Dynamic Live Power Banner
+                            Spacer(modifier = Modifier.height(14.dp))
                             if (batteryInfo.status == "Charging" && hd.chargeSpeedMa > 0) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(colors.accentGreen.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
                                         .border(1.dp, colors.accentGreen.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
-                                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -557,10 +550,10 @@ fun DashboardContent(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "⚡ Charging at ${hd.chargeSpeedMa} mA (${String.format("%.1f", hd.chargeSpeedWatts)}W)",
-                                            fontSize = 12.sp,
+                                            text = "⚡ Charging: ${hd.chargeSpeedMa} mA (${String.format("%.1f", hd.chargeSpeedWatts)}W)",
+                                            fontSize = 11.sp,
                                             color = colors.accentGreen,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontWeight = FontWeight.Bold
                                         )
                                         if (hd.estimatedTimeToFull > 0) {
                                             val minsToFull = hd.estimatedTimeToFull / 1000 / 60
@@ -568,7 +561,7 @@ fun DashboardContent(
                                             val remMins = minsToFull % 60
                                             Text(
                                                 text = "~${hrsToFull}h ${remMins}m to full",
-                                                fontSize = 11.sp,
+                                                fontSize = 10.sp,
                                                 color = colors.textPrimary
                                             )
                                         }
@@ -580,7 +573,7 @@ fun DashboardContent(
                                         .fillMaxWidth()
                                         .background(colors.elevatedSurface, RoundedCornerShape(12.dp))
                                         .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(12.dp))
-                                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -591,15 +584,15 @@ fun DashboardContent(
                                         val hrsLeft = minsLeft / 60
                                         val remMins = minsLeft % 60
                                         Text(
-                                            text = "Est. Life: ${hrsLeft}h ${remMins}m",
-                                            fontSize = 12.sp,
+                                            text = "Est. Runtime: ${hrsLeft}h ${remMins}m",
+                                            fontSize = 11.sp,
                                             color = colors.accentOrange,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontWeight = FontWeight.Bold
                                         )
                                         if (hd.dischargeRatePctPerHour > 0) {
                                             Text(
                                                 text = "${String.format("%.1f", hd.dischargeRatePctPerHour)}%/hr drain",
-                                                fontSize = 11.sp,
+                                                fontSize = 10.sp,
                                                 color = colors.textSecondary
                                             )
                                         }
@@ -610,103 +603,7 @@ fun DashboardContent(
                     }
                 }
 
-                // Section 3: Battery Diagnostics Card
-                Card(
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            text = "BATTERY DIAGNOSTICS",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textSecondary,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                DiagnosticItem("Health State", batteryInfo.health, colors.textPrimary)
-                                DiagnosticItem("Voltage", "${String.format("%.2f", batteryInfo.voltageV)} V", colors.textSecondary)
-                                if (batteryInfo.capacityMah > 0) {
-                                    DiagnosticItem("Capacity", "${batteryInfo.capacityMah.toInt()} mAh", colors.textSecondary)
-                                }
-                            }
-                            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                val currentText = when {
-                                    batteryInfo.currentMa == 0 -> "—"
-                                    batteryInfo.currentMa < 0 -> "${batteryInfo.currentMa} mA"
-                                    else -> "+${batteryInfo.currentMa} mA"
-                                }
-                                val wattText = when {
-                                    batteryInfo.currentMa == 0 -> "—"
-                                    batteryInfo.currentMa < 0 -> "-${String.format("%.2f", batteryInfo.watts)} W"
-                                    else -> "+${String.format("%.2f", batteryInfo.watts)} W"
-                                }
-                                val currentTextColor = when {
-                                    batteryInfo.currentMa < 0 -> colors.accentOrange
-                                    batteryInfo.currentMa > 0 -> colors.accentGreen
-                                    else -> colors.textSecondary
-                                }
-
-                                Text(
-                                    text = currentText,
-                                    fontSize = 15.sp,
-                                    color = currentTextColor,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "Power: $wattText",
-                                    fontSize = 12.sp,
-                                    color = colors.textPrimary,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "${batteryInfo.status} (${batteryInfo.technology})",
-                                    fontSize = 11.sp,
-                                    color = colors.textSecondary
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Thermal Throttle State",
-                                fontSize = 12.sp,
-                                color = colors.textSecondary
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        if (thermalStatus != "Normal") Color(0x28EF4444) else colors.accentGreen.copy(alpha = 0.15f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = thermalStatus,
-                                    fontSize = 11.sp,
-                                    color = if (thermalStatus != "Normal") Color(0xFFEF4444) else colors.accentGreen,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Section 4: CPU Cluster Monitor with Visual Mini-Gauges
+                // CPU Cluster Frequency Grid
                 if (coreFreqs.isNotEmpty()) {
                     Card(
                         shape = RoundedCornerShape(22.dp),
@@ -715,7 +612,7 @@ fun DashboardContent(
                             .fillMaxWidth()
                             .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
                     ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
+                        Column(modifier = Modifier.padding(18.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -726,16 +623,16 @@ fun DashboardContent(
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = colors.textSecondary,
-                                    letterSpacing = 1.sp
+                                    letterSpacing = 0.8.sp
                                 )
                                 Text(
                                     text = "${coreFreqs.size} Cores Active",
                                     fontSize = 11.sp,
                                     color = colors.accentBlue,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
                             coreFreqs.chunked(4).forEachIndexed { rowIndex, rowCores ->
                                 Row(
@@ -744,7 +641,7 @@ fun DashboardContent(
                                 ) {
                                     rowCores.forEachIndexed { colIndex, freq ->
                                         val coreId = rowIndex * 4 + colIndex
-                                        val maxExpectedFreq = 3000f // 3.0 GHz normal ceiling
+                                        val maxExpectedFreq = 3000f
                                         val freqRatio = (freq / maxExpectedFreq).coerceIn(0.1f, 1f)
 
                                         Box(
@@ -752,30 +649,29 @@ fun DashboardContent(
                                                 .weight(1f)
                                                 .background(colors.elevatedSurface, RoundedCornerShape(12.dp))
                                                 .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(12.dp))
-                                                .padding(horizontal = 6.dp, vertical = 10.dp),
+                                                .padding(horizontal = 6.dp, vertical = 8.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Text(
                                                     text = "C$coreId",
-                                                    fontSize = 10.sp,
+                                                    fontSize = 9.sp,
                                                     color = colors.textTertiary,
                                                     fontWeight = FontWeight.Bold
                                                 )
-                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = if (freq > 0) "$freq" else "—",
-                                                    fontSize = 13.sp,
+                                                    fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = colors.textPrimary
                                                 )
                                                 Text(
                                                     text = "MHz",
-                                                    fontSize = 9.sp,
+                                                    fontSize = 8.sp,
                                                     color = colors.textSecondary
                                                 )
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                // Mini visual frequency fill bar
+                                                Spacer(modifier = Modifier.height(4.dp))
                                                 Box(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
@@ -793,32 +689,13 @@ fun DashboardContent(
                                         }
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                             }
                         }
                     }
                 }
 
-                // Section 5: System CPU load bar
-                SystemLoadCard(
-                    title = "SYSTEM CPU LOAD",
-                    value = "${cpuUsage.toInt()}%",
-                    subValue = if (cpuTemp > 0) "${String.format("%.1f", cpuTemp)}°C Core Temp" else "Active",
-                    progress = (cpuUsage / 100f).coerceIn(0f, 1f),
-                    barColor = colors.accentGreen
-                )
-
-                // Section 6: System RAM allocation
-                val ramPercentage = if (ramTotalGb > 0) (ramUsedGb / ramTotalGb).coerceIn(0f, 1f) else 0f
-                SystemLoadCard(
-                    title = "RAM ALLOCATION",
-                    value = "${String.format("%.1f", ramUsedGb)} / ${String.format("%.1f", ramTotalGb)} GB",
-                    subValue = "${(ramPercentage * 100).toInt()}% Used",
-                    progress = ramPercentage,
-                    barColor = colors.accentOrange
-                )
-
-                // Section 7: Main Navigation Action Button (Apple HIG pill style)
+                // Process Manager Action Button
                 Button(
                     onClick = onNavigateToProcesses,
                     shape = RoundedCornerShape(18.dp),
@@ -829,8 +706,8 @@ fun DashboardContent(
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                        .height(54.dp)
+                        .padding(vertical = 4.dp)
+                        .height(52.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -838,9 +715,9 @@ fun DashboardContent(
                     ) {
                         Text(
                             text = "MANAGE RUNNING PROCESSES",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            letterSpacing = 1.sp
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 12.sp,
+                            letterSpacing = 0.8.sp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(
@@ -857,12 +734,211 @@ fun DashboardContent(
     }
 }
 
+/**
+ * High-impact, GPU-accelerated Radial Multi-Arc Hero Hub.
+ * Draws CPU, RAM, and Battery Telemetry on smooth canvas arcs with zero recomposition overhead.
+ */
 @Composable
-private fun DiagnosticItem(label: String, value: String, valueColor: Color) {
+fun RadialTelemetryHeroCard(
+    cpuUsage: Float,
+    ramUsageRatio: Float,
+    ramUsedGb: Float,
+    ramTotalGb: Float,
+    batteryMa: Int,
+    batteryWatts: Float,
+    batteryStatus: String,
+    modifier: Modifier = Modifier
+) {
     val colors = ProStatsColors.current
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(text = "$label: ", fontSize = 12.sp, color = colors.textSecondary)
-        Text(text = value, fontSize = 12.sp, color = valueColor, fontWeight = FontWeight.SemiBold)
+
+    // Smooth lightweight 300ms transitions
+    val animatedCpu by animateFloatAsState(
+        targetValue = (cpuUsage / 100f).coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "radialCpu"
+    )
+    val animatedRam by animateFloatAsState(
+        targetValue = ramUsageRatio.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "radialRam"
+    )
+
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+        modifier = modifier
+            .border(1.dp, colors.borderColor, RoundedCornerShape(24.dp))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "SYSTEM TELEMETRY HUB",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textSecondary,
+                    letterSpacing = 0.8.sp
+                )
+                Box(
+                    modifier = Modifier
+                        .background(colors.accentGreen.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "LIVE",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = colors.accentGreen
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Multi-Arc Canvas
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(160.dp)
+            ) {
+                val cpuColor = colors.accentGreen
+                val ramColor = colors.accentOrange
+                val trackColor = colors.elevatedSurface
+
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val strokeWidthOuter = 10.dp.toPx()
+                    val strokeWidthInner = 8.dp.toPx()
+
+                    // Outer Ring: CPU (Start at -90deg / Top)
+                    drawArc(
+                        color = trackColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidthOuter, cap = StrokeCap.Round),
+                        size = Size(size.width - strokeWidthOuter, size.height - strokeWidthOuter),
+                        topLeft = Offset(strokeWidthOuter / 2, strokeWidthOuter / 2)
+                    )
+                    drawArc(
+                        color = cpuColor,
+                        startAngle = -90f,
+                        sweepAngle = animatedCpu * 360f,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidthOuter, cap = StrokeCap.Round),
+                        size = Size(size.width - strokeWidthOuter, size.height - strokeWidthOuter),
+                        topLeft = Offset(strokeWidthOuter / 2, strokeWidthOuter / 2)
+                    )
+
+                    // Inner Ring: RAM
+                    val innerPadding = 18.dp.toPx()
+                    drawArc(
+                        color = trackColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidthInner, cap = StrokeCap.Round),
+                        size = Size(size.width - innerPadding * 2, size.height - innerPadding * 2),
+                        topLeft = Offset(innerPadding, innerPadding)
+                    )
+                    drawArc(
+                        color = ramColor,
+                        startAngle = -90f,
+                        sweepAngle = animatedRam * 360f,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidthInner, cap = StrokeCap.Round),
+                        size = Size(size.width - innerPadding * 2, size.height - innerPadding * 2),
+                        topLeft = Offset(innerPadding, innerPadding)
+                    )
+                }
+
+                // Center Digital Readout
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "${cpuUsage.toInt()}%",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = colors.textPrimary,
+                        lineHeight = 28.sp
+                    )
+                    Text(
+                        text = "CPU LOAD",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Legend Chips
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                TelemetryLegendPill(
+                    dotColor = colors.accentGreen,
+                    title = "CPU",
+                    value = "${cpuUsage.toInt()}%"
+                )
+                TelemetryLegendPill(
+                    dotColor = colors.accentOrange,
+                    title = "RAM",
+                    value = "${String.format("%.1f", ramUsedGb)}/${String.format("%.1f", ramTotalGb)}G"
+                )
+                val currentPwr = if (batteryMa != 0) {
+                    if (batteryMa > 0) "+${batteryMa}mA" else "${batteryMa}mA"
+                } else "Idle"
+                TelemetryLegendPill(
+                    dotColor = if (batteryMa > 0) colors.accentGreen else colors.accentPurple,
+                    title = "PWR",
+                    value = currentPwr
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TelemetryLegendPill(
+    dotColor: Color,
+    title: String,
+    value: String
+) {
+    val colors = ProStatsColors.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .background(colors.elevatedSurface, RoundedCornerShape(10.dp))
+            .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .background(dotColor, CircleShape)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = "$title: ",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = colors.textSecondary
+        )
+        Text(
+            text = value,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = colors.textPrimary
+        )
     }
 }
 
@@ -876,9 +952,9 @@ fun HeroMetricTile(
     modifier: Modifier = Modifier
 ) {
     val colors = ProStatsColors.current
-    val animatedAccent by androidx.compose.animation.animateColorAsState(
+    val animatedAccent by animateColorAsState(
         targetValue = accentColor,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 400),
+        animationSpec = tween(durationMillis = 300),
         label = "heroAccentColor"
     )
 
@@ -889,7 +965,7 @@ fun HeroMetricTile(
         modifier = modifier.border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
     ) {
         Column(
-            modifier = Modifier.padding(18.dp)
+            modifier = Modifier.padding(16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically
@@ -902,101 +978,26 @@ fun HeroMetricTile(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = category,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.textSecondary,
                     letterSpacing = 0.8.sp
                 )
             }
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = value,
-                fontSize = 26.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = animatedAccent,
-                lineHeight = 30.sp
+                lineHeight = 28.sp
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = subValue,
                 fontSize = 11.sp,
                 color = colors.textSecondary,
                 fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-@Composable
-fun SystemLoadCard(
-    title: String,
-    value: String,
-    subValue: String,
-    progress: Float,
-    barColor: Color,
-    modifier: Modifier = Modifier
-) {
-    val colors = ProStatsColors.current
-    val animatedProgress by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = progress,
-        animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
-        ),
-        label = "systemLoadProgress"
-    )
-    val animatedColor by androidx.compose.animation.animateColorAsState(
-        targetValue = barColor,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 350),
-        label = "barColor"
-    )
-
-    Card(
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-        modifier = modifier
-            .fillMaxWidth()
-            .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textSecondary,
-                    letterSpacing = 0.8.sp
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = value,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textPrimary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = subValue,
-                        fontSize = 11.sp,
-                        color = colors.textTertiary
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                color = animatedColor,
-                trackColor = colors.elevatedSurface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
             )
         }
     }
