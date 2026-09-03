@@ -61,7 +61,10 @@ data class SensorInfo(
     val typeInt: Int,
     val powerMa: Float,
     val maxRange: Float,
-    val unit: String = ""
+    val unit: String = "",
+    val category: String = "General",
+    val hardwareSource: String = "Hardware Sensor",
+    val isWakeUp: Boolean = false
 )
 
 class HardwareMonitor(private val context: Context) {
@@ -204,10 +207,24 @@ class HardwareMonitor(private val context: Context) {
         return info
     }
 
+    private fun detectProcessorVendor(): String {
+        val hardware = (Build.HARDWARE + " " + Build.BOARD + " " + Build.MANUFACTURER).lowercase()
+        return when {
+            hardware.contains("qcom") || hardware.contains("qualcomm") || hardware.contains("snapdragon") || hardware.contains("sm") -> "Qualcomm Snapdragon"
+            hardware.contains("mt") || hardware.contains("mediatek") || hardware.contains("helio") || hardware.contains("dimensity") -> "MediaTek"
+            hardware.contains("exynos") || hardware.contains("samsung") || hardware.contains("universal") -> "Samsung Exynos"
+            hardware.contains("tensor") || hardware.contains("gs") || hardware.contains("zuma") -> "Google Tensor"
+            hardware.contains("unisoc") || hardware.contains("sprd") || hardware.contains("sc") -> "Unisoc"
+            else -> "System SoC"
+        }
+    }
+
     fun getSensorInfo(): List<SensorInfo> {
         cachedSensorInfo?.let { return it }
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val sensors = sensorManager.getSensorList(Sensor.TYPE_ALL)
+        val procVendor = detectProcessorVendor()
+
         val info = sensors.map { s ->
             val typeStr = s.stringType ?: "Unknown"
             val unit = when (s.type) {
@@ -233,6 +250,48 @@ class HardwareMonitor(private val context: Context) {
                     else -> ""
                 }
             }
+
+            val category = when (s.type) {
+                Sensor.TYPE_ACCELEROMETER, Sensor.TYPE_ACCELEROMETER_UNCALIBRATED,
+                Sensor.TYPE_GRAVITY, Sensor.TYPE_LINEAR_ACCELERATION,
+                Sensor.TYPE_SIGNIFICANT_MOTION, Sensor.TYPE_STEP_DETECTOR, Sensor.TYPE_STEP_COUNTER -> "Motion & Kinematics"
+
+                Sensor.TYPE_GYROSCOPE, Sensor.TYPE_GYROSCOPE_UNCALIBRATED,
+                Sensor.TYPE_ROTATION_VECTOR, Sensor.TYPE_GAME_ROTATION_VECTOR,
+                Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR -> "Dynamics & Gyro"
+
+                Sensor.TYPE_MAGNETIC_FIELD, Sensor.TYPE_MAGNETIC_FIELD_UNCALIBRATED,
+                @Suppress("DEPRECATION") Sensor.TYPE_ORIENTATION -> "Magnetics & Compass"
+
+                Sensor.TYPE_LIGHT, Sensor.TYPE_PRESSURE,
+                @Suppress("DEPRECATION") Sensor.TYPE_TEMPERATURE, Sensor.TYPE_AMBIENT_TEMPERATURE,
+                Sensor.TYPE_RELATIVE_HUMIDITY -> "Environment & Climate"
+
+                Sensor.TYPE_PROXIMITY, Sensor.TYPE_HEART_RATE, Sensor.TYPE_HEART_BEAT,
+                Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT -> "Biometrics & Presence"
+
+                else -> "Processor & System Hub"
+            }
+
+            val vendorLower = s.vendor.lowercase()
+            val nameLower = s.name.lowercase()
+
+            val source = when {
+                vendorLower.contains("bosch") || nameLower.contains("bmi") || nameLower.contains("bma") || nameLower.contains("bmp") -> "Bosch Sensortec (MEMS)"
+                vendorLower.contains("stm") || vendorLower.contains("stmicro") || nameLower.contains("lsm") || nameLower.contains("lis") -> "STMicroelectronics (MEMS)"
+                vendorLower.contains("invensense") || vendorLower.contains("tdk") || nameLower.contains("icm") || nameLower.contains("mpu") -> "InvenSense / TDK"
+                vendorLower.contains("asahi") || vendorLower.contains("akm") || nameLower.contains("ak") -> "Asahi Kasei (AKM)"
+                vendorLower.contains("ams") || vendorLower.contains("taos") || nameLower.contains("tmd") -> "ams OSRAM"
+                vendorLower.contains("goodix") || nameLower.contains("goodix") -> "Goodix Hardware"
+                vendorLower.contains("sensortek") || nameLower.contains("stk") -> "Sensortek"
+                vendorLower.contains("sitronix") || nameLower.contains("stk") -> "Sitronix"
+                vendorLower.contains("qti") || vendorLower.contains("qualcomm") || nameLower.contains("qti") -> "Snapdragon Sensor Core (ADSP)"
+                vendorLower.contains("mediatek") || vendorLower.contains("mtk") || nameLower.contains("mtk") -> "MediaTek SCP Sensor Hub"
+                vendorLower.contains("google") -> "Google CHRE Context Hub"
+                vendorLower.contains("samsung") -> "Samsung Sensor Hub"
+                else -> "$procVendor Sensor Subsystem"
+            }
+
             SensorInfo(
                 name = s.name,
                 vendor = s.vendor,
@@ -240,7 +299,10 @@ class HardwareMonitor(private val context: Context) {
                 typeInt = s.type,
                 powerMa = s.power,
                 maxRange = s.maximumRange,
-                unit = unit
+                unit = unit,
+                category = category,
+                hardwareSource = source,
+                isWakeUp = s.isWakeUpSensor
             )
         }
         cachedSensorInfo = info

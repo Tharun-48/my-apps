@@ -211,15 +211,77 @@ fun SystemInfoScreen() {
 
         networkInfo?.let { net ->
             item {
-                InfoCard(title = "Network Interfaces", icon = Icons.Default.Info, iconColor = colors.accentBlue) {
+                InfoCard(title = "Network Interfaces & Bandwidth", icon = Icons.Default.Info, iconColor = colors.accentBlue) {
                     InfoRow("Connection Type", net.connectionType)
+                    if (net.activeInterfaceName.isNotBlank()) {
+                        InfoRow("Active Interface", net.activeInterfaceName)
+                    }
                     if (net.wifiSsid.isNotBlank() && net.wifiSsid != "<unknown ssid>") {
-                        InfoRow("Wi-Fi SSID", net.wifiSsid)
+                        InfoRow("Wi-Fi Network", net.wifiSsid)
                         InfoRow("Signal Quality", "${net.wifiSignalStrength}/4 bars")
                         InfoRow("Link Speed", "${net.linkSpeedMbps} Mbps")
                     }
-                    if (net.ipAddress.isNotBlank() && net.ipAddress != "0.0.0.0") {
-                        InfoRow("IP Address", net.ipAddress)
+                    if (net.downstreamBandwidthKbps > 0) {
+                        InfoRow("Downlink Est.", "${net.downstreamBandwidthKbps / 1000} Mbps")
+                    }
+                    if (net.ipAddress.isNotBlank()) {
+                        InfoRow("IPv4 Address", net.ipAddress)
+                    }
+
+                    if (net.interfaces.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Detected Physical & Virtual Interfaces:",
+                            color = colors.textSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        net.interfaces.take(6).forEach { iface ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp)
+                                    .background(colors.elevatedSurface, RoundedCornerShape(8.dp))
+                                    .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = iface.name,
+                                                color = colors.textPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (iface.isUp) "UP" else "DOWN",
+                                                color = if (iface.isUp) colors.accentGreen else colors.textSecondary,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        if (iface.ipv4.isNotBlank()) {
+                                            Text(text = "IPv4: ${iface.ipv4}", color = colors.textSecondary, fontSize = 11.sp)
+                                        }
+                                        if (iface.ipv6.isNotBlank()) {
+                                            Text(text = "IPv6: ${iface.ipv6.take(24)}...", color = colors.textSecondary, fontSize = 10.sp)
+                                        }
+                                    }
+                                    Text(
+                                        text = "MTU ${iface.mtu}",
+                                        color = colors.textSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -250,7 +312,7 @@ fun SystemInfoScreen() {
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "LIVE STREAM",
+                        text = "HARDWARE SOURCED",
                         color = colors.accentPurple,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -346,17 +408,27 @@ fun SensorRow(sensor: SensorInfo, liveReading: FloatArray? = null) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = sensor.name,
+                        color = colors.textPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = sensor.name,
-                    color = colors.textPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
+                    text = "${sensor.hardwareSource} • ${sensor.category}",
+                    color = colors.accentBlue,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 10.sp
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
                 Text(
                     text = "${sensor.vendor} • ${sensor.type}",
                     color = colors.textSecondary,
-                    fontSize = 11.sp
+                    fontSize = 10.sp
                 )
             }
             Spacer(modifier = Modifier.width(10.dp))
@@ -364,7 +436,7 @@ fun SensorRow(sensor: SensorInfo, liveReading: FloatArray? = null) {
                 modifier = Modifier
                     .background(colors.elevatedSurface, RoundedCornerShape(8.dp))
                     .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(8.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
                 val valueText = if (liveReading != null && liveReading.isNotEmpty()) {

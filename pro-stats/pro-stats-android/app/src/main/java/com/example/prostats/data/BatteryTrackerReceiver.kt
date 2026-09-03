@@ -35,12 +35,11 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
                 }
             }
 
-            Intent.ACTION_POWER_CONNECTED -> {
+            Intent.ACTION_BATTERY_CHANGED, Intent.ACTION_POWER_CONNECTED, Intent.ACTION_POWER_DISCONNECTED -> {
                 try {
-                    BatteryTracker.onPowerConnected(context)
-                    BatteryTracker.recordDataPoint(context)
+                    checkBatteryProtectionAlarms(context)
                 } catch (e: Exception) {
-                    Log.e("BatteryTrackerReceiver", "Error on power connected", e)
+                    Log.e("BatteryTrackerReceiver", "Error on battery change alert check", e)
                 }
             }
 
@@ -102,13 +101,13 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
                         context,
                         nm,
                         ID_CHARGE_ALARM,
-                        "Battery Charge Limit Reached ($pct%)",
-                        "Unplug charger to protect battery health and prevent overcharging wear."
+                        "⚡ Battery Charge Limit Reached ($pct%)",
+                        "Unplug charger now to preserve battery health and prevent high-voltage wear."
                     )
                 }
             }
 
-            // 2. High Battery Temperature Alarm (e.g. > 42°C)
+            // 2. High Battery & CPU Temperature Alarm (e.g. > 42°C / 45°C)
             if (BatteryTracker.isTempAlarmEnabled(context)) {
                 val tempLimit = BatteryTracker.getTempAlarmLimit(context)
                 if (tempC >= tempLimit) {
@@ -116,8 +115,8 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
                         context,
                         nm,
                         ID_TEMP_ALARM,
-                        "High Battery Temperature Alert (${tempC.toInt()}°C)",
-                        "Device battery is running hot. Allow the device to cool down."
+                        "🔥 High Temperature Alert (${String.format(java.util.Locale.US, "%.1f", tempC)}°C)",
+                        "Battery temperature exceeded ${tempLimit}°C safety threshold. Stop heavy usage to cool down."
                     )
                 }
             }
@@ -130,8 +129,8 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
                         context,
                         nm,
                         ID_LOW_BATTERY_ALARM,
-                        "Low Battery Alert ($pct%)",
-                        "Battery level dropped to $pct%. Connect to charger soon."
+                        "⚠️ Low Battery Warning ($pct%)",
+                        "Battery level dropped to $pct%. Connect to charger to avoid device shutdown."
                     )
                 }
             }
@@ -144,11 +143,12 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Battery Protection & Health Alarms",
+                "Battery Protection & Thermal Alarms",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Alerts for charge limits, battery temperature warnings, and low battery"
+                description = "Urgent alerts for charge limits, overheating, and low battery"
                 enableVibration(true)
+                vibrationPattern = longArrayOf(0, 400, 200, 400)
             }
             nm.createNotificationChannel(channel)
         }
@@ -169,9 +169,13 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVibrate(longArrayOf(0, 400, 200, 400))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .addAction(android.R.drawable.ic_menu_info_details, "Open ProStats", pendingIntent)
 
         nm.notify(id, builder.build())
     }

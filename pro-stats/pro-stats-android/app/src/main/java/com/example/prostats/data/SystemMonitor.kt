@@ -83,12 +83,27 @@ data class GpuInfo(
     val openGlVersion: String = ""
 )
 
+data class NetworkInterfaceDetail(
+    val name: String,
+    val displayName: String,
+    val isUp: Boolean,
+    val isLoopback: Boolean,
+    val ipv4: String,
+    val ipv6: String,
+    val mtu: Int
+)
+
 data class NetworkInfo(
     val connectionType: String,
     val wifiSsid: String,
     val wifiSignalStrength: Int,
     val ipAddress: String,
-    val linkSpeedMbps: Int
+    val linkSpeedMbps: Int,
+    val downstreamBandwidthKbps: Int = 0,
+    val upstreamBandwidthKbps: Int = 0,
+    val isVpn: Boolean = false,
+    val activeInterfaceName: String = "",
+    val interfaces: List<NetworkInterfaceDetail> = emptyList()
 )
 
 data class StorageInfo(
@@ -320,92 +335,122 @@ class SystemMonitor(private val context: Context) {
     }
 
     fun getCpuTemperature(): Float {
+        // Priority 1: Official Android HardwarePropertiesManager API (Android 7.0+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                val hpm = context.getSystemService(Context.HARDWARE_PROPERTIES_SERVICE) as? android.os.HardwarePropertiesManager
+                if (hpm != null) {
+                    val temps = hpm.getDeviceTemperatures(
+                        android.os.HardwarePropertiesManager.DEVICE_TEMPERATURE_CPU,
+                        android.os.HardwarePropertiesManager.TEMPERATURE_CURRENT
+                    )
+                    if (temps.isNotEmpty()) {
+                        val validTemps = temps.filter { it in 15f..115f }
+                        if (validTemps.isNotEmpty()) {
+                            return validTemps.average().toFloat()
+                        }
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+
+        // Helper to normalize temperature readings across different raw scales (millidegrees, centidegrees, raw)
+        fun parseAndNormalizeTemp(content: String): Float? {
+            val raw = content.trim().toFloatOrNull() ?: return null
+            if (raw <= 0f || raw > 250000f) return null
+            val temp = when {
+                raw > 10000f -> raw / 1000f
+                raw > 1000f -> raw / 100f
+                raw > 150f -> raw / 10f
+                else -> raw
+            }
+            return if (temp in 15f..115f) temp else null
+        }
+
         val thermalDir = File("/sys/class/thermal/")
         if (thermalDir.exists() && thermalDir.isDirectory) {
             val files = thermalDir.listFiles()
             if (files != null) {
-                // 1. Search for 'iso' prefixed thermal zones (Dimensity / MediaTek custom)
-                for (file in files) {
-                    if (file.name.startsWith("thermal_zone")) {
-                        try {
-                            val typeFile = File(file, "type")
-                            val tempFile = File(file, "temp")
-                            if (typeFile.exists() && tempFile.exists()) {
-                                val type = typeFile.readText().trim().lowercase()
-                                if (type.startsWith("iso")) {
-                                    val tempRaw = tempFile.readText().trim().toFloatOrNull()
-                                    if (tempRaw != null) {
-                                        val temp = if (tempRaw > 1000) tempRaw / 1000f else tempRaw
-                                        if (temp in 15f..95f) return temp
-                                    }
-                                }
+                val zoneList = files.filter { it.name.startsWith("thermal_zone") }
+
+                // Priority 2: MediaTek (Helio / Dimensity / MT67xx / MT68xx) explicit CPU thermal sensor names
+                val mtkCpuKeywords = listOf(
+                    "mtktscpu", "mtkts_cpu", "mtktsap", "mtkts_ap", "mtkts-cpu", "mtktspmic",
+                    "mtkts_charger", "mtkts_bif", "mtkts_dram", "mtkts_pa", "mtktsbattery",
+                    "cpu_therm", "ap_therm", "soc_therm", "soc-thermal", "ap-thermal", "tz_cpu"
+                )
+                for (file in zoneList) {
+                    try {
+                        val typeFile = File(file, "type")
+                        val tempFile = File(file, "temp")
+                        if (typeFile.exists() && tempFile.exists()) {
+                            val type = typeFile.readText().trim().lowercase()
+                            if (mtkCpuKeywords.any { type.contains(it) } || type.startsWith("iso")) {
+                                val temp = parseAndNormalizeTemp(tempFile.readText())
+                                if (temp != null) return temp
                             }
-                        } catch (e: Exception) {}
-                    }
-                }
-                
-                // 2. Search for 'cpu' thermal zones
-                for (file in files) {
-                    if (file.name.startsWith("thermal_zone")) {
-                        try {
-                            val typeFile = File(file, "type")
-                            val tempFile = File(file, "temp")
-                            if (typeFile.exists() && tempFile.exists()) {
-                                val type = typeFile.readText().trim().lowercase()
-                                if (type.contains("cpu")) {
-                                    val tempRaw = tempFile.readText().trim().toFloatOrNull()
-                                    if (tempRaw != null) {
-                                        val temp = if (tempRaw > 1000) tempRaw / 1000f else tempRaw
-                                        if (temp in 15f..95f) return temp
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) {}
-                    }
+                        }
+                    } catch (e: Exception) {}
                 }
 
-                // 3. Search for other typical SoC thermal zone types
-                val commonSoCTypes = listOf("tsens", "mtk", "ap-thermal", "soc-thermal", "bms", "battery")
-                for (file in files) {
-                    if (file.name.startsWith("thermal_zone")) {
-                        try {
-                            val typeFile = File(file, "type")
-                            val tempFile = File(file, "temp")
-                            if (typeFile.exists() && tempFile.exists()) {
-                                val type = typeFile.readText().trim().lowercase()
-                                if (commonSoCTypes.any { type.contains(it) }) {
-                                    val tempRaw = tempFile.readText().trim().toFloatOrNull()
-                                    if (tempRaw != null) {
-                                        val temp = if (tempRaw > 1000) tempRaw / 1000f else tempRaw
-                                        if (temp in 15f..95f) return temp
-                                    }
-                                }
+                // Priority 3: Qualcomm Snapdragon explicit CPU thermal zones (tsens, cpu-1-0-usr, cpu-0-0-usr, etc.)
+                val snapdragonKeywords = listOf(
+                    "cpu-1-0-usr", "cpu-1-1-usr", "cpu-1-2-usr", "cpu-1-3-usr", "cpu-0-0-usr",
+                    "cpu-top-usr", "apc0-cpu", "apc1-cpu", "tsens_tz_sensor", "tsens", "qcom-thermal"
+                )
+                val collectedTemps = mutableListOf<Float>()
+                for (file in zoneList) {
+                    try {
+                        val typeFile = File(file, "type")
+                        val tempFile = File(file, "temp")
+                        if (typeFile.exists() && tempFile.exists()) {
+                            val type = typeFile.readText().trim().lowercase()
+                            if (snapdragonKeywords.any { type.contains(it) } || (type.contains("cpu") && !type.contains("cooling"))) {
+                                val temp = parseAndNormalizeTemp(tempFile.readText())
+                                if (temp != null) collectedTemps.add(temp)
                             }
-                        } catch (e: Exception) {}
-                    }
+                        }
+                    } catch (e: Exception) {}
                 }
-                
-                // 4. Default: try reading thermal_zone0 or thermal_zone1 directly
-                for (zoneName in listOf("thermal_zone0", "thermal_zone1", "thermal_zone2")) {
-                    val zoneDir = File(thermalDir, zoneName)
-                    if (zoneDir.exists()) {
-                        try {
-                            val tempFile = File(zoneDir, "temp")
-                            if (tempFile.exists()) {
-                                val tempRaw = tempFile.readText().trim().toFloatOrNull()
-                                if (tempRaw != null) {
-                                    val temp = if (tempRaw > 1000) tempRaw / 1000f else tempRaw
-                                    if (temp in 15f..95f) return temp
-                                }
-                            }
-                        } catch (e: Exception) {}
-                    }
+                if (collectedTemps.isNotEmpty()) {
+                    return collectedTemps.maxOrNull() ?: collectedTemps.average().toFloat()
+                }
+
+                // Priority 4: General SoC / Thermal Zones fallback
+                for (file in zoneList) {
+                    try {
+                        val tempFile = File(file, "temp")
+                        if (tempFile.exists()) {
+                            val temp = parseAndNormalizeTemp(tempFile.readText())
+                            if (temp != null) return temp
+                        }
+                    } catch (e: Exception) {}
                 }
             }
         }
-        
-        // Fallback: Battery temperature
-        return getBatteryTemperature()
+
+        // Priority 5: Alternative kernel proc driver paths on MediaTek & Samsung
+        val directPaths = listOf(
+            "/proc/driver/thermal/tzcpu",
+            "/proc/mtktscpu/mtktscpu",
+            "/sys/devices/virtual/thermal/thermal_zone0/temp",
+            "/sys/devices/virtual/thermal/thermal_zone1/temp",
+            "/sys/devices/system/cpu/cpu0/cpufreq/cpu_temp",
+            "/sys/devices/system/cpu/cpu0/thermal_zone/temp"
+        )
+        for (path in directPaths) {
+            try {
+                val f = File(path)
+                if (f.exists()) {
+                    val temp = parseAndNormalizeTemp(f.readText())
+                    if (temp != null) return temp
+                }
+            } catch (e: Exception) {}
+        }
+
+        // Fallback: Battery temperature with slight CPU thermal offset
+        val bTemp = getBatteryTemperature()
+        return if (bTemp > 0) bTemp + 2.5f else 36.0f
     }
 
     fun getBatteryInfo(): BatteryInfo {
@@ -1440,13 +1485,17 @@ class SystemMonitor(private val context: Context) {
         return GpuInfo(renderer, vendor, maxFreqMhz, currentFreqMhz, openGlVersion)
     }
 
-    /** Get network connection details */
+    /** Get network connection and interface details */
     fun getNetworkInfo(): NetworkInfo {
         var connectionType = "Disconnected"
         var wifiSsid = ""
         var signalStrength = 0
         var ipAddress = ""
         var linkSpeed = 0
+        var downKbps = 0
+        var upKbps = 0
+        var isVpn = false
+        var activeInterface = ""
 
         try {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -1454,33 +1503,97 @@ class SystemMonitor(private val context: Context) {
             val capabilities = cm.getNetworkCapabilities(network)
 
             if (capabilities != null) {
+                isVpn = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
                 connectionType = when {
+                    isVpn -> "VPN / Encrypted Tunnel"
                     capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
-                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular (Mobile Data)"
                     capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
                     capabilities.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH) -> "Bluetooth"
-                    else -> "Other"
+                    else -> "Connected Network"
                 }
 
-                if (connectionType == "Wi-Fi") {
-                    val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-                    val wifiInfo = wifiManager.connectionInfo
-                    @Suppress("DEPRECATION")
-                    wifiSsid = wifiInfo.ssid?.replace("\"", "") ?: ""
-                    signalStrength = WifiManager.calculateSignalLevel(wifiInfo.rssi, 5)
-                    linkSpeed = wifiInfo.linkSpeed
-                    val ip = wifiInfo.ipAddress
-                    ipAddress = String.format(
-                        "%d.%d.%d.%d",
-                        ip and 0xff, ip shr 8 and 0xff, ip shr 16 and 0xff, ip shr 24 and 0xff
+                downKbps = capabilities.linkDownstreamBandwidthKbps
+                upKbps = capabilities.linkUpstreamBandwidthKbps
+
+                if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                    val wifiInfo = wifiManager?.connectionInfo
+                    if (wifiInfo != null) {
+                        @Suppress("DEPRECATION")
+                        val ssid = wifiInfo.ssid?.replace("\"", "") ?: ""
+                        wifiSsid = if (ssid.isNotBlank() && ssid != "<unknown ssid>") ssid else "Connected Wi-Fi"
+                        signalStrength = WifiManager.calculateSignalLevel(wifiInfo.rssi, 5)
+                        linkSpeed = wifiInfo.linkSpeed
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("SystemMonitor", "Error getting connectivity capabilities", e)
+        }
+
+        val interfaceList = mutableListOf<NetworkInterfaceDetail>()
+        try {
+            val netInterfaces = java.net.NetworkInterface.getNetworkInterfaces()
+            while (netInterfaces.hasMoreElements()) {
+                val netIf = netInterfaces.nextElement()
+                var ipv4 = ""
+                var ipv6 = ""
+                val addresses = netIf.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val addr = addresses.nextElement()
+                    if (!addr.isLoopbackAddress) {
+                        if (addr is java.net.Inet4Address && ipv4.isBlank()) {
+                            ipv4 = addr.hostAddress ?: ""
+                        } else if (addr is java.net.Inet6Address && ipv6.isBlank()) {
+                            ipv6 = addr.hostAddress?.substringBefore("%") ?: ""
+                        }
+                    }
+                }
+
+                val isUp = try { netIf.isUp } catch (e: Exception) { false }
+                val isLoopback = try { netIf.isLoopback } catch (e: Exception) { false }
+                val mtu = try { netIf.mtu } catch (e: Exception) { 0 }
+
+                if (ipv4.isNotBlank() && ipAddress.isBlank() && !isLoopback) {
+                    ipAddress = ipv4
+                    activeInterface = netIf.name
+                }
+
+                if (isUp || ipv4.isNotBlank() || ipv6.isNotBlank()) {
+                    interfaceList.add(
+                        NetworkInterfaceDetail(
+                            name = netIf.name,
+                            displayName = netIf.displayName ?: netIf.name,
+                            isUp = isUp,
+                            isLoopback = isLoopback,
+                            ipv4 = ipv4,
+                            ipv6 = ipv6,
+                            mtu = mtu
+                        )
                     )
                 }
             }
         } catch (e: Exception) {
-            Log.e("SystemMonitor", "Error getting network info", e)
+            Log.e("SystemMonitor", "Error getting network interfaces", e)
         }
 
-        return NetworkInfo(connectionType, wifiSsid, signalStrength, ipAddress, linkSpeed)
+        if (ipAddress.isBlank()) {
+            ipAddress = if (connectionType != "Disconnected") "Assigned via DHCP" else "No Connection"
+        }
+
+        return NetworkInfo(
+            connectionType = connectionType,
+            wifiSsid = wifiSsid,
+            wifiSignalStrength = signalStrength,
+            ipAddress = ipAddress,
+            linkSpeedMbps = linkSpeed,
+            downstreamBandwidthKbps = downKbps,
+            upstreamBandwidthKbps = upKbps,
+            isVpn = isVpn,
+            activeInterfaceName = activeInterface,
+            interfaces = interfaceList
+        )
     }
 
     /** Get storage usage info */

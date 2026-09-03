@@ -2,6 +2,27 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-04] MediaTek & Snapdragon CPU Thermal Probes, Hardware Sensor Sourcing & Real-time Protection Alarms
+- **User Prompt**: *"check the system info network interface try to fix it also in hardware sensors try to source every sensors based on the processor and model. try to make improvements in high temperation warning and battery protection alarm. try to get cpu temp reading also it is hard in mediatek, even through they have sensor many apps cant find it. also in snapdragon its easy but in mediatek its hard"*
+- **Summary of Changes**:
+  - **MediaTek (Helio/Dimensity) & Snapdragon CPU Thermal Probing (`SystemMonitor.kt`)**:
+    - Integrated multi-vendor thermal zone scanning targeting MediaTek kernel types (`mtktscpu`, `mtkts_cpu`, `mtktsAP`, `mtktspmic`, `mtkts_charger`, `mtkts_bif`, `mtkts_dram`, `cpu_therm`, `ap_therm`, `tz_cpu*`).
+    - Added hardware temperature normalizer supporting raw millidegrees (`45000` ➔ `45.0°C`), centidegrees (`4500` ➔ `45.0°C`), and raw scale values, filtering out erroneous disconnected sensor codes.
+    - Added official `HardwarePropertiesManager.getDeviceTemperatures(DEVICE_TEMPERATURE_CPU)` API integration as primary high-accuracy source.
+  - **Comprehensive Network Interfaces & Bandwidth (`SystemMonitor.kt` & `SystemInfoScreen.kt`)**:
+    - Enumerates all physical and virtual interfaces (`wlan0`, `rmnet0`, `tun0`, etc.) with UP/DOWN states, MTU, IPv4, and IPv6.
+    - Tracks active connection type, downlink/uplink estimated bandwidth, Wi-Fi SSID, and signal quality.
+  - **Processor & Component Sensor Sourcing (`HardwareMonitor.kt` & `SystemInfoScreen.kt`)**:
+    - Automatically classifies every hardware sensor by SoC subsystem (`Snapdragon Sensor Core (ADSP)`, `MediaTek SCP Sensor Hub`, `Google CHRE`, `Exynos Sensor Hub`) and component vendor (`Bosch Sensortec`, `STMicroelectronics`, `InvenSense/TDK`, `ams OSRAM`, `Asahi Kasei`, `Goodix`).
+    - Groups sensors into distinct functional categories (*Motion & Kinematics*, *Dynamics & Gyro*, *Magnetics & Compass*, *Environment & Climate*, *Biometrics & Presence*).
+  - **Real-Time Battery Protection & Thermal Alarms (`BatteryTrackerReceiver.kt`)**:
+    - Alarms now check immediately on `ACTION_BATTERY_CHANGED` in real time.
+    - Added high-priority alarm channel with custom vibration pattern (`0, 400, 200, 400`), `CATEGORY_ALARM`, and direct quick-action buttons.
+  - **Build & Packaging**:
+    - Recompiled and verified `ProStats-v2.3.apk` in `pro-stats/releases/`.
+
+---
+
 ### [2026-09-04] Installed Version Label Fix, Live Internet Update Monitor & Strictly Manual Logging
 - **User Prompt**: *"1. In settings, in about and release status app installed version is still showing v2.2, change it to 2.3"*, *"2.can you able to show updates notification in app when the new update done any time connected by internet?"*, *"3. i guess the log only meant to output manual whenever it is clicked. check it is manual cause it logs saved without i clicked tho"*
 - **Summary of Changes**:
