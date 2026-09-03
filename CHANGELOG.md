@@ -2,6 +2,14 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-03] Connected RuFlo (Claude-Flow V3) MCP Integration
+- **User Prompt**: *"isnt you connect to ruflo"*, *"my another workspace connected with ruflo"*, *"try to out it"*, *"try to connect this also"*
+- **Summary of Changes**:
+  - Located the RuFlo V3 multi-agent / swarm runtime configuration from the user's other workspace.
+  - Created `.mcp.json` in `my-apps` with the `claude-flow` MCP server configuration (`ruflo@latest mcp start`).
+  - Created `.claude-flow/config.yaml` with hierarchical-mesh topology, hybrid memory, neural paths, and MCP port settings.
+  - Updated global `C:\Users\SoloWanderer\.gemini\config\mcp_config.json` with the `claude-flow` MCP server for global workspace availability.
+
 ---
 
 ### [2026-08-27] Active Running Processes Engine via Usage Access (UsageEvents & ActivityManager)
