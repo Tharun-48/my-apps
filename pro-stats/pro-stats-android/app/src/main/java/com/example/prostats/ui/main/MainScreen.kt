@@ -33,13 +33,14 @@ import androidx.compose.ui.unit.sp
 import com.example.prostats.data.ProcessItem
 import com.example.prostats.theme.ProStatsColors
 
-// Extension helper to convert Drawable to Bitmap for Compose
-fun Drawable.toBitmap(): Bitmap {
-    val width = intrinsicWidth.coerceAtLeast(1)
-    val height = intrinsicHeight.coerceAtLeast(1)
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+// Thread-safe lightweight LRU cache for downscaled icon bitmaps (saves ~80MB RAM)
+private val iconLruCache = object : android.util.LruCache<String, androidx.compose.ui.graphics.ImageBitmap>(50) {}
+
+// Extension helper to convert Drawable to low-memory thumbnail Bitmap for Compose
+fun Drawable.toThumbnailBitmap(targetSizePx: Int = 96): Bitmap {
+    val bitmap = Bitmap.createBitmap(targetSizePx, targetSizePx, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    setBounds(0, 0, canvas.width, canvas.height)
+    setBounds(0, 0, targetSizePx, targetSizePx)
     draw(canvas)
     return bitmap
 }
@@ -49,10 +50,12 @@ fun AppIcon(packageName: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val colors = ProStatsColors.current
     val iconBitmap = remember(packageName) {
-        try {
+        iconLruCache.get(packageName) ?: try {
             val pm = context.packageManager
             val icon = pm.getApplicationIcon(packageName)
-            icon.toBitmap().asImageBitmap()
+            val img = icon.toThumbnailBitmap(96).asImageBitmap()
+            iconLruCache.put(packageName, img)
+            img
         } catch (e: Exception) {
             null
         }

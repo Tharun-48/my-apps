@@ -258,36 +258,47 @@ class HardwareMonitor(private val context: Context) {
  */
 class SensorLiveReader(context: Context) : SensorEventListener {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    private val _readings = mutableMapOf<Int, FloatArray>()
+    private val _readings = mutableMapOf<String, FloatArray>()
 
     @Volatile
     var version: Long = 0L
         private set
 
-    /** Returns a snapshot copy of current readings. Creates a new map each call so Compose detects state change. */
-    fun getSnapshot(): Map<Int, FloatArray> {
+    /** Returns a snapshot copy of current readings keyed by "${sensor.type}_${sensor.name}". */
+    fun getSnapshot(): Map<String, FloatArray> {
         synchronized(_readings) {
             return _readings.mapValues { it.value.copyOf() }
         }
     }
 
-    // Legacy accessor — kept for compatibility but callers should prefer getSnapshot()
-    val readings: Map<Int, FloatArray> get() = getSnapshot()
-
     fun start() {
-        val sensors = sensorManager.getSensorList(Sensor.TYPE_ALL)
-        sensors.forEach { sensor ->
-            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
+        try {
+            val sensors = sensorManager.getSensorList(Sensor.TYPE_ALL)
+            sensors.forEach { sensor ->
+                try {
+                    // Use SENSOR_DELAY_NORMAL (5Hz) to drastically reduce RAM/CPU usage compared to 60Hz UI delay
+                    sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+                } catch (e: Exception) {
+                    // Ignore unregisterable OEM sensors
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
     fun stop() {
-        sensorManager.unregisterListener(this)
+        try {
+            sensorManager.unregisterListener(this)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onSensorChanged(event: SensorEvent) {
+        val key = "${event.sensor.type}_${event.sensor.name}"
         synchronized(_readings) {
-            _readings[event.sensor.type] = event.values.copyOf()
+            _readings[key] = event.values.copyOf()
         }
         version++
     }

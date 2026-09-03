@@ -129,7 +129,7 @@ fun DashboardScreen(
         HorizontalPager(
             state = pagerState,
             key = { page -> page },
-            beyondViewportPageCount = 1,
+            beyondViewportPageCount = 0,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)

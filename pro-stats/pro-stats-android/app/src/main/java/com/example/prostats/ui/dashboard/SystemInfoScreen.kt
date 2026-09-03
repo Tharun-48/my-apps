@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,8 +43,8 @@ fun SystemInfoScreen() {
     var storageInfo by remember { mutableStateOf<StorageInfo?>(null) }
     var memoryDetail by remember { mutableStateOf<MemoryDetailInfo?>(null) }
 
-    // Live sensor readings map: sensorType -> FloatArray of values
-    var liveReadings by remember { mutableStateOf<Map<Int, FloatArray>>(emptyMap()) }
+    // Live sensor readings map: "${sensor.type}_${sensor.name}" -> FloatArray of values
+    var liveReadings by remember { mutableStateOf<Map<String, FloatArray>>(emptyMap()) }
 
     // Register/unregister SensorLiveReader with the screen lifecycle
     val sensorReader = remember { SensorLiveReader(context) }
@@ -258,8 +259,9 @@ fun SystemInfoScreen() {
                 }
             }
 
-            items(sensorInfoList, key = { it.typeInt }) { sensor ->
-                SensorRow(sensor = sensor, liveReading = liveReadings[sensor.typeInt])
+            itemsIndexed(sensorInfoList, key = { index, sensor -> "${sensor.typeInt}_${sensor.name}_$index" }) { _, sensor ->
+                val reading = liveReadings["${sensor.typeInt}_${sensor.name}"]
+                SensorRow(sensor = sensor, liveReading = reading)
             }
         }
     }
@@ -362,22 +364,35 @@ fun SensorRow(sensor: SensorInfo, liveReading: FloatArray? = null) {
                 modifier = Modifier
                     .background(colors.elevatedSurface, RoundedCornerShape(8.dp))
                     .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
                 val valueText = if (liveReading != null && liveReading.isNotEmpty()) {
-                    val v = liveReading[0]
-                    val formatted = if (v % 1f == 0f) v.toInt().toString()
-                    else String.format(java.util.Locale.US, "%.2f", v)
-                    "$formatted ${sensor.unit}".trim()
+                    when (liveReading.size) {
+                        1 -> {
+                            val v = liveReading[0]
+                            val formatted = if (v % 1f == 0f) v.toLong().toString()
+                            else String.format(java.util.Locale.US, "%.2f", v)
+                            "$formatted ${sensor.unit}".trim()
+                        }
+                        2 -> {
+                            String.format(java.util.Locale.US, "X: %.1f  Y: %.1f %s", liveReading[0], liveReading[1], sensor.unit).trim()
+                        }
+                        3 -> {
+                            String.format(java.util.Locale.US, "X: %.1f  Y: %.1f  Z: %.1f %s", liveReading[0], liveReading[1], liveReading[2], sensor.unit).trim()
+                        }
+                        else -> {
+                            String.format(java.util.Locale.US, "x: %.2f y: %.2f z: %.2f", liveReading[0], liveReading[1], liveReading[2])
+                        }
+                    }
                 } else {
-                    "-- ${sensor.unit}".trim()
+                    if (sensor.unit.isNotBlank()) "Standby (${sensor.unit})" else "Standby"
                 }
                 Text(
                     text = valueText,
                     color = colors.accentPurple,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
+                    fontSize = 11.sp
                 )
             }
         }
