@@ -2,6 +2,21 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-04] Installed Version Label Fix, Live Internet Update Monitor & Strictly Manual Logging
+- **User Prompt**: *"1. In settings, in about and release status app installed version is still showing v2.2, change it to 2.3"*, *"2.can you able to show updates notification in app when the new update done any time connected by internet?"*, *"3. i guess the log only meant to output manual whenever it is clicked. check it is manual cause it logs saved without i clicked tho"*
+- **Summary of Changes**:
+  - **Settings Installed Version Label (`SettingsScreen.kt`)**:
+    - Updated the hardcoded `"v2.2"` label in About & Release Status to dynamically evaluate `"v${BuildConfig.VERSION_NAME}"` (`v2.3`).
+  - **Live Internet Update Monitor (`UpdateChecker.kt` & `MainActivity.kt`)**:
+    - Added `startNetworkMonitoring(context)` utilizing `ConnectivityManager.NetworkCallback` to automatically check for newer GitHub releases and trigger system update notifications whenever internet/WiFi/Mobile Data connects.
+  - **Strictly Manual Diagnostic Logging (`AppLogger.kt` & `SettingsScreen.kt`)**:
+    - Removed automatic file writing on startup in `AppLogger.init` and background services.
+    - Added `AppLogger.generateManualDiagnosticLog(context)` to write diagnostic files ONLY when explicitly triggered by the user clicking "Generate Diagnostic Log (Manual)" in Settings.
+  - **Build & Packaging**:
+    - Recompiled and verified `ProStats-v2.3.apk` in `pro-stats/releases/`.
+
+---
+
 ### [2026-09-04] Swipe Crash Fix, Massive RAM Optimization & Multi-Axis Sensor Calibration
 - **User Prompt**: *"the app crashes if i swipe hard in system info"*, *"and it taking 200 mb of ram tho idk it is high or low but its essentially higher than discord"*, *"and also half of the sensors not outputing correctinng"*
 - **Summary of Changes**:

@@ -947,14 +947,14 @@ fun SettingsScreen(
 
                     Button(
                         onClick = {
-                            AppLogger.logError(context, "TestTag", "Manual diagnostic test log generated from Settings")
-                            testLogStatus = "Diagnostic test log written to ${logDir.name}"
+                            val path = AppLogger.generateManualDiagnosticLog(context)
+                            testLogStatus = "Manual diagnostic log saved to ${java.io.File(path).name}"
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = colors.elevatedSurface, contentColor = colors.textPrimary),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Write Diagnostic Test Log Entry", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text("Generate Diagnostic Log (Manual)", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     }
 
                     if (testLogStatus != null) {
@@ -1004,7 +1004,7 @@ fun SettingsScreen(
                                 .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(8.dp))
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
-                            Text("v2.2", color = colors.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("v${com.example.prostats.BuildConfig.VERSION_NAME}", color = colors.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 

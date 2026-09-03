@@ -20,8 +20,9 @@ class MainActivity : ComponentActivity() {
       com.example.prostats.data.BatteryTrackerReceiver.scheduleTracker(applicationContext)
       com.example.prostats.data.BatteryTracker.recordDataPoint(applicationContext)
       com.example.prostats.data.BatteryHealthEstimator.trackCycleData(applicationContext)
+      com.example.prostats.data.UpdateChecker.startNetworkMonitoring(applicationContext)
     } catch (e: Exception) {
-      android.util.Log.e("MainActivity", "Failed to schedule tracker", e)
+      android.util.Log.e("MainActivity", "Failed to schedule tracker / update monitor", e)
     }
 
     enableEdgeToEdge()

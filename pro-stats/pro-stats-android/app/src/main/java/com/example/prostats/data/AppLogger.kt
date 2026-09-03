@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import android.util.Log
+import com.example.prostats.BuildConfig
 import java.io.File
 import java.io.FileWriter
 import java.io.PrintWriter
@@ -22,7 +23,8 @@ object AppLogger {
     private var isInitialized = false
 
     /**
-     * Initializes the AppLogger and attaches a global uncaught exception handler.
+     * Initializes the AppLogger and attaches an uncaught exception crash handler.
+     * NOTE: Does NOT write any files to storage automatically on startup.
      */
     fun init(context: Context) {
         if (isInitialized) return
@@ -38,32 +40,28 @@ object AppLogger {
             defaultHandler?.uncaughtException(thread, throwable)
         }
 
-        logInfo(context, TAG, "AppLogger initialized successfully. Log directory target: ${getLogDirectory(context).absolutePath}")
+        Log.i(TAG, "AppLogger initialized. Logging is strictly manual.")
     }
 
     /**
-     * Retrieves the target log directory on phone storage, ensuring it is outside the Android system folder.
+     * Retrieves the target log directory on phone storage.
      */
     fun getLogDirectory(context: Context): File {
-        // Priority 1: Direct root storage /sdcard/ProStats/Logs
         val primaryDir = File(Environment.getExternalStorageDirectory(), LOG_FOLDER_NAME)
         if (primaryDir.exists() || primaryDir.mkdirs()) {
             return primaryDir
         }
 
-        // Priority 2: /sdcard/Documents/ProStats/Logs
         val docsDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), LOG_FOLDER_NAME)
         if (docsDir.exists() || docsDir.mkdirs()) {
             return docsDir
         }
 
-        // Priority 3: External App Files directory as fallback
         val externalAppDir = context.getExternalFilesDir("Logs")
         if (externalAppDir != null && (externalAppDir.exists() || externalAppDir.mkdirs())) {
             return externalAppDir
         }
 
-        // Priority 4: Internal private directory as emergency fallback
         val internalDir = File(context.filesDir, "Logs")
         if (!internalDir.exists()) {
             internalDir.mkdirs()
@@ -72,7 +70,7 @@ object AppLogger {
     }
 
     /**
-     * Checks if all files management access or storage permissions are granted.
+     * Checks if storage permissions are granted.
      */
     fun hasStoragePermission(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -85,7 +83,7 @@ object AppLogger {
     }
 
     /**
-     * Launches settings activity to grant storage permission if required.
+     * Launches settings to grant storage permission.
      */
     fun requestStoragePermission(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -111,27 +109,73 @@ object AppLogger {
     }
 
     /**
-     * Logs an error message and optional exception to log files on storage.
+     * Standard Logcat outputs — does NOT write to disk automatically.
      */
-    fun logError(context: Context, tag: String, message: String, throwable: Throwable? = null) {
+    fun logError(tag: String, message: String, throwable: Throwable? = null) {
         Log.e(tag, message, throwable)
-        writeLogEntry(context, "ERROR", tag, message, throwable)
     }
 
-    /**
-     * Logs an informational message to log files.
-     */
-    fun logInfo(context: Context, tag: String, message: String) {
+    fun logInfo(tag: String, message: String) {
         Log.i(tag, message)
-        writeLogEntry(context, "INFO", tag, message, null)
+    }
+
+    fun logWarning(tag: String, message: String, throwable: Throwable? = null) {
+        Log.w(tag, message, throwable)
     }
 
     /**
-     * Logs a warning message to log files.
+     * Generates a comprehensive manual diagnostic log file ONLY when explicitly requested by the user.
+     * Returns the generated file path.
      */
-    fun logWarning(context: Context, tag: String, message: String, throwable: Throwable? = null) {
-        Log.w(tag, message, throwable)
-        writeLogEntry(context, "WARN", tag, message, throwable)
+    fun generateManualDiagnosticLog(context: Context): String {
+        val timeStamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+        val fileTimestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+
+        val systemMonitor = SystemMonitor(context)
+        val hardwareMonitor = HardwareMonitor(context)
+
+        val ramInfo = systemMonitor.getRamInfo()
+        val batteryInfo = systemMonitor.getBatteryInfo()
+        val cpuUsage = systemMonitor.getSystemCpuUsage()
+        val freqs = systemMonitor.getCpuCoreFrequencies()
+        val thermal = systemMonitor.getThermalStatus()
+        val sotMs = systemMonitor.getScreenOnTimeSinceLastChargeMs()
+        val healthData = BatteryHealthEstimator.getHealthData(context)
+
+        val logBuilder = StringBuilder().apply {
+            append("================ PROSTATS DIAGNOSTIC LOG ================\n")
+            append("Generated: ").append(timeStamp).append("\n")
+            append("App Version: v").append(BuildConfig.VERSION_NAME).append(" (Code: ").append(BuildConfig.VERSION_CODE).append(")\n")
+            append("Device: ").append(Build.MANUFACTURER).append(" ").append(Build.MODEL).append(" (").append(Build.BOARD).append(")\n")
+            append("Android OS: ").append(Build.VERSION.RELEASE).append(" (SDK ").append(Build.VERSION.SDK_INT).append(")\n")
+            append("Kernel: ").append(System.getProperty("os.version") ?: "Unknown").append("\n")
+            append("--------------------------------------------------------\n")
+            append("SYSTEM TELEMETRY SNAPSHOT:\n")
+            append("• CPU Load: ").append(cpuUsage.toInt()).append("%\n")
+            append("• CPU Frequencies (MHz): ").append(freqs.joinToString(", ")).append("\n")
+            val availGb = (ramInfo.totalGb - ramInfo.usedGb).coerceAtLeast(0f)
+            val bTemp = systemMonitor.getBatteryTemperature()
+            append("• RAM: ").append(String.format(Locale.US, "%.2f", ramInfo.usedGb)).append(" / ").append(String.format(Locale.US, "%.2f", ramInfo.totalGb)).append(" GB (Avail: ").append(String.format(Locale.US, "%.2f", availGb)).append(" GB)\n")
+            append("• Battery Level: ").append(batteryInfo.level).append("% (").append(batteryInfo.status).append(")\n")
+            append("• Battery Power: ").append(batteryInfo.currentMa).append(" mA / ").append(String.format(Locale.US, "%.2f", batteryInfo.watts)).append(" W\n")
+            append("• Battery Temp: ").append(bTemp).append(" °C (Thermal: ").append(thermal).append(")\n")
+            append("• Battery Health Score: ").append(healthData.healthScore).append("% (Est. Capacity: ").append(healthData.currentCapacityMah).append(" mAh, Design: ").append(healthData.designCapacityMah).append(" mAh)\n")
+            append("• Screen-On Time: ").append(sotMs / 1000 / 60).append(" mins\n")
+            append("--------------------------------------------------------\n")
+            append("PERMISSIONS STATUS:\n")
+            append("• Usage Access: ").append(systemMonitor.hasUsageStatsPermission()).append("\n")
+            append("• Battery Optimizations Ignored: ").append(systemMonitor.isIgnoringBatteryOptimizations()).append("\n")
+            append("• Overlay Permission: ").append(android.provider.Settings.canDrawOverlays(context)).append("\n")
+            append("• Shizuku Access: ").append(systemMonitor.hasShizukuPermission()).append("\n")
+            append("========================================================\n")
+        }
+
+        val logDir = getLogDirectory(context)
+        val logFile = File(logDir, "prostats_manual_log_$fileTimestamp.txt")
+        appendToFile(logFile, logBuilder.toString())
+
+        Log.i(TAG, "Manual diagnostic log written: ${logFile.absolutePath}")
+        return logFile.absolutePath
     }
 
     /**
@@ -148,7 +192,7 @@ object AppLogger {
             append("Timestamp: ").append(timeStamp).append("\n")
             @Suppress("DEPRECATION")
             append("Thread: ").append(thread.name).append(" (ID: ").append(thread.id).append(")\n")
-            append("App Version: ProStats v2.1\n")
+            append("App Version: ProStats v").append(BuildConfig.VERSION_NAME).append("\n")
             append("Device: ").append(Build.MANUFACTURER).append(" ").append(Build.MODEL).append("\n")
             append("Android OS: ").append(Build.VERSION.RELEASE).append(" (SDK ").append(Build.VERSION.SDK_INT).append(")\n")
             append("Exception: ").append(throwable.javaClass.name).append(": ").append(throwable.message).append("\n")
@@ -159,41 +203,6 @@ object AppLogger {
         val logDir = getLogDirectory(context)
         val crashFile = File(logDir, "prostats_crash_log.txt")
         appendToFile(crashFile, crashReport)
-
-        // Also append to the daily log file
-        val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-        val dailyFile = File(logDir, "prostats_log_$dateStr.txt")
-        appendToFile(dailyFile, crashReport)
-    }
-
-    private fun writeLogEntry(context: Context, level: String, tag: String, message: String, throwable: Throwable?) {
-        val timeStamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
-        val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-
-        val logBuilder = StringBuilder()
-        logBuilder.append("[").append(timeStamp).append("] ")
-            .append("[").append(level).append("] ")
-            .append("[").append(tag).append("]: ")
-            .append(message).append("\n")
-
-        if (throwable != null) {
-            val sw = StringWriter()
-            throwable.printStackTrace(PrintWriter(sw))
-            logBuilder.append(sw.toString()).append("\n")
-        }
-
-        val entry = logBuilder.toString()
-        val logDir = getLogDirectory(context)
-
-        // Append to main error log if ERROR level
-        if (level == "ERROR" || level == "CRASH") {
-            val errorFile = File(logDir, "prostats_error_log.txt")
-            appendToFile(errorFile, entry)
-        }
-
-        // Append to daily combined log file
-        val dailyFile = File(logDir, "prostats_log_$dateStr.txt")
-        appendToFile(dailyFile, entry)
     }
 
     private fun appendToFile(file: File, content: String) {
@@ -203,7 +212,7 @@ object AppLogger {
                 writer.write(content)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error appending to file: ${file.absolutePath}", e)
+            Log.e(TAG, "Error writing to file: ${file.absolutePath}", e)
         }
     }
 }

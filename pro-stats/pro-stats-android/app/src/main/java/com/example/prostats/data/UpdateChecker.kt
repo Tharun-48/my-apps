@@ -11,7 +11,10 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.prostats.BuildConfig
 import com.example.prostats.R
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.io.BufferedReader
@@ -36,9 +39,42 @@ object UpdateChecker {
     private const val CHANNEL_ID = "prostats_updates"
     private const val NOTIFICATION_ID = 3001
 
+    private var isNetworkMonitoringStarted = false
+
+    /**
+     * Automatically listens for network availability changes (WiFi/Mobile Data).
+     * Whenever internet becomes available, immediately checks for new releases on GitHub and notifies the user.
+     */
+    fun startNetworkMonitoring(context: Context) {
+        if (isNetworkMonitoringStarted) return
+        isNetworkMonitoringStarted = true
+
+        try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            val request = android.net.NetworkRequest.Builder()
+                .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+
+            cm.registerNetworkCallback(request, object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) {
+                    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            kotlinx.coroutines.delay(2000)
+                            checkForUpdates(context, notifyUserIfAvailable = true)
+                        } catch (e: Exception) {
+                            Log.d(TAG, "Network-triggered update check failed: ${e.message}")
+                        }
+                    }
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register network callback for updates", e)
+        }
+    }
+
     /**
      * Check GitHub repository for newer compiled APK releases.
-     * Compares remote APK version (e.g. ProStats-v2.3.apk) with local BuildConfig.VERSION_NAME (e.g. 2.2).
+     * Compares remote APK version (e.g. ProStats-v2.3.apk) with local BuildConfig.VERSION_NAME (e.g. 2.3).
      */
     suspend fun checkForUpdates(context: Context, notifyUserIfAvailable: Boolean = false): UpdateInfo = withContext(Dispatchers.IO) {
         val currentVersionStr = BuildConfig.VERSION_NAME
