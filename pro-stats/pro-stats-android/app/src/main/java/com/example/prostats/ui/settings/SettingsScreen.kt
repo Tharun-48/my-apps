@@ -96,8 +96,8 @@ fun SettingsScreen(
                     val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream))
                     val response = reader.readText()
                     val jsonArray = org.json.JSONArray(response)
-                    var maxVersionStr = "2.2"
-                    var maxVersionNum = 2.2f
+                    var maxVersionStr = com.example.prostats.BuildConfig.VERSION_NAME
+                    var maxVersionNum = com.example.prostats.BuildConfig.VERSION_NAME.toFloatOrNull() ?: 2.3f
                     for (i in 0 until jsonArray.length()) {
                         val obj = jsonArray.getJSONObject(i)
                         val name = obj.getString("name")
@@ -110,7 +110,7 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    if (maxVersionNum > 2.2f) {
+                    if (maxVersionNum > (com.example.prostats.BuildConfig.VERSION_NAME.toFloatOrNull() ?: 2.3f)) {
                         latestVersion = maxVersionStr
                         updateAvailable = true
                     }

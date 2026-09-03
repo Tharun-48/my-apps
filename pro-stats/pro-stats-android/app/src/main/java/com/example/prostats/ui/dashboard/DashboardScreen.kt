@@ -876,6 +876,12 @@ fun HeroMetricTile(
     modifier: Modifier = Modifier
 ) {
     val colors = ProStatsColors.current
+    val animatedAccent by androidx.compose.animation.animateColorAsState(
+        targetValue = accentColor,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 400),
+        label = "heroAccentColor"
+    )
+
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(22.dp),
@@ -890,32 +896,32 @@ fun HeroMetricTile(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(6.dp)
-                        .background(accentColor, CircleShape)
+                        .size(8.dp)
+                        .background(animatedAccent, CircleShape)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = category,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.textSecondary,
-                    letterSpacing = 1.sp
+                    letterSpacing = 0.8.sp
                 )
             }
             Spacer(modifier = Modifier.height(14.dp))
             Text(
                 text = value,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = accentColor,
-                lineHeight = 28.sp
+                fontSize = 26.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = animatedAccent,
+                lineHeight = 30.sp
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = subValue,
                 fontSize = 11.sp,
                 color = colors.textSecondary,
-                fontWeight = FontWeight.Normal
+                fontWeight = FontWeight.Medium
             )
         }
     }
@@ -931,6 +937,20 @@ fun SystemLoadCard(
     modifier: Modifier = Modifier
 ) {
     val colors = ProStatsColors.current
+    val animatedProgress by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = progress,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+        ),
+        label = "systemLoadProgress"
+    )
+    val animatedColor by androidx.compose.animation.animateColorAsState(
+        targetValue = barColor,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 350),
+        label = "barColor"
+    )
+
     Card(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
@@ -951,7 +971,7 @@ fun SystemLoadCard(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.textSecondary,
-                    letterSpacing = 1.sp
+                    letterSpacing = 0.8.sp
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -970,8 +990,8 @@ fun SystemLoadCard(
             }
             Spacer(modifier = Modifier.height(14.dp))
             LinearProgressIndicator(
-                progress = { progress },
-                color = barColor,
+                progress = { animatedProgress },
+                color = animatedColor,
                 trackColor = colors.elevatedSurface,
                 modifier = Modifier
                     .fillMaxWidth()

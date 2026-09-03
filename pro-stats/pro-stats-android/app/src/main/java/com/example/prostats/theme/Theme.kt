@@ -115,31 +115,13 @@ fun lightAppColors() = AppColors(
 )
 
 fun dynamicAppColors(colorScheme: androidx.compose.material3.ColorScheme, isDark: Boolean): AppColors {
-    val cardBg = if (isDark) {
-        Color(
-            red = (colorScheme.surface.red * 0.35f + colorScheme.surfaceVariant.red * 0.65f),
-            green = (colorScheme.surface.green * 0.35f + colorScheme.surfaceVariant.green * 0.65f),
-            blue = (colorScheme.surface.blue * 0.35f + colorScheme.surfaceVariant.blue * 0.65f),
-            alpha = 1.0f
-        )
-    } else {
-        Color(
-            red = (colorScheme.surface.red * 0.75f + colorScheme.surfaceVariant.red * 0.25f),
-            green = (colorScheme.surface.green * 0.75f + colorScheme.surfaceVariant.green * 0.25f),
-            blue = (colorScheme.surface.blue * 0.75f + colorScheme.surfaceVariant.blue * 0.25f),
-            alpha = 1.0f
-        )
-    }
-
-    val elevatedBg = colorScheme.surfaceVariant
-
     return AppColors(
-        background = colorScheme.background,
-        cardSurface = cardBg,
-        elevatedSurface = elevatedBg,
-        surfaceContainerLow = if (isDark) colorScheme.surface else colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        surfaceContainerHigh = if (isDark) colorScheme.surfaceVariant.copy(alpha = 0.9f) else colorScheme.surfaceVariant,
-        textPrimary = colorScheme.onBackground,
+        background = colorScheme.surface,
+        cardSurface = colorScheme.surfaceContainerLow,
+        elevatedSurface = colorScheme.surfaceContainerHigh,
+        surfaceContainerLow = colorScheme.surfaceContainerLow,
+        surfaceContainerHigh = colorScheme.surfaceContainerHigh,
+        textPrimary = colorScheme.onSurface,
         textSecondary = colorScheme.onSurfaceVariant,
         textTertiary = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
         borderColor = colorScheme.outlineVariant.copy(alpha = if (isDark) 0.35f else 0.45f),
@@ -149,7 +131,7 @@ fun dynamicAppColors(colorScheme: androidx.compose.material3.ColorScheme, isDark
         accentPurple = colorScheme.secondary,
         accentBlue = colorScheme.tertiary,
         accentYellow = Color(0xFFFBBF24),
-        navBarColor = colorScheme.surface,
+        navBarColor = colorScheme.surfaceContainer,
         isDark = isDark
     )
 }
