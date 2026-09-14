@@ -63,8 +63,8 @@ fun darkAppColors() = AppColors(
     textPrimary = Color(0xFFF3F4F6),
     textSecondary = Color(0xFF9CA3AF),
     textTertiary = Color(0xFF6B7280),
-    borderColor = Color(0x10FFFFFF), // Ultra-soft hairline
-    borderColorSubtle = Color(0x08FFFFFF),
+    borderColor = Color(0x19FFFFFF), // Subtle hairline (alpha ≈ 0.10)
+    borderColorSubtle = Color(0x0FFFFFFF), // Ultra-subtle hairline (alpha ≈ 0.06)
     accentGreen = Color(0xFF34D399),
     accentOrange = Color(0xFFFB923C),
     accentPurple = Color(0xFFA78BFA),
@@ -83,8 +83,8 @@ fun amoledAppColors() = AppColors(
     textPrimary = Color(0xFFFFFFFF),
     textSecondary = Color(0xFFA1A1AA),
     textTertiary = Color(0xFF71717A),
-    borderColor = Color(0x14FFFFFF),
-    borderColorSubtle = Color(0x0AFFFFFF),
+    borderColor = Color(0x1CFFFFFF), // Subtle hairline (alpha ≈ 0.11)
+    borderColorSubtle = Color(0x0FFFFFFF), // Ultra-subtle hairline (alpha ≈ 0.06)
     accentGreen = Color(0xFF4ADE80),
     accentOrange = Color(0xFFFB923C),
     accentPurple = Color(0xFFA78BFA),
@@ -103,8 +103,8 @@ fun lightAppColors() = AppColors(
     textPrimary = Color(0xFF0F172A),
     textSecondary = Color(0xFF64748B),
     textTertiary = Color(0xFF94A3B8),
-    borderColor = Color(0x0E000000),
-    borderColorSubtle = Color(0x06000000),
+    borderColor = Color(0x19000000), // Subtle hairline (alpha ≈ 0.10)
+    borderColorSubtle = Color(0x0F000000), // Ultra-subtle hairline (alpha ≈ 0.06)
     accentGreen = Color(0xFF10B981),
     accentOrange = Color(0xFFF97316),
     accentPurple = Color(0xFF8B5CF6),
@@ -124,8 +124,8 @@ fun dynamicAppColors(colorScheme: androidx.compose.material3.ColorScheme, isDark
         textPrimary = colorScheme.onSurface,
         textSecondary = colorScheme.onSurfaceVariant,
         textTertiary = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-        borderColor = colorScheme.outlineVariant.copy(alpha = if (isDark) 0.20f else 0.25f),
-        borderColorSubtle = colorScheme.outlineVariant.copy(alpha = if (isDark) 0.10f else 0.12f),
+        borderColor = colorScheme.outlineVariant.copy(alpha = if (isDark) 0.10f else 0.10f), // Subtle hairline
+        borderColorSubtle = colorScheme.outlineVariant.copy(alpha = if (isDark) 0.06f else 0.06f), // Ultra-subtle hairline
         accentGreen = colorScheme.primary,
         accentOrange = Color(0xFFFB923C),
         accentPurple = colorScheme.secondary,

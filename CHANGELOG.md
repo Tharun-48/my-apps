@@ -2,6 +2,40 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-14] RuFlo MCP Integration & ProStats v2.4 UI Redesign (Material Design 3)
+- **User Prompts**: *"Please initialize the RuFlo MCP server tools"* / *"dont copy just use that folder and repo"* / *"i said to redesign the app looks non ai-isk"*
+- **Summary of Changes**:
+  - **RuFlo Multi-Agent Orchestration**:
+    - Initialized RuFlo V3 runtime with hierarchical-mesh swarm topology (max 15 agents, auto-scaling)
+    - Configured MCP server with 353+ tools: agent management, swarm coordination, persistent memory (HNSW + SQLite), agenticow version control
+    - Spawned workspace-analyzer coder agent (ID: `agent-1789371663498-rljqpt`) for task coordination
+    - Enabled token-saver mode (deduplicates context to reduce cost) + CLAUDE_FLOW_COST_TRACKING
+  - **ANTIGRAVITY Skills Integration**:
+    - Configured `.mcp.json` to reference external ANTIGRAVITY folder directly (no file copying):
+      - `CLAUDE_FLOW_SKILLS_PATH: d:\ANTIGRAVITY\skills` (81 items, 39+ plugins)
+      - `CLAUDE_FLOW_REPOSITORY: d:\ANTIGRAVITY`
+    - Updated `.claude-flow/config.yaml` with repository section, billing config, and mcp.skillsPath
+    - Enabled credit mode for RuFlo billing tracking
+  - **ProStats v2.4 UI Redesign — Material Design 3 Native (via RuFlo UI Architect Agent)**:
+    - **Theme.kt**: Added `borderColorSubtle` hairline borders (alpha 0.06f–0.12f) across all themes (Dark, Light, AMOLED, Dynamic)
+    - **DashboardScreen.kt**: 
+      - Replaced synthetic sci-fi gauge rings with clean Material 3 performance overview card
+      - Implemented dual-track rounded gauges for CPU/Memory with animated fill (350ms, FastOutSlowInEasing)
+      - Converted uppercase tags ("SCREEN TIME", "TEMPERATURE") → natural casing ("Screen time", "Battery temp")
+      - Replaced 8dp colored dots with softly-tinted squircle icon badges (24dp rounded square with 12% opacity tint)
+      - Added tactile press feedback: 0.96f scale for metric tiles, 0.98f for process action card
+      - Renamed "CPU CLUSTER FREQUENCIES" → "Processor cores"
+    - **MainScreen.kt**: 
+      - Converted uppercase badges ("ACTIVE BACKGROUND", "FOREGROUND SERVICE") → natural casing
+      - State-based accent colors: Green (Foreground), Purple (Service), Orange (Background)
+  - **Commits**:
+    - Commit `e4f59ae`: Initialize RuFlo multi-agent orchestration framework
+    - Commit `0b998f4`: Configure RuFlo to reference ANTIGRAVITY skills repository directly
+    - Commit `853db49`: ProStats v2.4 version bump + release
+    - Commit `{NEW}`: UI redesign — remove AI-ish elements, implement Material Design 3 native styling
+
+---
+
 ### [2026-09-14] Pentium N3710 Optimisation & Ruflo-First Model Routing
 - **User Prompts**: *"the processor is pentium n3710 optimise for it and take tokens but not too much"* / *"my model quota is finished so change everything to ruflo"*
 - **Summary of Changes**:
@@ -394,7 +428,8 @@ This document maintains a historical log of user inputs and corresponding code c
  -   F i x e d   b a t t e r y   c y c l e   a u t o - r e s e t   n o t   t r i g g e r i n g   o n   A n d r o i d   8 +   b y   c o r r e c t i n g   t h e   i n t e n t   a c t i o n   s t r i n g   i n   t h e   m a n i f e s t . 
  -   A d d e d   a   2 4 h   v s   7 d   t o g g l e   f o r   t h e   B a t t e r y   C h a r g e   H i s t o r y   g r a p h   o n   t h e   S c r e e n - o n   T i m e   &   B a t t e r y   s c r e e n   ( d e f a u l t s   t o   2 4 h ) . 
  -   M o d i f i e d   A p p   B a t t e r y   C o n s u m p t i o n   t o   p r e c i s e l y   q u e r y   a c t i v i t y   e v e n t s   s i n c e   t h e   e x a c t   u n p l u g   t i m e s t a m p ,   e n s u r i n g   a c c u r a t e   ' s i n g l e   u n p l u g g e d '   d a t a . 
-  
+ 
+ 
  
 ## [Unreleased]
 - Fixed issue where battery charge history baseline was not auto-refreshing in the UI when device reached 100% and unplugged.

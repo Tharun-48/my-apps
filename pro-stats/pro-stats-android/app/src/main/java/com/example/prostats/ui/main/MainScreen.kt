@@ -445,12 +445,16 @@ fun ProcessRow(
                             else ->
                                 Pair(colors.elevatedSurface, colors.textSecondary)
                         }
+                        // Natural casing for badge text
+                        val badgeText = item.processState
+                            .lowercase()
+                            .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = badgeBg
                         ) {
                             Text(
-                                text = item.processState,
+                                text = badgeText,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = badgeFg,

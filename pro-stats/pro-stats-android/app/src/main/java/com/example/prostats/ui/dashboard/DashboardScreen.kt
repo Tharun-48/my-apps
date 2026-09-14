@@ -940,7 +940,7 @@ fun SystemPerformanceHeroCard(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Live Energy Flow Strip
+            // Live Energy Flow Strip with Material 3 Status Indicator
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -954,12 +954,20 @@ fun SystemPerformanceHeroCard(
                 ) {
                     val pwrColor = if (batteryMa > 0) colors.accentGreen else colors.accentPurple
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Softly-tinted squircle status badge
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
-                                .background(pwrColor, CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                                .size(24.dp)
+                                .background(pwrColor.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(pwrColor, CircleShape)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = if (batteryMa > 0) "Charging rate" else "Discharge rate",
                             fontSize = 11.sp,
