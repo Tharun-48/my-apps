@@ -3,7 +3,7 @@
 # Watches for file changes and auto-commits + pushes
 # =============================================
 
-$repoPath = "C:\Users\SoloWanderer\Documents\antigravity\my-apps"
+$repoPath = if ($PSScriptRoot) { $PSScriptRoot } else { "D:\ANTIGRAVITY\my-apps" }
 $git = if (Get-Command "git" -ErrorAction SilentlyContinue) { "git" } else { "C:\Program Files\Git\cmd\git.exe" }
 $debounceSeconds = 5   # Wait 5s after last change before committing
 

@@ -2,6 +2,30 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-14] Post-Windows Reset Environment & Configuration Recovery
+- **User Prompt**: *"hi, i reseted my windows i need to retrive everything like my old one - every infos, automations and git.. also ruflo one"*, *"also my skills - android, design and more"*, *"make a desired folder in d drive"*
+- **Summary of Changes**:
+  - **Git Identity & Configuration Restored**:
+    - Re-configured global Git identity with `user.name = "Tharun GV"`, `user.email = "ganapathytharungv448@gmail.com"`, `init.defaultBranch = "main"`, and `credential.helper = "manager"`.
+    - Verified connectivity to `https://github.com/Tharun-48/my-apps.git`.
+  - **D: Drive Skills Hub & Persistent Junction (`D:\ANTIGRAVITY\skills`)**:
+    - Created dedicated persistent storage folder `D:\ANTIGRAVITY\skills` so skills are never lost on Windows OS resets.
+    - Consolidated all 38 skills into this folder:
+      - **Android**: `android-material3-design`, `android-skills`, `lightweight-android-optimization`.
+      - **Design**: `apple-design-system`, `android-material3-design`.
+      - **RuFlo / Claude-Flow Swarm Suite**: `ruflo`, `agentdb-*` (advanced, learning, memory-patterns, optimization, vector-search), `flow-nexus-*` (neural, platform, swarm), `github-*` automation skills, `swarm-advanced`, `swarm-orchestration`, `v3-*` architecture & optimization skills, and `verification-quality`.
+    - Created Directory Junction linking `C:\Users\Tharun\.gemini\config\skills` -> `D:\ANTIGRAVITY\skills` for global Antigravity IDE availability.
+    - Added `ruflo` skill directly to `d:\ANTIGRAVITY\my-apps\.agents\skills\ruflo`.
+  - **RuFlo & Claude-Flow V3 MCP Recovery**:
+    - Restored `claude-flow` MCP configuration in `C:\Users\Tharun\.gemini\config\mcp_config.json` and created persistent backup at `D:\ANTIGRAVITY\mcp_config.json`.
+    - Initialized global NPM installation for `ruflo@latest`.
+  - **Automation & Script Resilience**:
+    - Updated `auto-sync.ps1` to dynamically resolve `$repoPath` via `$PSScriptRoot` with fallback to `D:\ANTIGRAVITY\my-apps`.
+    - Updated `CHANGELOG.md` link in `.agents/AGENTS.md`.
+    - Enabled PowerShell `RemoteSigned` execution policy for current user.
+
+---
+
 ### [2026-09-04] UI Polish & Artificial Badge Removal
 - **User Prompt**: *"why somewhere the ui looks ai ish like the live,live stream word near system telemetry and hardware sensor not needed"*
 - **Summary of Changes**:

@@ -3,7 +3,7 @@
 ## Git & Versioning Rules
 - **Git Commit & Push on Changes**: Whenever any changes or fixes are made to code or configuration files in the workspace, you MUST perform a `git add`, `git commit`, and immediately run `git push origin main` to push the changes to GitHub.
 - **Do Not Change Version Number**: Do NOT increment or modify the application version number (e.g. `versionCode` or `versionName` in `build.gradle.kts`) unless explicitly instructed by the user.
-- **Maintain Change Log**: Keep a detailed historical log of all user inputs/requests and corresponding code modifications in [CHANGELOG.md](file:///c:/Users/SoloWanderer/Documents/antigravity/my-apps/CHANGELOG.md). Always update `CHANGELOG.md` whenever new changes are made.
+- **Maintain Change Log**: Keep a detailed historical log of all user inputs/requests and corresponding code modifications in [CHANGELOG.md](file:///d:/ANTIGRAVITY/my-apps/CHANGELOG.md). Always update `CHANGELOG.md` whenever new changes are made.
 
 ## Android Build & Deployment Rules
 - Whenever any changes or fixes are made to the Android application in `pro-stats/pro-stats-android`, you MUST recompile the APK and:
