@@ -14,12 +14,16 @@
         "npm_config_update_notifier": "false",
         "CLAUDE_FLOW_MODE": "v3",
         "CLAUDE_FLOW_HOOKS_ENABLED": "true",
-        "CLAUDE_FLOW_TOPOLOGY": "flat",
-        "CLAUDE_FLOW_MAX_AGENTS": "4",
-        "CLAUDE_FLOW_MEMORY_BACKEND": "sqlite",
+        "CLAUDE_FLOW_TOPOLOGY": "hierarchical-mesh",
+        "CLAUDE_FLOW_MAX_AGENTS": "15",
+        "CLAUDE_FLOW_MEMORY_BACKEND": "hybrid",
         "CLAUDE_FLOW_TOKEN_SAVER": "true",
         "CLAUDE_FLOW_LAZY_LOAD": "true",
-        "CLAUDE_FLOW_CONCURRENCY": "2"
+        "CLAUDE_FLOW_CONCURRENCY": "4",
+        "CLAUDE_FLOW_SKILLS_PATH": "d:\\ANTIGRAVITY\\skills",
+        "CLAUDE_FLOW_COST_TRACKING": "true",
+        "CLAUDE_FLOW_CREDIT_MODE": "true",
+        "CLAUDE_FLOW_REPOSITORY": "d:\\ANTIGRAVITY"
       },
       "autoStart": true
     }

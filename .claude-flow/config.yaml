@@ -1,6 +1,12 @@
 # RuFlo V3 Runtime Configuration
 version: "3.0.0"
 
+# External repository references (no copying - direct access)
+repository:
+  skillsPath: d:\ANTIGRAVITY\skills
+  rootPath: d:\ANTIGRAVITY
+  type: external-reference
+
 swarm:
   topology: hierarchical-mesh
   maxAgents: 15
@@ -35,6 +41,12 @@ hooks:
   enabled: true
   autoExecute: true
 
+billing:
+  creditMode: true
+  costTracking: enabled
+  tokenSaver: true
+
 mcp:
   autoStart: true
   port: 3000
+  skillsPath: d:\ANTIGRAVITY\skills
