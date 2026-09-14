@@ -2,6 +2,15 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-14] Pentium N3710 Optimisation & Ruflo-First Model Routing
+- **User Prompts**: *"the processor is pentium n3710 optimise for it and take tokens but not too much"* / *"my model quota is finished so change everything to ruflo"*
+- **Summary of Changes**:
+  - **`.mcp.json`**: Tuned ruflo for N3710 — topology `flat`, max agents `4`, memory backend `sqlite` (vs heavy HNSW), token-saver on, lazy-load on, concurrency `2`
+  - **`AGENTS.md`**: Corrected processor name (N3700 → N3710), added N3710 parallel-agent cap rule, added "Ruflo by default" + token efficiency rules + model fallback order
+  - **`auto-sync.ps1`**: Increased debounce from 5s → 15s to reduce CPU thrash during file-change polling on low-end hardware
+
+---
+
 ### [2026-09-14] Windows Reset Recovery & GitHub Re-Authentication
 - **User Prompt**: *"hi, i reseted my windows i need to retrieve everything like my old one - every infos, automations and git.. also ruflo one"* / *"also my skills - android, design and more"*
 - **Summary of Actions**:

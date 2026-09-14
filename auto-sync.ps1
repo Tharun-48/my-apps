@@ -6,7 +6,7 @@
 $repoPath = if ($PSScriptRoot) { $PSScriptRoot } else { "D:\ANTIGRAVITY\my-apps" }
 $git = if (Get-Command "git" -ErrorAction SilentlyContinue) { "git" } else { "C:\Program Files\Git\cmd\git.exe" }
 $gh  = if (Test-Path "C:\Program Files\GitHub CLI\gh.exe") { "C:\Program Files\GitHub CLI\gh.exe" } else { "gh" }
-$debounceSeconds = 5   # Wait 5s after last change before committing
+$debounceSeconds = 15  # Increased for Pentium N3710 — reduces CPU thrash on low-end hardware
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Auto-Sync: my-apps GitHub Watcher" -ForegroundColor Cyan
