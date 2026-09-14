@@ -2,6 +2,27 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-14] UI De-AI-ification & Material Design 3 Native Micro-Animations
+- **User Prompt**: *"my friends said my app looks ai ish...can you change ui elements to be less ai verse? with good animations not impact the performance"*
+- **Summary of Changes**:
+  - **System Performance Hero Hub (`DashboardScreen.kt`)**:
+    - Replaced the synthetic concentric sci-fi circular gauge rings with a clean, authentic Material 3 performance overview card.
+    - Implemented dual-track rounded gauges for Processor (CPU) and Memory (RAM) with animated fill (`FastOutSlowInEasing`, 350ms), readable values, and dynamic load status subtitles.
+    - Integrated real-time energy flow throughput strip with live current (mA) and wattage (W).
+  - **Quick Metric Tiles with Tactile Press Feedback (`DashboardScreen.kt`)**:
+    - Replaced uppercase tags (`"SCREEN TIME"`, `"TEMPERATURE"`) and 8dp colored dots with natural title casing (`"Screen time"`, `"Battery temp"`) and softly-tinted squircle icon badges (`DateRange`, `Thermostat/Info`).
+    - Added tactile press feedback: Cards smoothly scale to `0.96f` on press via Compose `graphicsLayer` without canvas overhead.
+  - **Processor Cores & Interactive Process Action Card (`DashboardScreen.kt`)**:
+    - Renamed `"CPU CLUSTER FREQUENCIES"` to `"Processor cores"`.
+    - Replaced the large dark button shouting `"MANAGE RUNNING PROCESSES"` with an interactive Material 3 Action Card with active process details, chevron icon, and tactile press scaling (`0.98f`).
+  - **Process State Badges & Theme Hairlines (`MainScreen.kt` & `Theme.kt`)**:
+    - Converted uppercase badges (`"ACTIVE BACKGROUND"`, `"FOREGROUND SERVICE"`) to clean natural casing.
+    - Softened hard card borders across all themes into translucent, subtle hairlines (`alpha = 0.06f–0.12f`).
+  - **Build Environment Configuration**:
+    - Updated `gradle.properties` to target valid system JDK 21 at `C:/Program Files/Java/jdk-21.0.12.1`.
+
+---
+
 ### [2026-09-14] Post-Windows Reset Environment & Configuration Recovery
 - **User Prompt**: *"hi, i reseted my windows i need to retrive everything like my old one - every infos, automations and git.. also ruflo one"*, *"also my skills - android, design and more"*, *"make a desired folder in d drive"*
 - **Summary of Changes**:

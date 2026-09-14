@@ -446,15 +446,15 @@ fun ProcessRow(
                                 Pair(colors.elevatedSurface, colors.textSecondary)
                         }
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
+                            shape = RoundedCornerShape(8.dp),
                             color = badgeBg
                         ) {
                             Text(
-                                text = item.processState.uppercase(),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
+                                text = item.processState,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
                                 color = badgeFg,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
                     }

@@ -5,7 +5,9 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,6 +15,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -21,10 +25,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -379,9 +387,9 @@ fun DashboardContent(
                     }
                 }
 
-                // Dynamic Hero Multi-Arc Radial Telemetry Hub
+                // Modern System Performance Hero Hub
                 val ramRatio = if (ramTotalGb > 0) (ramUsedGb / ramTotalGb).coerceIn(0f, 1f) else 0f
-                RadialTelemetryHeroCard(
+                SystemPerformanceHeroCard(
                     cpuUsage = cpuUsage,
                     ramUsageRatio = ramRatio,
                     ramUsedGb = ramUsedGb,
@@ -402,9 +410,10 @@ fun DashboardContent(
                     val sotMins = minutes % 60
 
                     HeroMetricTile(
-                        category = "SCREEN TIME",
+                        title = "Screen time",
                         value = "${sotHours}h ${sotMins}m",
-                        subValue = "Since Last Charge",
+                        subValue = "Since last charge",
+                        icon = Icons.Default.DateRange,
                         accentColor = colors.accentPurple,
                         onClick = onNavigateToSotDetail,
                         modifier = Modifier.weight(1f)
@@ -417,9 +426,10 @@ fun DashboardContent(
                     }
 
                     HeroMetricTile(
-                        category = "TEMPERATURE",
-                        value = "${String.format("%.1f", batteryTemp)}°C",
+                        title = "Battery temp",
+                        value = "${String.format(java.util.Locale.US, "%.1f", batteryTemp)}°C",
                         subValue = "Thermal: $thermalStatus",
+                        icon = if (batteryTemp >= 45f) Icons.Default.Warning else Icons.Default.Info,
                         accentColor = tempColor,
                         onClick = onNavigateToBatteryTempDetail,
                         modifier = Modifier.weight(1f)
@@ -442,12 +452,12 @@ fun DashboardContent(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Battery Health & Power",
-                                    fontSize = 14.sp,
+                                    text = "Battery health",
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = colors.textPrimary
                                 )
-                                val cycleSource = if (hd.cycleSourceIsSystem) "System" else "Calc"
+                                val cycleSource = if (hd.cycleSourceIsSystem) "System verified" else "Estimated"
                                 Box(
                                     modifier = Modifier
                                         .background(colors.elevatedSurface, RoundedCornerShape(8.dp))
@@ -455,10 +465,10 @@ fun DashboardContent(
                                         .padding(horizontal = 8.dp, vertical = 3.dp)
                                 ) {
                                     Text(
-                                        text = "$cycleSource Cycles: ${hd.chargeCycles}",
+                                        text = "${hd.chargeCycles} cycles · $cycleSource",
                                         fontSize = 10.sp,
                                         color = colors.textPrimary,
-                                        fontWeight = FontWeight.SemiBold
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
                             }
@@ -618,17 +628,16 @@ fun DashboardContent(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "CPU CLUSTER FREQUENCIES",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = colors.textSecondary,
-                                    letterSpacing = 0.8.sp
+                                    text = "Processor cores",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textPrimary
                                 )
                                 Text(
-                                    text = "${coreFreqs.size} Cores Active",
-                                    fontSize = 11.sp,
+                                    text = "${coreFreqs.size} active cores",
+                                    fontSize = 12.sp,
                                     color = colors.accentBlue,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Medium
                                 )
                             }
                             Spacer(modifier = Modifier.height(14.dp))
@@ -653,10 +662,10 @@ fun DashboardContent(
                                         ) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Text(
-                                                    text = "C$coreId",
+                                                    text = "Core $coreId",
                                                     fontSize = 9.sp,
                                                     color = colors.textTertiary,
-                                                    fontWeight = FontWeight.Bold
+                                                    fontWeight = FontWeight.Medium
                                                 )
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
@@ -694,35 +703,66 @@ fun DashboardContent(
                     }
                 }
 
-                // Process Manager Action Button
-                Button(
+                // Process Manager Interactive Action Card
+                val procInteraction = remember { MutableInteractionSource() }
+                val procPressed by procInteraction.collectIsPressedAsState()
+                val procScale by animateFloatAsState(
+                    targetValue = if (procPressed) 0.98f else 1f,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "procScale"
+                )
+
+                Card(
                     onClick = onNavigateToProcesses,
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (colors.isDark) Color(0xFFF3F4F6) else Color(0xFF0F172A),
-                        contentColor = if (colors.isDark) Color(0xFF0C0D10) else Color.White
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
+                    interactionSource = procInteraction,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .height(52.dp)
+                        .graphicsLayer {
+                            scaleX = procScale
+                            scaleY = procScale
+                        }
+                        .border(1.dp, colors.borderColor, RoundedCornerShape(20.dp))
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "MANAGE RUNNING PROCESSES",
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 12.sp,
-                            letterSpacing = 0.8.sp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(colors.accentGreen.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = colors.accentGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Running processes",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "Inspect memory usage & background tasks",
+                                fontSize = 11.sp,
+                                color = colors.textSecondary
+                            )
+                        }
                         Icon(
-                            imageVector = Icons.Default.PlayArrow,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                            tint = colors.textSecondary,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -734,11 +774,12 @@ fun DashboardContent(
 }
 
 /**
- * High-impact, GPU-accelerated Radial Multi-Arc Hero Hub.
- * Draws CPU, RAM, and Battery Telemetry on smooth canvas arcs with zero recomposition overhead.
+ * Modern, authentic Material Design 3 System Performance Hero Card.
+ * Replaces synthetic concentric sci-fi rings with clear, human-centered telemetry:
+ * Dual-track animated CPU & Memory meters and live real-time battery energy flow.
  */
 @Composable
-fun RadialTelemetryHeroCard(
+fun SystemPerformanceHeroCard(
     cpuUsage: Float,
     ramUsageRatio: Float,
     ramUsedGb: Float,
@@ -750,189 +791,204 @@ fun RadialTelemetryHeroCard(
 ) {
     val colors = ProStatsColors.current
 
-    // Smooth lightweight 300ms transitions
     val animatedCpu by animateFloatAsState(
         targetValue = (cpuUsage / 100f).coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-        label = "radialCpu"
+        animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+        label = "heroCpuAnim"
     )
     val animatedRam by animateFloatAsState(
         targetValue = ramUsageRatio.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-        label = "radialRam"
+        animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+        label = "heroRamAnim"
     )
 
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-        modifier = modifier
-            .border(1.dp, colors.borderColor, RoundedCornerShape(24.dp))
+        modifier = modifier.border(1.dp, colors.borderColor, RoundedCornerShape(24.dp))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(20.dp)
         ) {
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "System Overview",
-                    fontSize = 14.sp,
+                    text = "System performance",
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = colors.textPrimary
                 )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Multi-Arc Canvas
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(160.dp)
-            ) {
-                val cpuColor = colors.accentGreen
-                val ramColor = colors.accentOrange
-                val trackColor = colors.elevatedSurface
-
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val strokeWidthOuter = 10.dp.toPx()
-                    val strokeWidthInner = 8.dp.toPx()
-
-                    // Outer Ring: CPU (Start at -90deg / Top)
-                    drawArc(
-                        color = trackColor,
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        style = Stroke(width = strokeWidthOuter, cap = StrokeCap.Round),
-                        size = Size(size.width - strokeWidthOuter, size.height - strokeWidthOuter),
-                        topLeft = Offset(strokeWidthOuter / 2, strokeWidthOuter / 2)
-                    )
-                    drawArc(
-                        color = cpuColor,
-                        startAngle = -90f,
-                        sweepAngle = animatedCpu * 360f,
-                        useCenter = false,
-                        style = Stroke(width = strokeWidthOuter, cap = StrokeCap.Round),
-                        size = Size(size.width - strokeWidthOuter, size.height - strokeWidthOuter),
-                        topLeft = Offset(strokeWidthOuter / 2, strokeWidthOuter / 2)
-                    )
-
-                    // Inner Ring: RAM
-                    val innerPadding = 18.dp.toPx()
-                    drawArc(
-                        color = trackColor,
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        style = Stroke(width = strokeWidthInner, cap = StrokeCap.Round),
-                        size = Size(size.width - innerPadding * 2, size.height - innerPadding * 2),
-                        topLeft = Offset(innerPadding, innerPadding)
-                    )
-                    drawArc(
-                        color = ramColor,
-                        startAngle = -90f,
-                        sweepAngle = animatedRam * 360f,
-                        useCenter = false,
-                        style = Stroke(width = strokeWidthInner, cap = StrokeCap.Round),
-                        size = Size(size.width - innerPadding * 2, size.height - innerPadding * 2),
-                        topLeft = Offset(innerPadding, innerPadding)
-                    )
-                }
-
-                // Center Digital Readout
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .background(colors.accentGreen.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
                     Text(
-                        text = "${cpuUsage.toInt()}%",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = colors.textPrimary,
-                        lineHeight = 28.sp
-                    )
-                    Text(
-                        text = "CPU LOAD",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textSecondary
+                        text = "Optimal",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.accentGreen
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Legend Chips
+            // Dual Telemetry Meters: CPU and RAM
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                TelemetryLegendPill(
-                    dotColor = colors.accentGreen,
-                    title = "CPU",
-                    value = "${cpuUsage.toInt()}%"
-                )
-                TelemetryLegendPill(
-                    dotColor = colors.accentOrange,
-                    title = "RAM",
-                    value = "${String.format("%.1f", ramUsedGb)}/${String.format("%.1f", ramTotalGb)}G"
-                )
-                val currentPwr = if (batteryMa != 0) {
-                    if (batteryMa > 0) "+${batteryMa}mA" else "${batteryMa}mA"
-                } else "Idle"
-                TelemetryLegendPill(
-                    dotColor = if (batteryMa > 0) colors.accentGreen else colors.accentPurple,
-                    title = "PWR",
-                    value = currentPwr
-                )
+                // CPU Metric Column
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = "Processor",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textSecondary
+                        )
+                        Text(
+                            text = "${cpuUsage.toInt()}%",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.accentGreen
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(colors.elevatedSurface)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(animatedCpu)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(colors.accentGreen)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = when {
+                            cpuUsage < 30f -> "Light load"
+                            cpuUsage < 70f -> "Moderate load"
+                            else -> "High load"
+                        },
+                        fontSize = 11.sp,
+                        color = colors.textTertiary
+                    )
+                }
+
+                // RAM Metric Column
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = "Memory",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textSecondary
+                        )
+                        Text(
+                            text = String.format(java.util.Locale.US, "%.1f GB", ramUsedGb),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.accentOrange
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(colors.elevatedSurface)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(animatedRam)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(colors.accentOrange)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = String.format(java.util.Locale.US, "of %.1f GB (%.0f%%)", ramTotalGb, ramUsageRatio * 100f),
+                        fontSize = 11.sp,
+                        color = colors.textTertiary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Live Energy Flow Strip
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.elevatedSurface, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val pwrColor = if (batteryMa > 0) colors.accentGreen else colors.accentPurple
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(pwrColor, CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (batteryMa > 0) "Charging rate" else "Discharge rate",
+                            fontSize = 11.sp,
+                            color = colors.textSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    val currentText = if (batteryMa != 0) {
+                        val sign = if (batteryMa > 0) "+" else ""
+                        "$sign${batteryMa} mA · ${String.format(java.util.Locale.US, "%.1f", batteryWatts)}W"
+                    } else "Standby"
+                    Text(
+                        text = currentText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun TelemetryLegendPill(
-    dotColor: Color,
-    title: String,
-    value: String
-) {
-    val colors = ProStatsColors.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .background(colors.elevatedSurface, RoundedCornerShape(10.dp))
-            .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(7.dp)
-                .background(dotColor, CircleShape)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = "$title: ",
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = colors.textSecondary
-        )
-        Text(
-            text = value,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = colors.textPrimary
-        )
-    }
-}
-
-@Composable
 fun HeroMetricTile(
-    category: String,
+    title: String,
     value: String,
     subValue: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     accentColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -944,11 +1000,25 @@ fun HeroMetricTile(
         label = "heroAccentColor"
     )
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "tileScale"
+    )
+
     Card(
         onClick = onClick,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-        modifier = modifier.border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -958,31 +1028,38 @@ fun HeroMetricTile(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
-                        .background(animatedAccent, CircleShape)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+                        .size(32.dp)
+                        .background(animatedAccent.copy(alpha = 0.14f), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = animatedAccent,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = category,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textSecondary,
-                    letterSpacing = 0.8.sp
+                    text = title,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textSecondary
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = value,
                 fontSize = 24.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = animatedAccent,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary,
                 lineHeight = 28.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = subValue,
                 fontSize = 11.sp,
-                color = colors.textSecondary,
+                color = colors.textTertiary,
                 fontWeight = FontWeight.Medium
             )
         }
