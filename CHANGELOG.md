@@ -2,6 +2,19 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-14] Windows Reset Recovery & GitHub Re-Authentication
+- **User Prompt**: *"hi, i reseted my windows i need to retrieve everything like my old one - every infos, automations and git.. also ruflo one"* / *"also my skills - android, design and more"*
+- **Summary of Actions**:
+  - Restored Git global config: `user.name = Tharun GV`, `user.email = ganapathytharungv448@gmail.com`, `init.defaultBranch = main`, `credential.helper = manager`
+  - Confirmed all workspace data intact on D: drive (`d:\ANTIGRAVITY\my-apps`)
+  - Confirmed skills present: `android-material3-design`, `android-skills`, `apple-design-system`, `lightweight-android-optimization`, `ruflo`
+  - Installed GitHub CLI (`gh` v2.100.0) via winget; authenticated as **Tharun-48** via device flow (`gh auth login --web`)
+  - Successfully pushed 2 pending commits (`d829f72..7f7e038`) to `origin/main` after Windows Credential Manager token was wiped by reset
+  - Remote URL restored to clean HTTPS: `https://github.com/Tharun-48/my-apps.git`
+  - Auto-sync script (`auto-sync.ps1`) and scheduled task confirmed present and intact
+
+---
+
 ### [2026-09-14] UI De-AI-ification & Material Design 3 Native Micro-Animations
 - **User Prompt**: *"my friends said my app looks ai ish...can you change ui elements to be less ai verse? with good animations not impact the performance"*
 - **Summary of Changes**:
