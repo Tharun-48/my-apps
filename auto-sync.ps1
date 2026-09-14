@@ -5,6 +5,7 @@
 
 $repoPath = if ($PSScriptRoot) { $PSScriptRoot } else { "D:\ANTIGRAVITY\my-apps" }
 $git = if (Get-Command "git" -ErrorAction SilentlyContinue) { "git" } else { "C:\Program Files\Git\cmd\git.exe" }
+$gh  = if (Test-Path "C:\Program Files\GitHub CLI\gh.exe") { "C:\Program Files\GitHub CLI\gh.exe" } else { "gh" }
 $debounceSeconds = 5   # Wait 5s after last change before committing
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -63,13 +64,22 @@ function Sync-ToGitHub {
         return
     }
 
-    # Push to GitHub
+    # Push to GitHub (using gh token for non-interactive auth)
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Pushing to GitHub..." -ForegroundColor Cyan
-    & $git -C $repoPath push origin main
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Pushed successfully!" -ForegroundColor Green
-    } else {
-        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Push failed. Check your connection/token." -ForegroundColor Red
+    try {
+        $token = & $gh auth token 2>$null
+        if ($token) {
+            & $git -C $repoPath remote set-url origin "https://Tharun-48:$token@github.com/Tharun-48/my-apps.git"
+        }
+        & $git -C $repoPath push origin main 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Pushed successfully!" -ForegroundColor Green
+        } else {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Push failed. Check your connection/token." -ForegroundColor Red
+        }
+    } finally {
+        # Always restore clean remote URL (no token in URL)
+        & $git -C $repoPath remote set-url origin "https://github.com/Tharun-48/my-apps.git"
     }
 }
 
