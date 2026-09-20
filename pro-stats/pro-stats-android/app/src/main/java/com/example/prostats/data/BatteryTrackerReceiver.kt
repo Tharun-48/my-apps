@@ -26,20 +26,41 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
                 Log.d("BatteryTrackerReceiver", "Boot completed — tracker scheduled")
             }
 
+            Intent.ACTION_POWER_CONNECTED -> {
+                try {
+                    BatteryTracker.onPowerConnected(context)
+                    checkBatteryProtectionAlarms(context)
+                } catch (e: Exception) {
+                    Log.e("BatteryTrackerReceiver", "Error on power connected", e)
+                }
+            }
+
             Intent.ACTION_POWER_DISCONNECTED -> {
                 try {
                     BatteryTracker.onPowerDisconnected(context)
                     BatteryTracker.recordDataPoint(context)
+                    checkBatteryProtectionAlarms(context)
                 } catch (e: Exception) {
                     Log.e("BatteryTrackerReceiver", "Error on power disconnected", e)
                 }
             }
 
-            Intent.ACTION_BATTERY_CHANGED, Intent.ACTION_POWER_CONNECTED, Intent.ACTION_POWER_DISCONNECTED -> {
+            Intent.ACTION_BATTERY_CHANGED -> {
                 try {
                     checkBatteryProtectionAlarms(context)
+                    // Fix: Reset SOT baseline if phone reaches FULL (100%) while on charger
+                    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                    val pct = if (level >= 0 && scale > 0) (level * 100) / scale else -1
+                    val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                    val isFull = status == BatteryManager.BATTERY_STATUS_FULL
+                    val targetLevel = BatteryTracker.getTargetResetBatteryLevel(context)
+                    if (isFull && pct >= targetLevel) {
+                        BatteryTracker.updateLastUnplugFromFullTimestamp(context, System.currentTimeMillis())
+                        Log.d("BatteryTrackerReceiver", "Battery FULL at $pct% — SOT baseline auto-reset")
+                    }
                 } catch (e: Exception) {
-                    Log.e("BatteryTrackerReceiver", "Error on battery change alert check", e)
+                    Log.e("BatteryTrackerReceiver", "Error on battery change", e)
                 }
             }
 
@@ -48,7 +69,7 @@ class BatteryTrackerReceiver : BroadcastReceiver() {
                     BatteryTracker.recordDataPoint(context)
                     BatteryHealthEstimator.trackCycleData(context)
                     checkBatteryProtectionAlarms(context)
-                    
+
                     val pendingResult = goAsync()
                     // Periodically check GitHub for new releases
                     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {

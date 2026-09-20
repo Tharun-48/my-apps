@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.prostats"
         minSdk = 24
         targetSdk = 36
-        versionCode = 6
-        versionName = "2.3"
+        versionCode = 7
+        versionName = "2.4"
     }
 
     signingConfigs {

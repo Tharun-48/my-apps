@@ -272,47 +272,55 @@ object BatteryTracker {
 
     /**
      * Calculates kernel deep sleep vs screen-off awake time and screen-off drain rate.
+     * Algorithm: drain rate = (actual battery % dropped / elapsed hours) * screen-off fraction
+     * This correctly isolates idle drain by scaling total observed drain by the screen-off share.
      */
     fun getDeepSleepStats(context: Context): DeepSleepStats {
         val lastUnplug = getLastUnplugFromFullTimestamp(context)
-        val elapsedTotal = (System.currentTimeMillis() - lastUnplug).coerceAtLeast(1L)
+        val now = System.currentTimeMillis()
+        val elapsedTotal = (now - lastUnplug).coerceAtLeast(1L)
         val sotMs = getSotSinceLastCharge(context)
         val totalScreenOffMs = (elapsedTotal - sotMs).coerceAtLeast(0L)
 
-        // Kernel deep sleep = total elapsedRealtime - total uptimeMillis
-        val uptimeSinceBoot = SystemClock.uptimeMillis()
-        val realSinceBoot = SystemClock.elapsedRealtime()
-        val deepSleepTotalBoot = (realSinceBoot - uptimeSinceBoot).coerceAtLeast(0L)
+        // Kernel deep sleep = (total elapsedRealtime - total uptimeMillis) since boot
+        val uptimeSinceBoot = SystemClock.uptimeMillis().coerceAtLeast(1L)
+        val realSinceBoot = SystemClock.elapsedRealtime().coerceAtLeast(1L)
+        // Deep sleep fraction across entire boot lifetime
+        val deepSleepBootFraction = (realSinceBoot - uptimeSinceBoot).toDouble() / realSinceBoot.toDouble()
 
-        // Proportionate deep sleep within the current charge cycle
-        val deepSleepInCycle = if (realSinceBoot > 0) {
-            ((deepSleepTotalBoot.toDouble() / realSinceBoot.toDouble()) * totalScreenOffMs).toLong()
-        } else {
-            (totalScreenOffMs * 0.85).toLong()
-        }.coerceIn(0L, totalScreenOffMs)
+        // Apply that fraction to the screen-off time in the current cycle
+        val deepSleepInCycle = (deepSleepBootFraction.coerceIn(0.0, 1.0) * totalScreenOffMs).toLong()
+            .coerceIn(0L, totalScreenOffMs)
 
         val awakeInCycle = (totalScreenOffMs - deepSleepInCycle).coerceAtLeast(0L)
-        val deepSleepPct = if (totalScreenOffMs > 0) {
-            (deepSleepInCycle.toFloat() / totalScreenOffMs.toFloat()) * 100f
+        val deepSleepPct = if (totalScreenOffMs > 0L) {
+            (deepSleepInCycle.toFloat() / totalScreenOffMs.toFloat() * 100f).coerceIn(0f, 100f)
         } else {
             0f
-        }.coerceIn(0f, 100f)
+        }
 
-        // Screen-off drain rate (%/hour)
+        // Screen-off drain rate (%/hour) — fixed algorithm:
+        // 1. Compute total drain per hour across the full cycle (screen on + off)
+        // 2. Multiply by the screen-off fraction of elapsed time to isolate idle drain
         val drainRate = try {
             val history = getHistorySinceLastCharge(context)
             if (history.size >= 2) {
                 val first = history.first()
                 val last = history.last()
-                val totalDrain = (first.batteryLevel - last.batteryLevel).coerceAtLeast(0)
-                val hours = totalScreenOffMs / (1000f * 60f * 60f)
-                val elapsed = (last.timestamp - first.timestamp).coerceAtLeast(1L)
-                val screenOffRatio = (totalScreenOffMs.toFloat() / elapsed.toFloat()).coerceIn(0f, 1f)
-                if (hours > 0.1f) (totalDrain * screenOffRatio) / hours else 0.5f
+                val totalDrainPct = (first.batteryLevel - last.batteryLevel).coerceAtLeast(0).toFloat()
+                val totalElapsedHours = ((last.timestamp - first.timestamp).coerceAtLeast(1L)) / (1000f * 60f * 60f)
+                val screenOffFraction = (totalScreenOffMs.toFloat() / elapsedTotal.toFloat()).coerceIn(0f, 1f)
+                // Drain rate during screen-off periods = (total drain/hr) * screen-off share
+                val overallDrainPerHour = totalDrainPct / totalElapsedHours
+                val screenOffDrainPerHour = overallDrainPerHour * screenOffFraction
+                screenOffDrainPerHour.coerceIn(0f, 100f)
             } else {
-                0.5f
+                // Fallback: estimate from elapsed time if no history
+                val elapsedHours = elapsedTotal / (1000f * 60f * 60f)
+                if (elapsedHours > 0.5f) (1f / elapsedHours).coerceIn(0f, 5f) else 0.5f
             }
         } catch (e: Exception) {
+            Log.e(TAG, "Error computing screen-off drain rate", e)
             0.5f
         }
 
@@ -421,7 +429,7 @@ object BatteryTracker {
 
     fun getTargetResetBatteryLevel(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getInt(KEY_RESET_BATTERY_LEVEL, 90)
+        return prefs.getInt(KEY_RESET_BATTERY_LEVEL, 80)
     }
 
     fun setTargetResetBatteryLevel(context: Context, levelPct: Int) {
