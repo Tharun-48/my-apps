@@ -23,8 +23,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Shizuku Permission -->
+    <!-- Shizuku & Diagnostic Permissions -->
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+    <uses-permission android:name="android.permission.DUMP" tools:ignore="ProtectedPermissions" />
 
     <application
         android:allowBackup="true"

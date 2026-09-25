@@ -80,7 +80,10 @@ data class GpuInfo(
     val vendor: String,
     val maxFreqMhz: Long,
     val currentFreqMhz: Long,
-    val openGlVersion: String = ""
+    val openGlVersion: String = "",
+    val loadPct: Int = -1,
+    val thermalHeadroom: Float = -1f,
+    val thermalStatus: String = "Normal"
 )
 
 data class NetworkInterfaceDetail(
@@ -1401,13 +1404,14 @@ class SystemMonitor(private val context: Context) {
         }
     }
 
-    /** Get GPU info with reliable headless OpenGL ES query & hardware frequency checks */
+    /** Get GPU info with reliable headless OpenGL ES query, hardware frequency, real-time load %, and thermal metrics */
     fun getGpuInfo(): GpuInfo {
         var renderer = "Unknown"
         var vendor = "Unknown"
         var openGlVersion = ""
         var maxFreqMhz = 0L
         var currentFreqMhz = 0L
+        var loadPct = -1
 
         // 1. Direct Headless EGL / OpenGL Query (Universal on all Android devices)
         val eglDetails = getGpuEglDetails()
@@ -1417,15 +1421,17 @@ class SystemMonitor(private val context: Context) {
             openGlVersion = eglDetails.openGlVersion
         }
 
-        // 2. Query Clock Frequencies from sysfs
-        val sysfsPaths = listOf(
+        // 2. Query Clock Frequencies & Utilization from sysfs
+        val sysfsFreqPaths = listOf(
             // Qualcomm Adreno paths
             Pair("/sys/class/kgsl/kgsl-3d0/max_gpuclk", "/sys/class/kgsl/kgsl-3d0/gpuclk"),
             Pair("/sys/class/kgsl/kgsl-3d0/devfreq/max_freq", "/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq"),
             Pair("/sys/devices/platform/soc/soc:qcom,kgsl-3d0/kgsl/kgsl-3d0/max_gpuclk", "/sys/devices/platform/soc/soc:qcom,kgsl-3d0/kgsl/kgsl-3d0/gpuclk"),
             Pair("/sys/devices/platform/kgsl-3d0.0/kgsl/kgsl-3d0/max_gpuclk", "/sys/devices/platform/kgsl-3d0.0/kgsl/kgsl-3d0/gpuclk"),
-            // ARM Mali / Devfreq paths
+            // MediaTek / ARM Mali / Devfreq paths
             Pair("/sys/devices/platform/gpusysfs/gpu_max_clock", "/sys/devices/platform/gpusysfs/gpu_clock"),
+            Pair("/sys/kernel/gpu/gpu_clock", "/sys/kernel/gpu/gpu_clock"),
+            Pair("/sys/class/misc/mali0/device/clock", "/sys/class/misc/mali0/device/clock"),
             Pair("/sys/devices/platform/13040000.mali/devfreq/13040000.mali/max_freq", "/sys/devices/platform/13040000.mali/devfreq/13040000.mali/cur_freq"),
             Pair("/sys/class/devfreq/gpufreq/max_freq", "/sys/class/devfreq/gpufreq/cur_freq"),
             Pair("/sys/class/devfreq/13040000.mali/max_freq", "/sys/class/devfreq/13040000.mali/cur_freq"),
@@ -1433,7 +1439,7 @@ class SystemMonitor(private val context: Context) {
             Pair("/sys/class/devfreq/1c500000.mali/max_freq", "/sys/class/devfreq/1c500000.mali/cur_freq")
         )
 
-        for ((maxPath, curPath) in sysfsPaths) {
+        for ((maxPath, curPath) in sysfsFreqPaths) {
             try {
                 val maxF = File(maxPath)
                 val curF = File(curPath)
@@ -1448,23 +1454,85 @@ class SystemMonitor(private val context: Context) {
             } catch (e: Exception) {}
         }
 
-        // 3. Try Shizuku if sysfs is blocked
-        if (maxFreqMhz == 0L && isShizukuRunning() && hasShizukuPermission()) {
-            for ((maxPath, curPath) in sysfsPaths) {
-                try {
-                    val p = Shizuku.newProcess(arrayOf("sh", "-c", "cat $maxPath 2>/dev/null; cat $curPath 2>/dev/null"), null, null)
-                    val r = BufferedReader(InputStreamReader(p.inputStream))
-                    val maxLine = r.readLine()?.trim()?.toLongOrNull() ?: 0L
-                    val curLine = r.readLine()?.trim()?.toLongOrNull() ?: 0L
-                    p.waitFor()
-                    if (maxLine > 0L) {
-                        maxFreqMhz = if (maxLine > 1000000) maxLine / 1000000 else if (maxLine > 1000) maxLine / 1000 else maxLine
+        // Direct sysfs GPU load queries (Qualcomm gpubusy / MediaTek utilization)
+        val gpuBusyFiles = listOf(
+            "/sys/class/kgsl/kgsl-3d0/gpubusy",
+            "/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage",
+            "/sys/class/misc/mali0/device/utilization",
+            "/sys/kernel/gpu/gpu_busy",
+            "/sys/devices/platform/gpusysfs/gpu_busy"
+        )
+        for (bPath in gpuBusyFiles) {
+            try {
+                val f = File(bPath)
+                if (f.exists() && f.canRead()) {
+                    val text = f.readText().trim()
+                    val parsedLoad = parseGpuLoad(text)
+                    if (parsedLoad in 0..100) {
+                        loadPct = parsedLoad
+                        break
                     }
-                    if (curLine > 0L) {
-                        currentFreqMhz = if (curLine > 1000000) curLine / 1000000 else if (curLine > 1000) curLine / 1000 else curLine
+                }
+            } catch (e: Exception) {}
+        }
+
+        // 3. Try Shizuku if sysfs is blocked by Android 14+ / HyperOS SELinux
+        if ((maxFreqMhz == 0L || loadPct == -1) && isShizukuRunning() && hasShizukuPermission()) {
+            try {
+                val cmd = "cat /sys/class/kgsl/kgsl-3d0/gpubusy /sys/class/kgsl/kgsl-3d0/gpu_busy_percentage /sys/class/misc/mali0/device/utilization /sys/kernel/gpu/gpu_busy 2>/dev/null"
+                val p = Shizuku.newProcess(arrayOf("sh", "-c", cmd), null, null)
+                val reader = BufferedReader(InputStreamReader(p.inputStream))
+                var line = reader.readLine()
+                while (line != null) {
+                    val l = parseGpuLoad(line.trim())
+                    if (l in 0..100) {
+                        loadPct = l
+                        break
                     }
-                    if (maxFreqMhz > 0L) break
-                } catch (e: Exception) {}
+                    line = reader.readLine()
+                }
+                p.waitFor()
+            } catch (e: Exception) {}
+
+            if (maxFreqMhz == 0L || currentFreqMhz == 0L) {
+                for ((maxPath, curPath) in sysfsFreqPaths) {
+                    try {
+                        val p = Shizuku.newProcess(arrayOf("sh", "-c", "cat $maxPath 2>/dev/null; cat $curPath 2>/dev/null"), null, null)
+                        val r = BufferedReader(InputStreamReader(p.inputStream))
+                        val maxLine = r.readLine()?.trim()?.toLongOrNull() ?: 0L
+                        val curLine = r.readLine()?.trim()?.toLongOrNull() ?: 0L
+                        p.waitFor()
+                        if (maxLine > 0L && maxFreqMhz == 0L) {
+                            maxFreqMhz = if (maxLine > 1000000) maxLine / 1000000 else if (maxLine > 1000) maxLine / 1000 else maxLine
+                        }
+                        if (curLine > 0L && currentFreqMhz == 0L) {
+                            currentFreqMhz = if (curLine > 1000000) curLine / 1000000 else if (curLine > 1000) curLine / 1000 else curLine
+                        }
+                        if (maxFreqMhz > 0L && currentFreqMhz > 0L) break
+                    } catch (e: Exception) {}
+                }
+            }
+        }
+
+        // 4. Query Thermal Throttling Headroom & Status via Android PowerManager
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        var thermalHeadroom = -1f
+        var thermalStatus = "Normal"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && powerManager != null) {
+            try {
+                thermalHeadroom = powerManager.getThermalHeadroom(0)
+            } catch (e: Exception) {}
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && powerManager != null) {
+            thermalStatus = when (powerManager.currentThermalStatus) {
+                PowerManager.THERMAL_STATUS_NONE -> "Nominal (No Throttling)"
+                PowerManager.THERMAL_STATUS_LIGHT -> "Light Throttling"
+                PowerManager.THERMAL_STATUS_MODERATE -> "Moderate Throttling"
+                PowerManager.THERMAL_STATUS_SEVERE -> "Severe Throttling"
+                PowerManager.THERMAL_STATUS_CRITICAL -> "Critical Throttling"
+                PowerManager.THERMAL_STATUS_EMERGENCY -> "Emergency Cooldown"
+                PowerManager.THERMAL_STATUS_SHUTDOWN -> "Thermal Shutdown"
+                else -> "Normal"
             }
         }
 
@@ -1482,7 +1550,26 @@ class SystemMonitor(private val context: Context) {
             }
         }
 
-        return GpuInfo(renderer, vendor, maxFreqMhz, currentFreqMhz, openGlVersion)
+        return GpuInfo(renderer, vendor, maxFreqMhz, currentFreqMhz, openGlVersion, loadPct, thermalHeadroom, thermalStatus)
+    }
+
+    private fun parseGpuLoad(rawText: String): Int {
+        if (rawText.isBlank()) return -1
+        // Format A: Adreno gpubusy: "busy_cycles total_cycles" e.g. "45230 100000"
+        val parts = rawText.split("\\s+".toRegex()).filter { it.isNotBlank() }
+        if (parts.size >= 2) {
+            val busy = parts[0].toLongOrNull() ?: return -1
+            val total = parts[1].toLongOrNull() ?: return -1
+            if (total > 0L) {
+                return ((busy * 100.0) / total).toInt().coerceIn(0, 100)
+            }
+        }
+        // Format B: Direct percentage number e.g. "45" or "45%"
+        val cleanNum = rawText.replace("%", "").trim().toIntOrNull()
+        if (cleanNum != null) {
+            return if (cleanNum in 0..100) cleanNum else if (cleanNum in 101..255) ((cleanNum * 100) / 255) else -1
+        }
+        return -1
     }
 
     /** Get network connection and interface details */

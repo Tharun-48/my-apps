@@ -17,18 +17,7 @@ build/
 # Ensure release APKs are explicitly tracked
 !pro-stats/releases/*.apk
 
-# RuFlo runtime & daemon files (keep config and policy)
-.claude-flow/agents/
-.claude-flow/daemon.pid
-.claude-flow/daemon-state.json
-.claude-flow/metrics/
-.swarm/state.json
-.swarm/memory.db
-
-# Ruflo local secrets and runtime data
+# Local secrets
 .env
 .env.local
 .env.*.local
-.claude-flow/data/
-.claude-flow/logs/
-.claude-flow/sessions/

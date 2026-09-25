@@ -2,6 +2,33 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-09-25] ProStats v2.5 Release, Real-Time GPU Utilization, RuFlo Removal & AGENTS.md Fixes
+- **User Prompts**: *"fix my agent.md to allow push app file to app releases and check and directory"* / *"push new app version"* / *"check log folder working well or not, add or check in agent.md that anytime before prompt or input here starts need to read the logs - the logs should not be clunky tho it is easy to read without more credits"* / *"check this conversation and from for gpu i cant do anything - try adding those metrics in my app"* / *"remove ruflo"* / *"use jdk 21"*
+- **Summary of Changes**:
+  - **GPU Telemetry & Metrics Enhancement (`SystemMonitor.kt`, `SystemInfoScreen.kt`, `AndroidManifest.xml`)**:
+    - Added hardware GPU load utilization % queries:
+      - Qualcomm Adreno: parses `/sys/class/kgsl/kgsl-3d0/gpubusy` (busy cycles / total cycles ratio) and `gpu_busy_percentage`.
+      - ARM Mali / MediaTek: queries `/sys/class/misc/mali0/device/utilization` and `/sys/kernel/gpu/gpu_busy`.
+      - Frequency nodes: `/sys/kernel/gpu/gpu_clock` and devfreq scaling paths.
+      - Non-root standard fallback: queries Android `PowerManager.getThermalHeadroom(0)` and `currentThermalStatus` for real-time GPU/SoC thermal throttling state.
+    - Updated `SystemInfoScreen.kt` to display real-time GPU utilization %, active frequency, max frequency, thermal headroom %, and OpenGL ES version.
+    - Added `<uses-permission android:name="android.permission.DUMP" />` in `AndroidManifest.xml` for dumpsys graphics & surfaceflinger metrics.
+  - **AppLogger Scoped Storage Resilience (`AppLogger.kt`)**:
+    - Enforced scoped storage checking: only accesses external root storage if full storage permission is granted.
+    - Added automatic graceful fallback to app-specific external storage (`context.getExternalFilesDir("Logs")`) or internal storage (`context.filesDir`) to prevent crashes or silent write failures.
+  - **RuFlo Removal**:
+    - Completely uninstalled and removed `.claude-flow/`, `.swarm/`, `.claude/`, `.mcp.json`, and ruflo skill references across workspace and MCP configurations.
+    - Cleaned `.gitignore` of all runtime/daemon artifacts.
+  - **Directory Hygiene & Workspace Rules (`AGENTS.md`)**:
+    - Resolved git rebase conflict in `.gitignore` and removed accidental nested subproject gitlink `my-apps/my-apps`.
+    - Added rule permitting and requiring release APK binaries in `pro-stats/releases/` to be committed and pushed to GitHub.
+    - Added mandatory pre-prompt log reading protocol with anti-clunky token/credit conservation rule (reading only top 40–50 lines).
+  - **App Version Bump & Release**:
+    - Bumped `versionCode` 7 → 8, `versionName` "2.4" → "2.5".
+    - Compiled release APK (`ProStats-v2.5.apk`, 9.7MB) using JDK 21 (`jdk-21.0.12.1`) and deployed to `pro-stats/releases/`.
+
+---
+
 ### [2026-09-14] RuFlo MCP Integration & ProStats v2.4 UI Redesign (Material Design 3)
 - **User Prompts**: *"Please initialize the RuFlo MCP server tools"* / *"dont copy just use that folder and repo"* / *"i said to redesign the app looks non ai-isk"*
 - **Summary of Changes**:

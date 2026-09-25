@@ -44,17 +44,35 @@ object AppLogger {
     }
 
     /**
+     * Checks if storage permissions are granted.
+     */
+    fun hasStoragePermission(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            val read = context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val write = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            read && write
+        }
+    }
+
+    /**
      * Retrieves the target log directory on phone storage.
+     * Respects Android scoped storage rules:
+     * - If full storage access is granted, writes to /sdcard/ProStats/Logs
+     * - Otherwise writes cleanly to app-specific external storage or internal files dir without failing
      */
     fun getLogDirectory(context: Context): File {
-        val primaryDir = File(Environment.getExternalStorageDirectory(), LOG_FOLDER_NAME)
-        if (primaryDir.exists() || primaryDir.mkdirs()) {
-            return primaryDir
-        }
+        if (hasStoragePermission(context)) {
+            val primaryDir = File(Environment.getExternalStorageDirectory(), LOG_FOLDER_NAME)
+            if (primaryDir.exists() || primaryDir.mkdirs()) {
+                return primaryDir
+            }
 
-        val docsDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), LOG_FOLDER_NAME)
-        if (docsDir.exists() || docsDir.mkdirs()) {
-            return docsDir
+            val docsDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), LOG_FOLDER_NAME)
+            if (docsDir.exists() || docsDir.mkdirs()) {
+                return docsDir
+            }
         }
 
         val externalAppDir = context.getExternalFilesDir("Logs")
@@ -67,19 +85,6 @@ object AppLogger {
             internalDir.mkdirs()
         }
         return internalDir
-    }
-
-    /**
-     * Checks if storage permissions are granted.
-     */
-    fun hasStoragePermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            val read = context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            val write = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            read && write
-        }
     }
 
     /**
@@ -172,7 +177,7 @@ object AppLogger {
 
         val logDir = getLogDirectory(context)
         val logFile = File(logDir, "prostats_manual_log_$fileTimestamp.txt")
-        appendToFile(logFile, logBuilder.toString())
+        appendToFile(context, logFile, logBuilder.toString())
 
         Log.i(TAG, "Manual diagnostic log written: ${logFile.absolutePath}")
         return logFile.absolutePath
@@ -202,17 +207,27 @@ object AppLogger {
 
         val logDir = getLogDirectory(context)
         val crashFile = File(logDir, "prostats_crash_log.txt")
-        appendToFile(crashFile, crashReport)
+        appendToFile(context, crashFile, crashReport)
     }
 
-    private fun appendToFile(file: File, content: String) {
+    private fun appendToFile(context: Context, file: File, content: String) {
         try {
             file.parentFile?.mkdirs()
             FileWriter(file, true).use { writer ->
                 writer.write(content)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error writing to file: ${file.absolutePath}", e)
+            Log.e(TAG, "Error writing to file: ${file.absolutePath}, falling back to app-specific internal storage", e)
+            try {
+                val fallbackFile = File(context.getExternalFilesDir("Logs") ?: context.filesDir, file.name)
+                fallbackFile.parentFile?.mkdirs()
+                FileWriter(fallbackFile, true).use { writer ->
+                    writer.write(content)
+                }
+                Log.i(TAG, "Successfully wrote log to fallback: ${fallbackFile.absolutePath}")
+            } catch (fallbackEx: Exception) {
+                Log.e(TAG, "Failed fallback write", fallbackEx)
+            }
         }
     }
 }

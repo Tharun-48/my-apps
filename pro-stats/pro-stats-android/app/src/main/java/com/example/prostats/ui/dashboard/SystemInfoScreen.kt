@@ -142,8 +142,17 @@ fun SystemInfoScreen() {
                     if (gpu.openGlVersion.isNotBlank()) {
                         InfoRow("OpenGL ES", gpu.openGlVersion)
                     }
-                    if (gpu.maxFreqMhz > 0) InfoRow("Max Frequency", "${gpu.maxFreqMhz} MHz")
+                    if (gpu.loadPct >= 0) {
+                        InfoRow("GPU Utilization", "${gpu.loadPct}%")
+                    }
                     if (gpu.currentFreqMhz > 0) InfoRow("Current Frequency", "${gpu.currentFreqMhz} MHz")
+                    if (gpu.maxFreqMhz > 0) InfoRow("Max Frequency", "${gpu.maxFreqMhz} MHz")
+                    if (gpu.thermalHeadroom >= 0f) {
+                        val headroomPct = ((1.0f - gpu.thermalHeadroom.coerceIn(0f, 1f)) * 100).toInt()
+                        InfoRow("Thermal Headroom", "$headroomPct% remaining (${gpu.thermalStatus})")
+                    } else if (gpu.thermalStatus != "Normal") {
+                        InfoRow("Thermal State", gpu.thermalStatus)
+                    }
                 }
             }
         }
