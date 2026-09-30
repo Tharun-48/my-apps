@@ -4,8 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +15,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,8 +94,11 @@ fun SotDetailScreen(
         }
     }
 
-    // Active Screen On Time for the selected range or entire window
+    // Active Screen On Time for the selected range or entire window (debounced for fluid dragging)
     val activeWindowSotMs by produceState(initialValue = 0L, key1 = startTime, key2 = refreshTick, key3 = selectedRange) {
+        if (selectedRange != null) {
+            kotlinx.coroutines.delay(80)
+        }
         val now = System.currentTimeMillis()
         val qStart = selectedRange?.first ?: startTime
         val qEnd = selectedRange?.second ?: now
@@ -113,7 +119,7 @@ fun SotDetailScreen(
         points.isNotEmpty() || totalSotMs > 0L
     }
 
-    // App usage list (filtered dynamically by selected draggable timeframe)
+    // App usage list (debounced during dragging for 60-120fps fluid scrubber motion)
     val rawAppList by produceState(
         initialValue = emptyList<com.example.prostats.data.AppBatteryUsage>(),
         startTime,
@@ -124,6 +130,9 @@ fun SotDetailScreen(
         if (!hasData) {
             value = emptyList()
         } else {
+            if (selectedRange != null) {
+                kotlinx.coroutines.delay(120)
+            }
             val now = System.currentTimeMillis()
             val qStart = selectedRange?.first ?: startTime
             val qEnd = selectedRange?.second ?: now
@@ -395,7 +404,7 @@ fun SotDetailScreen(
                                                 Box(
                                                     modifier = Modifier
                                                         .size(8.dp)
-                                                        .background(Color(0xFF0091EA), CircleShape)
+                                                        .background(colors.accentBlue, CircleShape)
                                                 )
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text("Battery usage", fontSize = 11.sp, color = colors.textSecondary)
@@ -435,7 +444,7 @@ fun SotDetailScreen(
                                     ) {
                                         Text(
                                             text = "Showing drain from $startStr to $endStr",
-                                            color = Color(0xFF0091EA),
+                                            color = colors.accentBlue,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium
                                         )
@@ -805,7 +814,7 @@ fun SotDetailScreen(
                                 },
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (selectedRange != null) Color(0xFF0091EA) else colors.textSecondary,
+                                color = if (selectedRange != null) colors.accentBlue else colors.textSecondary,
                                 letterSpacing = 1.sp
                             )
                             Text(
@@ -817,7 +826,7 @@ fun SotDetailScreen(
                                     "Since charge"
                                 },
                                 fontSize = 11.sp,
-                                color = if (selectedRange != null) Color(0xFF0091EA) else colors.textTertiary
+                                color = if (selectedRange != null) colors.accentBlue else colors.textTertiary
                             )
                         }
                         Spacer(modifier = Modifier.height(10.dp))
@@ -827,12 +836,12 @@ fun SotDetailScreen(
                                 Box(
                                     modifier = Modifier
                                         .background(
-                                            if (active) Color(0xFF0091EA).copy(alpha = 0.18f) else colors.elevatedSurface,
+                                            if (active) colors.accentBlue.copy(alpha = 0.16f) else colors.elevatedSurface,
                                             RoundedCornerShape(10.dp)
                                         )
                                         .border(
                                             1.dp,
-                                            if (active) Color(0xFF0091EA).copy(alpha = 0.5f) else colors.borderColorSubtle,
+                                            if (active) colors.accentBlue.copy(alpha = 0.45f) else colors.borderColorSubtle,
                                             RoundedCornerShape(10.dp)
                                         )
                                         .clickable { appSort = key }
@@ -843,7 +852,7 @@ fun SotDetailScreen(
                                         text = label,
                                         fontSize = 11.sp,
                                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (active) Color(0xFF0091EA) else colors.textSecondary
+                                        color = if (active) colors.accentBlue else colors.textSecondary
                                     )
                                 }
                             }
@@ -904,105 +913,144 @@ fun BatteryGraph(
     val labelColor = if (colors.isDark) android.graphics.Color.GRAY else android.graphics.Color.DKGRAY
     val gridColor = if (colors.isDark) Color(0x12FFFFFF) else Color(0x10000000)
 
-    var activeDragTarget by remember { mutableStateOf(DragTarget.NONE) }
-    var dragInitialRange by remember { mutableStateOf<Pair<Long, Long>?>(null) }
-    var dragStartX by remember { mutableFloatStateOf(0f) }
+    val currentSelectedRange = rememberUpdatedState(selectedRange)
+    val onRangeSelectedUpdated = rememberUpdatedState(onRangeSelected)
+
+    // Local visual range for 120fps direct dragging with zero pointer lag
+    var visualRange by remember { mutableStateOf(selectedRange) }
+
+    LaunchedEffect(selectedRange) {
+        visualRange = selectedRange
+    }
+
+    val coroutineScope = rememberCoroutineScope()
+    var debounceSyncJob by remember { mutableStateOf<Job?>(null) }
+
+    // Harmonic design tokens: vibrant accent blue & accent purple
+    val primaryAccent = colors.accentBlue
+    val secondaryAccent = colors.accentPurple
 
     Canvas(
         modifier = modifier
-            .pointerInput(sortedPoints, selectedRange) {
-                detectTapGestures(
-                    onDoubleTap = {
-                        // Double tap reverts to normal state
-                        onRangeSelected(null)
-                    },
-                    onTap = { offset ->
-                        val width = size.width
-                        val xRatio = (offset.x / width).coerceIn(0f, 1f)
-                        val tappedTs = minTime + (xRatio * timeSpan).toLong()
-                        // Center a 2-hour slice around tap position
-                        val halfSpan = (timeSpan / 4L).coerceIn(30 * 60 * 1000L, 3 * 60 * 60 * 1000L)
-                        val s = (tappedTs - halfSpan).coerceAtLeast(minTime)
-                        val e = (tappedTs + halfSpan).coerceAtMost(maxTime)
-                        onRangeSelected(Pair(s, if (e > s) e else s + 60000L))
+            .pointerInput(sortedPoints, minTime, maxTime, timeSpan) {
+                var lastTapTime = 0L
+                var lastTapPos = Offset.Zero
+
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val downTime = System.currentTimeMillis()
+                    val width = size.width
+
+                    // Double-tap to reset: within 320ms and 36dp
+                    val isDoubleTap = (downTime - lastTapTime < 320L) && (down.position - lastTapPos).getDistance() < 36.dp.toPx()
+                    lastTapTime = downTime
+                    lastTapPos = down.position
+
+                    if (isDoubleTap) {
+                        visualRange = null
+                        onRangeSelectedUpdated.value(null)
+                        down.consume()
+                        return@awaitEachGesture
                     }
-                )
-            }
-            .pointerInput(sortedPoints, selectedRange) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val width = size.width
-                        dragStartX = offset.x
 
-                        if (selectedRange != null) {
-                            dragInitialRange = selectedRange
-                            val (sTs, eTs) = selectedRange
-                            val sX = ((sTs - minTime).toFloat() / timeSpan) * width
-                            val eX = ((eTs - minTime).toFloat() / timeSpan) * width
-                            val thresholdPx = 36.dp.toPx()
+                    val currentRange = visualRange ?: currentSelectedRange.value
+                    val (startX, endX) = if (currentRange != null) {
+                        val sX = ((currentRange.first - minTime).toFloat() / timeSpan).coerceIn(0f, 1f) * width
+                        val eX = ((currentRange.second - minTime).toFloat() / timeSpan).coerceIn(0f, 1f) * width
+                        Pair(sX, eX)
+                    } else {
+                        Pair(-1000f, -1000f)
+                    }
 
-                            activeDragTarget = when {
-                                kotlin.math.abs(offset.x - sX) <= thresholdPx -> DragTarget.START_HANDLE
-                                kotlin.math.abs(offset.x - eX) <= thresholdPx -> DragTarget.END_HANDLE
-                                offset.x in (sX..eX) -> DragTarget.MIDDLE_REGION
-                                else -> {
-                                    // Tap/drag outside: create new range
-                                    val tappedTs = minTime + ((offset.x / width).coerceIn(0f, 1f) * timeSpan).toLong()
-                                    val defaultSpan = (timeSpan / 3L).coerceIn(60 * 60 * 1000L, 3 * 60 * 60 * 1000L)
-                                    val newStart = tappedTs.coerceAtLeast(minTime)
-                                    val newEnd = (newStart + defaultSpan).coerceAtMost(maxTime)
-                                    val newRange = Pair(newStart, newEnd)
-                                    onRangeSelected(newRange)
-                                    dragInitialRange = newRange
-                                    DragTarget.END_HANDLE
+                    val hitTolerance = 36.dp.toPx()
+                    val distToStart = kotlin.math.abs(down.position.x - startX)
+                    val distToEnd = kotlin.math.abs(down.position.x - endX)
+
+                    val activeTarget: DragTarget
+                    val initialRange: Pair<Long, Long>
+
+                    if (currentRange == null) {
+                        // First tap creates an initial slice centered at the touch point
+                        val tappedTs = minTime + ((down.position.x / width).coerceIn(0f, 1f) * timeSpan).toLong()
+                        val defaultSpan = (timeSpan / 3L).coerceIn(45 * 60 * 1000L, 3 * 60 * 60 * 1000L)
+                        val s = (tappedTs - defaultSpan / 2).coerceAtLeast(minTime)
+                        val e = (s + defaultSpan).coerceAtMost(maxTime)
+                        initialRange = Pair(s, e)
+                        visualRange = initialRange
+                        activeTarget = DragTarget.END_HANDLE
+                    } else {
+                        initialRange = currentRange
+                        activeTarget = when {
+                            distToStart <= hitTolerance && distToEnd <= hitTolerance -> {
+                                if (down.position.x < (startX + endX) / 2f) DragTarget.START_HANDLE else DragTarget.END_HANDLE
+                            }
+                            distToStart <= hitTolerance -> DragTarget.START_HANDLE
+                            distToEnd <= hitTolerance -> DragTarget.END_HANDLE
+                            down.position.x in (startX..endX) -> DragTarget.MIDDLE_REGION
+                            else -> {
+                                if (distToStart < distToEnd) DragTarget.START_HANDLE else DragTarget.END_HANDLE
+                            }
+                        }
+                    }
+
+                    var activeRange = initialRange
+                    var lastX = down.position.x
+                    var hasMoved = false
+
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            change.consume()
+                            break
+                        }
+
+                        val curX = change.position.x
+                        val dx = curX - lastX
+
+                        if (kotlin.math.abs(dx) >= 0.5f) {
+                            hasMoved = true
+                            lastX = curX
+                            change.consume()
+
+                            val minWindowMs = 10 * 60 * 1000L
+                            val updatedRange = when (activeTarget) {
+                                DragTarget.START_HANDLE -> {
+                                    val newStart = (minTime + (curX / width).coerceIn(0f, 1f) * timeSpan).toLong()
+                                        .coerceIn(minTime, activeRange.second - minWindowMs)
+                                    Pair(newStart, activeRange.second)
                                 }
+                                DragTarget.END_HANDLE -> {
+                                    val newEnd = (minTime + (curX / width).coerceIn(0f, 1f) * timeSpan).toLong()
+                                        .coerceIn(activeRange.first + minWindowMs, maxTime)
+                                    Pair(activeRange.first, newEnd)
+                                }
+                                DragTarget.MIDDLE_REGION -> {
+                                    val dt = ((dx / width) * timeSpan).toLong()
+                                    val duration = activeRange.second - activeRange.first
+                                    val newStart = (activeRange.first + dt).coerceIn(minTime, maxTime - duration)
+                                    val newEnd = newStart + duration
+                                    Pair(newStart, newEnd)
+                                }
+                                DragTarget.NONE -> activeRange
                             }
-                        } else {
-                            // Initial drag when range is null: create a slice
-                            val tappedTs = minTime + ((offset.x / width).coerceIn(0f, 1f) * timeSpan).toLong()
-                            val defaultSpan = (timeSpan / 3L).coerceIn(60 * 60 * 1000L, 3 * 60 * 60 * 1000L)
-                            val newStart = (tappedTs - defaultSpan / 2).coerceAtLeast(minTime)
-                            val newEnd = (newStart + defaultSpan).coerceAtMost(maxTime)
-                            val newRange = Pair(newStart, newEnd)
-                            onRangeSelected(newRange)
-                            dragInitialRange = newRange
-                            activeDragTarget = DragTarget.END_HANDLE
-                        }
-                    },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        val width = size.width
-                        val initial = dragInitialRange ?: return@detectDragGestures
-                        val deltaX = change.position.x - dragStartX
-                        val deltaTs = ((deltaX / width) * timeSpan).toLong()
+                            activeRange = updatedRange
+                            visualRange = updatedRange
 
-                        when (activeDragTarget) {
-                            DragTarget.START_HANDLE -> {
-                                val newStart = (initial.first + deltaTs).coerceIn(minTime, initial.second - 15 * 60 * 1000L)
-                                onRangeSelected(Pair(newStart, initial.second))
+                            // Debounce sync so user pausing gives live app list update without dragging hitch
+                            debounceSyncJob?.cancel()
+                            debounceSyncJob = coroutineScope.launch {
+                                delay(160)
+                                onRangeSelectedUpdated.value(updatedRange)
                             }
-                            DragTarget.END_HANDLE -> {
-                                val newEnd = (initial.second + deltaTs).coerceIn(initial.first + 15 * 60 * 1000L, maxTime)
-                                onRangeSelected(Pair(initial.first, newEnd))
-                            }
-                            DragTarget.MIDDLE_REGION -> {
-                                val windowDuration = initial.second - initial.first
-                                val newStart = (initial.first + deltaTs).coerceIn(minTime, maxTime - windowDuration)
-                                val newEnd = newStart + windowDuration
-                                onRangeSelected(Pair(newStart, newEnd))
-                            }
-                            DragTarget.NONE -> {}
                         }
-                    },
-                    onDragEnd = {
-                        activeDragTarget = DragTarget.NONE
-                        dragInitialRange = null
-                    },
-                    onDragCancel = {
-                        activeDragTarget = DragTarget.NONE
-                        dragInitialRange = null
                     }
-                )
+
+                    debounceSyncJob?.cancel()
+                    if (hasMoved || currentRange == null) {
+                        onRangeSelectedUpdated.value(activeRange)
+                    }
+                }
             }
     ) {
         val width = size.width
@@ -1014,7 +1062,7 @@ fun BatteryGraph(
             textAlign = android.graphics.Paint.Align.RIGHT
         }
 
-        // 1. Draw horizontal grid lines & percentage labels (0%, 25%, 50%, 75%, 100%)
+        // Horizontal grid lines & percentage labels
         for (pct in listOf(0, 25, 50, 75, 100)) {
             val y = height * (1f - pct / 100f)
             drawLine(color = gridColor, start = Offset(0f, y), end = Offset(width, y), strokeWidth = 1.dp.toPx())
@@ -1028,12 +1076,12 @@ fun BatteryGraph(
         }
 
         if (coords.isNotEmpty()) {
-            val isFiltered = selectedRange != null
-            val (sTs, eTs) = selectedRange ?: Pair(minTime, maxTime)
+            val activeRange = visualRange
+            val isFiltered = activeRange != null
+            val (sTs, eTs) = activeRange ?: Pair(minTime, maxTime)
             val startX = ((sTs - minTime).toFloat() / timeSpan).coerceIn(0f, 1f) * width
             val endX = ((eTs - minTime).toFloat() / timeSpan).coerceIn(0f, 1f) * width
 
-            // Draw full base curve (dimmed if filtered, vibrant if normal)
             val baseLinePath = Path().apply {
                 moveTo(coords[0].x, coords[0].y)
                 for (i in 1 until coords.size) lineTo(coords[i].x, coords[i].y)
@@ -1050,26 +1098,22 @@ fun BatteryGraph(
                 drawPath(
                     path = fillPath,
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color(0xFF0091EA).copy(alpha = 0.22f), Color.Transparent)
+                        colors = listOf(primaryAccent.copy(alpha = 0.18f), secondaryAccent.copy(alpha = 0.04f), Color.Transparent)
                     )
                 )
                 drawPath(
                     path = baseLinePath,
-                    brush = Brush.horizontalGradient(colors = listOf(Color(0xFF0091EA), Color(0xFF10B981))),
+                    brush = Brush.horizontalGradient(colors = listOf(primaryAccent, secondaryAccent)),
                     style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
                 )
             } else {
-                // Dimmed background curve
+                // Dimmed inactive line
                 drawPath(
                     path = baseLinePath,
-                    color = if (colors.isDark) Color(0x35FFFFFF) else Color(0x25000000),
+                    color = if (colors.isDark) Color(0x30FFFFFF) else Color(0x22000000),
                     style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
                 )
 
-                // Highlighted slice between startX and endX
-                val sliceCoords = coords.filter { it.x in (startX..endX) }.toMutableList()
-
-                // Interpolate start and end edge points on the curve
                 fun getYAtX(targetX: Float): Float {
                     val p1 = coords.lastOrNull { it.x <= targetX } ?: coords.first()
                     val p2 = coords.firstOrNull { it.x >= targetX } ?: coords.last()
@@ -1081,6 +1125,7 @@ fun BatteryGraph(
                 val startY = getYAtX(startX)
                 val endY = getYAtX(endX)
 
+                val sliceCoords = coords.filter { it.x in (startX..endX) }
                 val fullSliceCoords = mutableListOf<Offset>()
                 fullSliceCoords.add(Offset(startX, startY))
                 sliceCoords.forEach { pt ->
@@ -1088,7 +1133,7 @@ fun BatteryGraph(
                 }
                 fullSliceCoords.add(Offset(endX, endY))
 
-                // Highlighted blue shaded area
+                // Translucent gradient shaded veil
                 val sliceFillPath = Path().apply {
                     moveTo(fullSliceCoords.first().x, fullSliceCoords.first().y)
                     for (i in 1 until fullSliceCoords.size) lineTo(fullSliceCoords[i].x, fullSliceCoords[i].y)
@@ -1099,77 +1144,97 @@ fun BatteryGraph(
                 drawPath(
                     path = sliceFillPath,
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color(0xFF0091EA).copy(alpha = 0.32f), Color(0xFF0091EA).copy(alpha = 0.06f))
+                        colors = listOf(primaryAccent.copy(alpha = 0.22f), secondaryAccent.copy(alpha = 0.06f), Color.Transparent)
                     )
                 )
 
-                // Vertical boundary lines
+                // Vertical boundary divider lines with gradient fade
                 drawLine(
-                    color = Color(0xFF0091EA).copy(alpha = 0.55f),
+                    brush = Brush.verticalGradient(listOf(primaryAccent.copy(alpha = 0.85f), primaryAccent.copy(alpha = 0.15f))),
                     start = Offset(startX, 0f),
                     end = Offset(startX, height),
                     strokeWidth = 1.5.dp.toPx()
                 )
                 drawLine(
-                    color = Color(0xFF0091EA).copy(alpha = 0.55f),
+                    brush = Brush.verticalGradient(listOf(secondaryAccent.copy(alpha = 0.85f), secondaryAccent.copy(alpha = 0.15f))),
                     start = Offset(endX, 0f),
                     end = Offset(endX, height),
                     strokeWidth = 1.5.dp.toPx()
                 )
 
-                // Highlighted blue curve segment
+                // Vibrant highlighted curve segment
                 val sliceLinePath = Path().apply {
                     moveTo(fullSliceCoords.first().x, fullSliceCoords.first().y)
                     for (i in 1 until fullSliceCoords.size) lineTo(fullSliceCoords[i].x, fullSliceCoords[i].y)
                 }
                 drawPath(
                     path = sliceLinePath,
-                    color = Color(0xFF0091EA),
+                    brush = Brush.horizontalGradient(listOf(primaryAccent, secondaryAccent)),
                     style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                 )
 
-                // Draggable start handle (Outer blue ring, dark center)
+                // Start Handle (glow, solid disc, inner core)
                 drawCircle(
-                    color = Color(0xFF0091EA),
-                    radius = 7.5.dp.toPx(),
+                    color = primaryAccent.copy(alpha = 0.22f),
+                    radius = 11.dp.toPx(),
                     center = Offset(startX, startY)
                 )
                 drawCircle(
-                    color = if (colors.isDark) Color(0xFF181820) else Color.White,
-                    radius = 3.2.dp.toPx(),
+                    color = primaryAccent,
+                    radius = 6.5.dp.toPx(),
+                    center = Offset(startX, startY)
+                )
+                drawCircle(
+                    color = if (colors.isDark) Color(0xFF16181D) else Color.White,
+                    radius = 2.5.dp.toPx(),
                     center = Offset(startX, startY)
                 )
 
-                // Draggable end handle (Outer blue ring, dark center)
+                // End Handle (glow, solid disc, inner core)
                 drawCircle(
-                    color = Color(0xFF0091EA),
-                    radius = 7.5.dp.toPx(),
+                    color = secondaryAccent.copy(alpha = 0.22f),
+                    radius = 11.dp.toPx(),
                     center = Offset(endX, endY)
                 )
                 drawCircle(
-                    color = if (colors.isDark) Color(0xFF181820) else Color.White,
-                    radius = 3.2.dp.toPx(),
+                    color = secondaryAccent,
+                    radius = 6.5.dp.toPx(),
+                    center = Offset(endX, endY)
+                )
+                drawCircle(
+                    color = if (colors.isDark) Color(0xFF16181D) else Color.White,
+                    radius = 2.5.dp.toPx(),
                     center = Offset(endX, endY)
                 )
 
-                // Floating Blue Pill Badge at Top (HH:mm-HH:mm)
+                // Floating Pill Badge
                 val sText = labelFormat.format(Date(sTs))
                 val eText = labelFormat.format(Date(eTs))
-                val pillText = "$sText-$eText"
+                val durationMs = (eTs - sTs).coerceAtLeast(0L)
+                val durMins = durationMs / 60000L
+                val durHrs = durMins / 60
+                val durRem = durMins % 60
+                val durText = if (durHrs > 0) "${durHrs}h ${durRem}m" else "${durRem}m"
+                val pillText = "$sText – $eText • $durText"
 
                 val pillPaint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.WHITE
-                    textSize = 11.dp.toPx()
+                    color = if (colors.isDark) android.graphics.Color.WHITE else android.graphics.Color.parseColor("#0F172A")
+                    textSize = 10.dp.toPx()
                     isFakeBoldText = true
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
                 val pillBgPaint = android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#0091EA")
+                    color = if (colors.isDark) android.graphics.Color.parseColor("#1E212B") else android.graphics.Color.parseColor("#FFFFFF")
                     style = android.graphics.Paint.Style.FILL
                 }
+                val pillStrokePaint = android.graphics.Paint().apply {
+                    color = if (colors.isDark) android.graphics.Color.parseColor("#384152") else android.graphics.Color.parseColor("#E2E8F0")
+                    style = android.graphics.Paint.Style.STROKE
+                    strokeWidth = 1.dp.toPx()
+                }
 
-                val pillWidth = 96.dp.toPx()
-                val pillHeight = 26.dp.toPx()
+                val pillWidth = 112.dp.toPx()
+                val pillHeight = 22.dp.toPx()
                 val pillCenterX = ((startX + endX) / 2f).coerceIn(pillWidth / 2f + 4.dp.toPx(), width - pillWidth / 2f - 4.dp.toPx())
                 val pillCenterY = 14.dp.toPx()
                 val pillRect = android.graphics.RectF(
@@ -1179,7 +1244,8 @@ fun BatteryGraph(
                     pillCenterY + pillHeight / 2f
                 )
                 drawContext.canvas.nativeCanvas.drawRoundRect(pillRect, 8.dp.toPx(), 8.dp.toPx(), pillBgPaint)
-                drawContext.canvas.nativeCanvas.drawText(pillText, pillCenterX, pillCenterY + 4.dp.toPx(), pillPaint)
+                drawContext.canvas.nativeCanvas.drawRoundRect(pillRect, 8.dp.toPx(), 8.dp.toPx(), pillStrokePaint)
+                drawContext.canvas.nativeCanvas.drawText(pillText, pillCenterX, pillCenterY + 3.5.dp.toPx(), pillPaint)
             }
         }
 
