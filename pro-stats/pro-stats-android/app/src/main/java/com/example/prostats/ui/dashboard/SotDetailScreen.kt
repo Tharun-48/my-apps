@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +25,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +52,9 @@ fun SotDetailScreen(
     var lastUnplugTs by remember { mutableLongStateOf(BatteryTracker.getLastUnplugFromFullTimestamp(context)) }
     var refreshTick by remember { mutableIntStateOf(0) }
 
+    // Interactive timeline scrubber state (Task 3)
+    var selectedTimeMs by remember { mutableStateOf<Long?>(null) }
+
     // Periodic refresh loop every 15s for live metrics
     LaunchedEffect(Unit) {
         while (true) {
@@ -66,14 +72,13 @@ fun SotDetailScreen(
     // Sort state for app list
     var appSort by remember { mutableStateOf("Time") } // Time | Battery | Name
 
-    // Time range toggle state
-    var timeRange by remember { mutableStateOf("Since Charge") } // "Since Charge", "24h", or "7d"
+    // Time range toggle state (Since Charge or 24h)
+    var timeRange by remember { mutableStateOf("Since Charge") }
 
     val startTime = remember(lastUnplugTs, timeRange, refreshTick) {
         val now = System.currentTimeMillis()
         when (timeRange) {
             "Since Charge" -> lastUnplugTs
-            "7d" -> now - 7 * 24 * 60 * 60 * 1000L
             else -> now - 24 * 60 * 60 * 1000L
         }
     }
@@ -82,7 +87,6 @@ fun SotDetailScreen(
     val points = remember(startTime, refreshTick, timeRange) {
         when (timeRange) {
             "Since Charge" -> BatteryTracker.getHistorySinceLastCharge(context)
-            "7d" -> BatteryTracker.getHistory7d(context)
             else -> BatteryTracker.getHistory24h(context)
         }
     }
@@ -100,14 +104,27 @@ fun SotDetailScreen(
         points.isNotEmpty() || totalSotMs > 0L
     }
 
-    // App usage list
-    val rawAppList by produceState(initialValue = emptyList<com.example.prostats.data.AppBatteryUsage>(), key1 = startTime, key2 = refreshTick, key3 = hasData) {
+    // App usage list (filtered by interactive scrubbed time if active)
+    val rawAppList by produceState(
+        initialValue = emptyList<com.example.prostats.data.AppBatteryUsage>(),
+        startTime,
+        refreshTick,
+        hasData,
+        selectedTimeMs
+    ) {
         if (!hasData) {
             value = emptyList()
         } else {
             val now = System.currentTimeMillis()
+            val (qStart, qEnd) = if (selectedTimeMs != null) {
+                val s = (selectedTimeMs!! - 30 * 60 * 1000L).coerceAtLeast(startTime)
+                val e = (selectedTimeMs!! + 30 * 60 * 1000L).coerceAtMost(now)
+                Pair(s, if (e > s) e else s + 60000L)
+            } else {
+                Pair(startTime, now)
+            }
             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                systemMonitor.getAppBatteryUsageList(startTime, now)
+                systemMonitor.getAppBatteryUsageList(qStart, qEnd)
             }
         }
     }
@@ -270,13 +287,13 @@ fun SotDetailScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "BATTERY LEVEL TREND",
+                                        text = "BATTERY USAGE STATS",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = colors.textSecondary,
                                         letterSpacing = 1.sp
                                     )
-                                    // Time range segmented pill
+                                    // Time range segmented pill (Since Charge / 24h)
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         modifier = Modifier
@@ -284,7 +301,7 @@ fun SotDetailScreen(
                                             .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(12.dp))
                                             .padding(3.dp)
                                     ) {
-                                        listOf("Since Charge", "24h", "7d").forEach { range ->
+                                        listOf("Since Charge", "24h").forEach { range ->
                                             val active = timeRange == range
                                             Box(
                                                 modifier = Modifier
@@ -297,8 +314,11 @@ fun SotDetailScreen(
                                                         color = if (active) colors.accentPurple.copy(alpha = 0.5f) else Color.Transparent,
                                                         shape = RoundedCornerShape(8.dp)
                                                     )
-                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                                                    .clickable { timeRange = range },
+                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                                                    .clickable {
+                                                        timeRange = range
+                                                        selectedTimeMs = null
+                                                    },
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
@@ -327,6 +347,7 @@ fun SotDetailScreen(
                                             val now = System.currentTimeMillis()
                                             BatteryTracker.updateLastUnplugFromFullTimestamp(context, now)
                                             lastUnplugTs = now
+                                            selectedTimeMs = null
                                         }
                                     ) {
                                         Text("Reset Cycle", fontSize = 11.sp, color = colors.accentPurple, fontWeight = FontWeight.Bold)
@@ -336,10 +357,79 @@ fun SotDetailScreen(
                                 Spacer(modifier = Modifier.height(14.dp))
                                 BatteryGraph(
                                     points = points,
+                                    selectedTimestamp = selectedTimeMs,
+                                    onTimestampSelected = { selectedTimeMs = it },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(190.dp)
                                 )
+
+                                // Interactive Timeline Slider (Task 3)
+                                if (points.size >= 2) {
+                                    val sortedPts = remember(points) { points.sortedBy { it.timestamp } }
+                                    val minT = sortedPts.first().timestamp.toFloat()
+                                    val maxT = sortedPts.last().timestamp.toFloat()
+                                    val currentSliderVal = (selectedTimeMs ?: maxT.toLong()).toFloat().coerceIn(minT, maxT)
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(minT.toLong())),
+                                            fontSize = 10.sp,
+                                            color = colors.textTertiary
+                                        )
+                                        Slider(
+                                            value = currentSliderVal,
+                                            onValueChange = { selectedTimeMs = it.toLong() },
+                                            valueRange = minT..maxT,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .padding(horizontal = 6.dp),
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = colors.accentGreen,
+                                                activeTrackColor = colors.accentGreen,
+                                                inactiveTrackColor = colors.elevatedSurface
+                                            )
+                                        )
+                                        Text(
+                                            text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(maxT.toLong())),
+                                            fontSize = 10.sp,
+                                            color = colors.textTertiary
+                                        )
+                                    }
+
+                                    if (selectedTimeMs != null) {
+                                        val selectedDateStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(selectedTimeMs!!))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(colors.accentGreen.copy(alpha = 0.16f), RoundedCornerShape(8.dp))
+                                                    .border(1.dp, colors.accentGreen.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Filtered to ~$selectedDateStr (±30m)",
+                                                    color = colors.accentGreen,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            TextButton(
+                                                onClick = { selectedTimeMs = null },
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("Reset (Show All)", color = colors.accentOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -351,12 +441,10 @@ fun SotDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             val sotSubtitle = when (timeRange) {
-                                "7d" -> "Last 7 days active"
                                 "24h" -> "Last 24 hours active"
                                 else -> "Since disconnected"
                             }
                             val screenOffSubtitle = when (timeRange) {
-                                "7d" -> "Last 7 days idle"
                                 "24h" -> "Last 24 hours idle"
                                 else -> "Background standby"
                             }
@@ -685,20 +773,27 @@ fun SotDetailScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "APP BATTERY DRAIN",
+                                text = if (selectedTimeMs != null) {
+                                    val formattedTime = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(selectedTimeMs!!))
+                                    "APP DRAIN AT $formattedTime"
+                                } else {
+                                    "APP BATTERY DRAIN"
+                                },
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = colors.textSecondary,
+                                color = if (selectedTimeMs != null) colors.accentGreen else colors.textSecondary,
                                 letterSpacing = 1.sp
                             )
                             Text(
-                                text = when (timeRange) {
-                                    "7d" -> "Last 7 days"
-                                    "24h" -> "Last 24 hours"
-                                    else -> "Since charge"
+                                text = if (selectedTimeMs != null) {
+                                    "Selected 1h window"
+                                } else if (timeRange == "24h") {
+                                    "Last 24 hours"
+                                } else {
+                                    "Since charge"
                                 },
                                 fontSize = 11.sp,
-                                color = colors.textTertiary
+                                color = if (selectedTimeMs != null) colors.accentGreen else colors.textTertiary
                             )
                         }
                         Spacer(modifier = Modifier.height(10.dp))
@@ -739,7 +834,11 @@ fun SotDetailScreen(
                                     .height(100.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("No application usage captured in this interval", color = colors.textSecondary, fontSize = 13.sp)
+                                Text(
+                                    text = if (selectedTimeMs != null) "No app activity recorded around selected time" else "No application usage captured in this interval",
+                                    color = colors.textSecondary,
+                                    fontSize = 13.sp
+                                )
                             }
                         }
                     } else {
@@ -756,6 +855,8 @@ fun SotDetailScreen(
 @Composable
 fun BatteryGraph(
     points: List<HistoryPoint>,
+    selectedTimestamp: Long?,
+    onTimestampSelected: (Long?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = ProStatsColors.current
@@ -775,7 +876,36 @@ fun BatteryGraph(
     val labelColor = if (colors.isDark) android.graphics.Color.GRAY else android.graphics.Color.DKGRAY
     val gridColor = if (colors.isDark) Color(0x12FFFFFF) else Color(0x10000000)
 
-    Canvas(modifier = modifier) {
+    Canvas(
+        modifier = modifier
+            .pointerInput(sortedPoints) {
+                detectTapGestures(
+                    onTap = { offset ->
+                        val width = size.width
+                        val xRatio = (offset.x / width).coerceIn(0f, 1f)
+                        val targetTs = minTime + (xRatio * timeSpan).toLong()
+                        onTimestampSelected(targetTs)
+                    }
+                )
+            }
+            .pointerInput(sortedPoints) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val width = size.width
+                        val xRatio = (offset.x / width).coerceIn(0f, 1f)
+                        val targetTs = minTime + (xRatio * timeSpan).toLong()
+                        onTimestampSelected(targetTs)
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val width = size.width
+                        val xRatio = (change.position.x / width).coerceIn(0f, 1f)
+                        val targetTs = minTime + (xRatio * timeSpan).toLong()
+                        onTimestampSelected(targetTs)
+                    }
+                )
+            }
+    ) {
         val width = size.width
         val height = size.height - 22.dp.toPx()
 
@@ -824,18 +954,76 @@ fun BatteryGraph(
             )
         }
 
+        // Render interactive scrubber vertical line & cursor badge (Task 3)
+        if (selectedTimestamp != null && selectedTimestamp in minTime..maxTime) {
+            val scrubRatio = ((selectedTimestamp - minTime).toFloat() / timeSpan).coerceIn(0f, 1f)
+            val scrubX = scrubRatio * width
+
+            // Find closest battery point level
+            val closestPoint = sortedPoints.minByOrNull { kotlin.math.abs(it.timestamp - selectedTimestamp) }
+            val levelAtScrub = closestPoint?.batteryLevel ?: 0
+            val yAtScrub = height * (1f - (levelAtScrub / 100f).coerceIn(0f, 1f))
+
+            // Vertical parallel scrubber line
+            drawLine(
+                brush = Brush.verticalGradient(
+                    colors = listOf(colors.accentGreen, colors.accentPurple, Color.Transparent)
+                ),
+                start = Offset(scrubX, 0f),
+                end = Offset(scrubX, height),
+                strokeWidth = 2.dp.toPx()
+            )
+
+            // Scrubber point indicator ring on the curve
+            drawCircle(
+                color = colors.accentGreen,
+                radius = 5.dp.toPx(),
+                center = Offset(scrubX, yAtScrub)
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 2.5.dp.toPx(),
+                center = Offset(scrubX, yAtScrub)
+            )
+
+            // Floating time & battery pill above the scrubber
+            val timeText = labelFormat.format(Date(selectedTimestamp))
+            val badgeText = "$timeText • $levelAtScrub%"
+            val badgePaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.WHITE
+                textSize = 10.dp.toPx()
+                isFakeBoldText = true
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            val bgPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.parseColor("#1E1E2E")
+                style = android.graphics.Paint.Style.FILL
+            }
+            val borderPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.parseColor("#10B981")
+                style = android.graphics.Paint.Style.STROKE
+                strokeWidth = 1.5.dp.toPx()
+            }
+            val badgeWidth = 84.dp.toPx()
+            val badgeHeight = 22.dp.toPx()
+            val badgeX = scrubX.coerceIn(badgeWidth / 2f + 4.dp.toPx(), width - badgeWidth / 2f - 4.dp.toPx())
+            val badgeY = 12.dp.toPx()
+            val rect = android.graphics.RectF(badgeX - badgeWidth / 2f, badgeY - 10.dp.toPx(), badgeX + badgeWidth / 2f, badgeY + 10.dp.toPx())
+            drawContext.canvas.nativeCanvas.drawRoundRect(rect, 8.dp.toPx(), 8.dp.toPx(), bgPaint)
+            drawContext.canvas.nativeCanvas.drawRoundRect(rect, 8.dp.toPx(), 8.dp.toPx(), borderPaint)
+            drawContext.canvas.nativeCanvas.drawText(badgeText, badgeX, badgeY + 3.5.dp.toPx(), badgePaint)
+        }
+
         val xLabelPaint = android.graphics.Paint().apply {
             color = labelColor
             textSize = 9.dp.toPx()
             textAlign = android.graphics.Paint.Align.CENTER
         }
         val step = timeSpan / 4
-        val isMultiDay = timeSpan > 24 * 60 * 60 * 1000L
-        val dynamicFormat = if (isMultiDay) SimpleDateFormat("dd/MM", Locale.getDefault()) else labelFormat
         for (i in 0..4) {
             val targetTime = minTime + i * step
             val x = (i / 4f) * width
-            val dateStr = dynamicFormat.format(Date(targetTime))
+            val dateStr = labelFormat.format(Date(targetTime))
             drawContext.canvas.nativeCanvas.drawText(
                 dateStr,
                 x.coerceIn(24.dp.toPx(), width - 24.dp.toPx()),

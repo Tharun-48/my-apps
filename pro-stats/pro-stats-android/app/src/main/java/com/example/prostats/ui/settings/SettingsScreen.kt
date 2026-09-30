@@ -28,7 +28,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.prostats.data.AppLogger
 import com.example.prostats.data.BatteryTracker
 import com.example.prostats.data.SystemMonitor
 import com.example.prostats.service.OverlayService
@@ -97,7 +96,7 @@ fun SettingsScreen(
                     val response = reader.readText()
                     val jsonArray = org.json.JSONArray(response)
                     var maxVersionStr = com.example.prostats.BuildConfig.VERSION_NAME
-                    var maxVersionNum = com.example.prostats.BuildConfig.VERSION_NAME.toFloatOrNull() ?: 2.3f
+                    var maxVersionNum = com.example.prostats.BuildConfig.VERSION_NAME.toFloatOrNull() ?: 2.5f
                     for (i in 0 until jsonArray.length()) {
                         val obj = jsonArray.getJSONObject(i)
                         val name = obj.getString("name")
@@ -110,7 +109,7 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    if (maxVersionNum > (com.example.prostats.BuildConfig.VERSION_NAME.toFloatOrNull() ?: 2.3f)) {
+                    if (maxVersionNum > (com.example.prostats.BuildConfig.VERSION_NAME.toFloatOrNull() ?: 2.5f)) {
                         latestVersion = maxVersionStr
                         updateAvailable = true
                     }
@@ -856,111 +855,6 @@ fun SettingsScreen(
                             updateOverlayService()
                         }
                     )
-                }
-            }
-
-            // Error Logging & Storage Card
-            var hasStoragePermission by remember { mutableStateOf(AppLogger.hasStoragePermission(context)) }
-            var testLogStatus by remember { mutableStateOf<String?>(null) }
-            val logDir = AppLogger.getLogDirectory(context)
-
-            Card(
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(colors.accentBlue.copy(alpha = 0.15f), CircleShape)
-                                .border(1.dp, colors.accentBlue.copy(alpha = 0.3f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Build,
-                                contentDescription = null,
-                                tint = colors.accentBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Log & Error Diagnostics", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Crash dumps and diagnostic traces are logged outside the Android sandbox directory for easy inspection.",
-                        color = colors.textSecondary,
-                        fontSize = 12.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(colors.elevatedSurface, RoundedCornerShape(12.dp))
-                            .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(12.dp))
-                            .padding(12.dp)
-                    ) {
-                        Column {
-                            Text("Storage Location", color = colors.accentBlue, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = logDir.absolutePath,
-                                color = colors.textPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (!hasStoragePermission) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(colors.accentOrange.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-                                .border(1.dp, colors.accentOrange.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                .padding(12.dp)
-                        ) {
-                            Column {
-                                Text("Storage Access Recommended", color = colors.accentOrange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Allow storage access to write log files directly to internal storage.", color = colors.textPrimary, fontSize = 12.sp)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Button(
-                                    onClick = { AppLogger.requestStoragePermission(context) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentOrange, contentColor = Color.Black),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text("Grant Storage Access", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-
-                    Button(
-                        onClick = {
-                            val path = AppLogger.generateManualDiagnosticLog(context)
-                            testLogStatus = "Manual diagnostic log saved to ${java.io.File(path).name}"
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.elevatedSurface, contentColor = colors.textPrimary),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Generate Diagnostic Log (Manual)", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    }
-
-                    if (testLogStatus != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(testLogStatus!!, color = colors.accentGreen, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    }
                 }
             }
 

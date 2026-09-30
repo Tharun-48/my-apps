@@ -35,3 +35,24 @@
 
 ## AI Model & Token Efficiency Rules
 - **Token Efficiency**: Keep prompts concise. Do not re-send large file contents if a diff suffices. Prefer targeted edits over full-file rewrites.
+
+## Production-Grade Engineering Skills (Addy Osmani)
+- **Agent Skills Framework**: Follow the SDLC quality gates and principles established in `addyosmani/agent-skills`:
+  - **Define & Plan**: Spec requirements before writing code; break tasks down into atomic, testable increments.
+  - **Build & Verify**: Implement changes with concrete verification gates (code compilation, test evidence, lint checks) rather than unverified assumptions.
+  - **Review & Simplify**: Ensure clean, maintainable, anti-rationalized code health and performance optimization.
+
+# UI & Design System Rules
+
+## Layout & Hierarchy
+- Use a strict spacing scale (4px/0.25rem increments). Never use arbitrary padding/margin (e.g., `padding: 13px`).
+- Avoid uniform card grids for everything. Design layout based on information priority and visual scanning patterns.
+- Keep border radius consistent according to element hierarchy (e.g., buttons vs. full modal surfaces). Avoid `rounded-2xl` on small components.
+
+## Color & Contrast
+- Use semantic design tokens (`bg-surface`, `text-primary`, `border-subtle`). Do not hardcode hex values directly in components.
+- Ensure all text meets WCAG 2.1 AA minimum contrast ratios (4.5:1 for normal text).
+
+## Interactivity & Components
+- Ensure every interactive element has visible hover, focus-visible, and active states.
+- Always include `aria-label` or visible text for icon-only buttons.

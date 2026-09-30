@@ -17,7 +17,8 @@ build/
 # Ensure release APKs are explicitly tracked
 !pro-stats/releases/*.apk
 
-# Local secrets
+# Local secrets & private agent logs
+CHANGELOG.md
 .env
 .env.local
 .env.*.local

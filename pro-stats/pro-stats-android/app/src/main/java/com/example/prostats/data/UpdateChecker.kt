@@ -74,7 +74,7 @@ object UpdateChecker {
 
     /**
      * Check GitHub repository for newer compiled APK releases.
-     * Compares remote APK version (e.g. ProStats-v2.3.apk) with local BuildConfig.VERSION_NAME (e.g. 2.3).
+     * Compares remote APK version (e.g. ProStats-v2.5.apk) with local BuildConfig.VERSION_NAME (e.g. 2.5).
      */
     suspend fun checkForUpdates(context: Context, notifyUserIfAvailable: Boolean = false): UpdateInfo = withContext(Dispatchers.IO) {
         val currentVersionStr = BuildConfig.VERSION_NAME

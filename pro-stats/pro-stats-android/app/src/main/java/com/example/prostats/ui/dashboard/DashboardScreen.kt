@@ -273,7 +273,7 @@ fun DashboardContent(
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "v2.3",
+                                text = "v${com.example.prostats.BuildConfig.VERSION_NAME}",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.accentGreen

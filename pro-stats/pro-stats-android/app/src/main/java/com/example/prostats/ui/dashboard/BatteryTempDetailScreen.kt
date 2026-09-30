@@ -53,24 +53,27 @@ fun BatteryTempDetailScreen(
     var cpuTemp by remember { mutableStateOf(systemMonitor.getCpuTemperature()) }
     var thermalStatus by remember { mutableStateOf(systemMonitor.getThermalStatus()) }
 
-    // Refresh loop every 5 seconds for live thermal updates & history fetch
+    // Refresh loop every 2 seconds for live thermal updates & history fetch
     LaunchedEffect(timeRange) {
         while (true) {
-            withContext(Dispatchers.IO) {
-                currentTemp = systemMonitor.getBatteryTemperature()
-                cpuTemp = systemMonitor.getCpuTemperature()
-                thermalStatus = systemMonitor.getThermalStatus()
-
-                val raw = BatteryTracker.getRawHistory(context)
-                val now = System.currentTimeMillis()
-                val cutoff = if (timeRange == "Today") {
-                    now - 24 * 60 * 60 * 1000L
-                } else {
-                    now - 7 * 24 * 60 * 60 * 1000L
-                }
-                historyPoints = raw.filter { it.timestamp >= cutoff && it.batteryTemp > 0f }
+            val bTemp = withContext(Dispatchers.IO) { systemMonitor.getBatteryTemperature() }
+            val cTemp = withContext(Dispatchers.IO) { systemMonitor.getCpuTemperature() }
+            val tStatus = withContext(Dispatchers.IO) { systemMonitor.getThermalStatus() }
+            val raw = withContext(Dispatchers.IO) { BatteryTracker.getRawHistory(context) }
+            val now = System.currentTimeMillis()
+            val cutoff = if (timeRange == "Today") {
+                now - 24 * 60 * 60 * 1000L
+            } else {
+                now - 7 * 24 * 60 * 60 * 1000L
             }
-            delay(5000)
+            val filtered = raw.filter { it.timestamp >= cutoff && it.batteryTemp > 0f }
+
+            currentTemp = bTemp
+            cpuTemp = cTemp
+            thermalStatus = tStatus
+            historyPoints = filtered
+
+            delay(2000)
         }
     }
 

@@ -330,11 +330,68 @@ class SystemMonitor(private val context: Context) {
         }
     }
 
+    @Volatile
+    private var liveBatteryTempC: Float = 0f
+
+    init {
+        try {
+            val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            val receiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: Intent?) {
+                    val rawTemp = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
+                    if (rawTemp > 0) {
+                        liveBatteryTempC = rawTemp / 10.0f
+                    }
+                }
+            }
+            context.registerReceiver(receiver, filter)
+        } catch (e: Exception) {
+            Log.e("SystemMonitor", "Failed to register live battery listener", e)
+        }
+    }
+
     fun getBatteryTemperature(): Float {
+        // Priority 1: Direct kernel sysfs / power_supply hardware nodes (millisecond live sensor)
+        val directBatterySysfsPaths = listOf(
+            "/sys/class/power_supply/battery/temp",
+            "/sys/class/power_supply/battery/batt_temp",
+            "/sys/class/power_supply/bms/temp",
+            "/sys/class/power_supply/battery/temperature",
+            "/sys/class/power_supply/battery/device/temp"
+        )
+        for (path in directBatterySysfsPaths) {
+            try {
+                val f = File(path)
+                if (f.exists() && f.canRead()) {
+                    val raw = f.readText().trim().toFloatOrNull()
+                    if (raw != null && raw > 0f) {
+                        val norm = when {
+                            raw > 1000f -> raw / 1000f
+                            raw > 100f -> raw / 10f
+                            else -> raw
+                        }
+                        if (norm in 5f..85f) return norm
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+
+        // Priority 2: Real-time broadcast receiver cache
+        if (liveBatteryTempC in 5f..85f) {
+            return liveBatteryTempC
+        }
+
+        // Priority 3: Sticky ACTION_BATTERY_CHANGED broadcast
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        val batteryStatus = context.registerReceiver(null, filter)
+        val batteryStatus = try { context.registerReceiver(null, filter) } catch (e: Exception) { null }
         val temp = batteryStatus?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
-        return temp / 10.0f
+        if (temp > 0) {
+            val t = temp / 10.0f
+            liveBatteryTempC = t
+            return t
+        }
+
+        return if (liveBatteryTempC > 0f) liveBatteryTempC else 28.0f
     }
 
     fun getCpuTemperature(): Float {
