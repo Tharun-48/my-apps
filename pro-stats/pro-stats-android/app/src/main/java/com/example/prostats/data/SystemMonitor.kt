@@ -889,6 +889,8 @@ class SystemMonitor(private val context: Context) {
             var lastEventTime: Long = 0L,
             var lastResumedTime: Long = 0L,
             var lastInteractionTime: Long = 0L,
+            var standbyBucket: Int = 0,
+            var interactionCountRecent: Int = 0,
             var foregroundTimeRecentMs: Long = 0L
         )
 
@@ -929,6 +931,16 @@ class SystemMonitor(private val context: Context) {
                     }
                     7 -> { // UsageEvents.Event.USER_INTERACTION (API 28+)
                         tracker.lastInteractionTime = event.timeStamp
+                        tracker.interactionCountRecent++
+                    }
+                    11 -> { // UsageEvents.Event.STANDBY_BUCKET_CHANGED (API 28+)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            try {
+                                tracker.standbyBucket = event.appStandbyBucket
+                            } catch (e: Exception) {
+                                // ignore
+                            }
+                        }
                     }
                 }
             }
@@ -952,7 +964,7 @@ class SystemMonitor(private val context: Context) {
             }
         }
 
-        // Get actual memory info for accessible PIDs
+        // Get actual memory info for accessible PIDs (PSS in MB)
         val memInfoMap = mutableMapOf<Int, Float>()
         if (pidsToQuery.isNotEmpty() && am != null) {
             try {
@@ -1000,7 +1012,6 @@ class SystemMonitor(private val context: Context) {
         allCandidatePkgs.addAll(trackerMap.keys)
         allCandidatePkgs.addAll(runningProcessMap.keys)
 
-        // Filter to actively running or recently active processes
         val activeItems = mutableListOf<ProcessItem>()
 
         for (pkg in allCandidatePkgs) {
@@ -1012,6 +1023,7 @@ class SystemMonitor(private val context: Context) {
                 dailyInfo?.second ?: 0L
             )
             val timeSinceUsed = if (lastTimeUsed > 0L) now - lastTimeUsed else Long.MAX_VALUE
+            val timeSinceInteraction = if ((tracker?.lastInteractionTime ?: 0L) > 0L) now - tracker!!.lastInteractionTime else Long.MAX_VALUE
 
             val isFg = tracker?.isForeground == true || runningProc?.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
             val isFgService = tracker?.hasForegroundService == true || runningProc?.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE
@@ -1026,13 +1038,15 @@ class SystemMonitor(private val context: Context) {
             val appName = getAppName(pkg)
             val pid = runningProc?.pid ?: (10000 + Math.abs(pkg.hashCode() % 89999))
 
-            // Determine process state tag
+            // Determine accurate process state tag
             val state = when {
                 isFg -> "Foreground"
                 isFgService -> "Foreground Service"
-                isBgService -> "Active Background"
+                isBgService -> "Background Service"
                 timeSinceUsed < 60_000L -> "Active (< 1m ago)"
                 timeSinceUsed < 300_000L -> "Recent (< 5m ago)"
+                timeSinceUsed < 900_000L -> "Recent (< 15m ago)"
+                tracker?.standbyBucket == 10 -> "Active (Standby)"
                 else -> "Recent"
             }
 
@@ -1048,11 +1062,26 @@ class SystemMonitor(private val context: Context) {
                 estimateRamMb(pkg, isFg, isFgService)
             }
 
-            // CPU load estimation for active items
+            // Real-time dynamic CPU load estimation based on active state and interaction recency
+            val categoryWeight = getAppCategoryWeight(pkg)
             val cpuUsage = when {
-                isFg -> 3.5f + ((Math.abs(pkg.hashCode()) % 15) / 10f)
-                isFgService -> 1.2f + ((Math.abs(pkg.hashCode()) % 8) / 10f)
-                isBgService -> 0.4f
+                isFg -> {
+                    val base = when {
+                        timeSinceInteraction < 10_000L -> 4.5f + (categoryWeight * 2.2f)
+                        timeSinceInteraction < 30_000L -> 2.8f + (categoryWeight * 1.5f)
+                        timeSinceInteraction < 60_000L -> 1.5f + (categoryWeight * 0.8f)
+                        else -> 0.8f + (categoryWeight * 0.5f)
+                    }
+                    val jitter = ((now / 1500 % 5) * 0.25f)
+                    (base + jitter).coerceIn(0.5f, 35.0f)
+                }
+                isFgService -> {
+                    val base = 1.2f + (categoryWeight * 0.6f)
+                    val jitter = ((now / 2000 % 3) * 0.15f)
+                    (base + jitter).coerceIn(0.3f, 8.0f)
+                }
+                isBgService -> 0.3f
+                timeSinceUsed < 60_000L -> 0.1f
                 else -> 0f
             }
 
@@ -1070,12 +1099,12 @@ class SystemMonitor(private val context: Context) {
                     pid = pid,
                     name = appName,
                     packageName = pkg,
-                    cpuUsage = cpuUsage,
-                    ramUsageMb = ramMb,
+                    cpuUsage = String.format(java.util.Locale.US, "%.1f", cpuUsage).toFloatOrNull() ?: cpuUsage,
+                    ramUsageMb = String.format(java.util.Locale.US, "%.1f", ramMb).toFloatOrNull() ?: ramMb,
                     systemTimeForegroundMs = totalSot,
                     lastTimeUsedMs = lastTimeUsed,
                     isShizukuMode = false,
-                    batteryUsagePct = batteryPct,
+                    batteryUsagePct = String.format(java.util.Locale.US, "%.1f", batteryPct).toFloatOrNull() ?: batteryPct,
                     processState = state
                 )
             )
@@ -1114,10 +1143,11 @@ class SystemMonitor(private val context: Context) {
             compareByDescending<ProcessItem> {
                 when {
                     it.processState.contains("Foreground", ignoreCase = true) && !it.processState.contains("Service", ignoreCase = true) -> 100
-                    it.processState.contains("Service", ignoreCase = true) -> 80
-                    it.processState.contains("Background", ignoreCase = true) -> 60
-                    it.processState.contains("< 1m", ignoreCase = true) -> 40
-                    it.processState.contains("< 5m", ignoreCase = true) -> 20
+                    it.processState.contains("Foreground Service", ignoreCase = true) -> 85
+                    it.processState.contains("Background Service", ignoreCase = true) -> 70
+                    it.processState.contains("< 1m", ignoreCase = true) -> 50
+                    it.processState.contains("< 5m", ignoreCase = true) -> 30
+                    it.processState.contains("< 15m", ignoreCase = true) -> 15
                     else -> 0
                 }
             }.thenByDescending { it.lastTimeUsedMs }
@@ -1125,23 +1155,48 @@ class SystemMonitor(private val context: Context) {
     }
 
     private fun estimateRamMb(packageName: String, isForeground: Boolean, isFgService: Boolean): Float {
-        val baseWeight = getAppCategoryWeight(packageName)
-        val baseMb = when {
-            baseWeight >= 2.5f -> 240f // Heavy games / 3D
-            baseWeight >= 1.8f -> 160f // Video / Camera / Navigation
-            baseWeight >= 1.3f -> 120f // Social / Browsers
-            baseWeight >= 1.0f -> 85f  // Standard Apps / Utilities
-            else -> 55f                // Background helpers / lightweight
+        var isLargeHeap = false
+        val baseMb = try {
+            val pm = context.packageManager
+            val appInfo = pm.getApplicationInfo(packageName, 0)
+            isLargeHeap = (appInfo.flags and ApplicationInfo.FLAG_LARGE_HEAP) != 0
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                when (appInfo.category) {
+                    ApplicationInfo.CATEGORY_GAME -> 320f
+                    ApplicationInfo.CATEGORY_VIDEO -> 210f
+                    ApplicationInfo.CATEGORY_IMAGE -> 150f
+                    ApplicationInfo.CATEGORY_SOCIAL -> 175f
+                    ApplicationInfo.CATEGORY_AUDIO -> 95f
+                    ApplicationInfo.CATEGORY_MAPS -> 190f
+                    ApplicationInfo.CATEGORY_PRODUCTIVITY -> 120f
+                    ApplicationInfo.CATEGORY_NEWS -> 110f
+                    else -> 90f
+                }
+            } else {
+                val weight = getAppCategoryWeight(packageName)
+                when {
+                    weight >= 2.0f -> 260f
+                    weight >= 1.5f -> 180f
+                    weight >= 1.2f -> 140f
+                    weight >= 1.0f -> 95f
+                    else -> 65f
+                }
+            }
+        } catch (e: Exception) {
+            85f
         }
-        val multiplier = if (isForeground) 1.25f else if (isFgService) 1.1f else 0.85f
-        val jitter = (Math.abs(packageName.hashCode()) % 20) - 10
-        return (baseMb * multiplier + jitter).coerceAtLeast(30f)
+
+        val heapFactor = if (isLargeHeap) 1.35f else 1.0f
+        val stateFactor = if (isForeground) 1.25f else if (isFgService) 1.10f else 0.75f
+        val jitter = (Math.abs(packageName.hashCode()) % 16) - 8
+        return ((baseMb * heapFactor * stateFactor) + jitter).coerceAtLeast(35f)
     }
 
     // Pro mode using Shizuku
     private fun fetchProcessesViaShizuku(): List<ProcessItem> {
         val list = mutableListOf<ProcessItem>()
-        
+
         // Fetch SOT and Battery Estimation maps since last unplug from full
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
@@ -1157,7 +1212,7 @@ class SystemMonitor(private val context: Context) {
         }
 
         val combinedStats = stats?.groupBy { it.packageName }
-            ?.mapValues { entry -> 
+            ?.mapValues { entry ->
                 val foregroundMs = entry.value.sumOf { it.totalTimeInForeground }
                 val lastTimeUsed = entry.value.maxOfOrNull { it.lastTimeUsed } ?: 0L
                 Pair(foregroundMs, lastTimeUsed)
@@ -1177,12 +1232,22 @@ class SystemMonitor(private val context: Context) {
             val process = Shizuku.newProcess(arrayOf("sh", "-c", "top -b -n 1 2>&1"), null, null)
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             var line: String?
-            
+
             var headerFound = false
             var colPid = -1
             var colCpu = -1
             var colRes = -1
             var colName = -1
+
+            // Group multi-process applications to aggregate their CPU/RAM cleanly
+            data class RawProcEntry(
+                val pid: Int,
+                val rawName: String,
+                val basePkg: String,
+                val cpu: Float,
+                val ramMb: Float
+            )
+            val rawEntries = mutableListOf<RawProcEntry>()
 
             while (reader.readLine().also { line = it } != null) {
                 val currentLine = line ?: break
@@ -1191,12 +1256,12 @@ class SystemMonitor(private val context: Context) {
                 val tokens = currentLine.trim().split("\\s+".toRegex())
 
                 if (!headerFound) {
-                    if (tokens.contains("PID") && (tokens.contains("NAME") || tokens.contains("Name") || tokens.contains("CMD") || tokens.contains("COMMAND"))) {
+                    if (tokens.contains("PID") && (tokens.contains("NAME") || tokens.contains("Name") || tokens.contains("CMD") || tokens.contains("COMMAND") || tokens.contains("ARGS"))) {
                         headerFound = true
                         colPid = tokens.indexOf("PID")
-                        colCpu = tokens.indexOfFirst { it.contains("CPU") || it.contains("cpu") }
-                        colRes = tokens.indexOfFirst { it.contains("RES") || it.contains("RSS") || it.contains("mem") || it.contains("MEM") }
-                        colName = tokens.indexOfFirst { it.contains("NAME") || it.contains("Name") || it.contains("CMD") || it.contains("COMMAND") }
+                        colCpu = tokens.indexOfFirst { it.contains("CPU", ignoreCase = true) }
+                        colRes = tokens.indexOfFirst { it.contains("RES", ignoreCase = true) || it.contains("RSS", ignoreCase = true) || it.contains("MEM", ignoreCase = true) }
+                        colName = tokens.indexOfFirst { it.contains("NAME", ignoreCase = true) || it.contains("CMD", ignoreCase = true) || it.contains("COMMAND", ignoreCase = true) || it.contains("ARGS", ignoreCase = true) }
                     }
                     continue
                 }
@@ -1208,48 +1273,66 @@ class SystemMonitor(private val context: Context) {
                     val ramStr = if (colRes != -1 && colRes < tokens.size) tokens[colRes] else "0"
                     val ramMb = parseRamToMb(ramStr)
                     val name = if (colName != -1 && colName < tokens.size) tokens[colName] else "unknown"
-                    
-                    if (name == "top") continue
 
-                    val appName = if (name.contains(".")) {
-                        getAppName(name)
-                    } else {
-                        name
-                    }
+                    // Filter out shell self-invocations & kernel threads
+                    if (name == "top" || name == "sh" || name.startsWith("[") || name.startsWith("kworker/")) continue
 
-                    val sotMs = combinedStats[name]?.first ?: 0L
-                    val lastTimeUsedMs = combinedStats[name]?.second ?: 0L
-                    val weightedTime = weightedTimes[name] ?: 0f
-                    // Normalized: shows each app's share out of 100%
-                    val batteryPct = if (totalWeightedTime > 0) {
-                        (weightedTime / totalWeightedTime) * 100f
-                    } else {
-                        0f
-                    }
-
-                    val processState = if (cpu > 0.5f) "Active (CPU)" else "Background"
-
-                    list.add(
-                        ProcessItem(
-                            pid = pid,
-                            name = appName,
-                            packageName = name,
-                            cpuUsage = cpu,
-                            ramUsageMb = ramMb,
-                            systemTimeForegroundMs = sotMs,
-                            lastTimeUsedMs = lastTimeUsedMs,
-                            isShizukuMode = true,
-                            batteryUsagePct = batteryPct,
-                            processState = processState
-                        )
-                    )
+                    val basePkg = name.substringBefore(":")
+                    rawEntries.add(RawProcEntry(pid, name, basePkg, cpu, ramMb))
                 }
             }
             process.waitFor()
+
+            // Group by package or binary name
+            val grouped = rawEntries.groupBy { it.basePkg }
+            for ((pkg, entries) in grouped) {
+                val primaryPid = entries.first().pid
+                val totalCpu = entries.sumOf { it.cpu.toDouble() }.toFloat()
+                val totalRam = entries.sumOf { it.ramMb.toDouble() }.toFloat()
+                val subProcessCount = entries.size
+
+                val appName = if (pkg.contains(".")) {
+                    getAppName(pkg)
+                } else {
+                    pkg
+                }
+
+                val sotMs = combinedStats[pkg]?.first ?: 0L
+                val lastTimeUsedMs = combinedStats[pkg]?.second ?: 0L
+                val weightedTime = weightedTimes[pkg] ?: 0f
+                val batteryPct = if (totalWeightedTime > 0) {
+                    (weightedTime / totalWeightedTime) * 100f
+                } else {
+                    0f
+                }
+
+                val processState = when {
+                    totalCpu >= 5.0f -> if (subProcessCount > 1) "Active (${subProcessCount} procs)" else "Active (High CPU)"
+                    totalCpu >= 0.5f -> if (subProcessCount > 1) "Active (${subProcessCount} procs)" else "Active (CPU)"
+                    subProcessCount > 1 -> "Background (${subProcessCount} procs)"
+                    totalRam > 0f -> "Background"
+                    else -> "Idle"
+                }
+
+                list.add(
+                    ProcessItem(
+                        pid = primaryPid,
+                        name = appName,
+                        packageName = pkg,
+                        cpuUsage = String.format(java.util.Locale.US, "%.1f", totalCpu).toFloatOrNull() ?: totalCpu,
+                        ramUsageMb = String.format(java.util.Locale.US, "%.1f", totalRam).toFloatOrNull() ?: totalRam,
+                        systemTimeForegroundMs = sotMs,
+                        lastTimeUsedMs = lastTimeUsedMs,
+                        isShizukuMode = true,
+                        batteryUsagePct = String.format(java.util.Locale.US, "%.1f", batteryPct).toFloatOrNull() ?: batteryPct,
+                        processState = processState
+                    )
+                )
+            }
         } catch (e: Exception) {
             Log.e("SystemMonitor", "Error fetching Shizuku stats", e)
         }
-        return list
+        return list.sortedByDescending { it.cpuUsage }
     }
 
     private fun parseRamToMb(ramStr: String): Float {

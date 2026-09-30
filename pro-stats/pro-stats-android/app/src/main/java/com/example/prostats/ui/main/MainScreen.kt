@@ -191,10 +191,12 @@ fun MainScreen(
                                 compareByDescending<ProcessItem> {
                                     when {
                                         it.processState.contains("Foreground", ignoreCase = true) && !it.processState.contains("Service", ignoreCase = true) -> 100
-                                        it.processState.contains("Service", ignoreCase = true) -> 80
-                                        it.processState.contains("Background", ignoreCase = true) -> 60
-                                        it.processState.contains("< 1m", ignoreCase = true) -> 40
-                                        it.processState.contains("< 5m", ignoreCase = true) -> 20
+                                        it.processState.contains("Foreground Service", ignoreCase = true) -> 85
+                                        it.processState.contains("Background Service", ignoreCase = true) -> 70
+                                        it.processState.contains("< 1m", ignoreCase = true) -> 50
+                                        it.processState.contains("< 5m", ignoreCase = true) -> 30
+                                        it.processState.contains("< 15m", ignoreCase = true) -> 15
+                                        it.processState.contains("Background", ignoreCase = true) -> 10
                                         else -> 0
                                     }
                                 }.thenByDescending { it.lastTimeUsedMs }
