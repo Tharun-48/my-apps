@@ -2,6 +2,26 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-10-08] Symmetrical Classic Logo, Material You OLED Theme, Real-Time Bandwidth & Dynamic Setup Flow
+- **User Prompts**: *"app logo arrow looks inaccurate / weird"* / *"material you should be the default, show light, dark, system default, in dark give toggle for deep / pure black"* / *"network interface and bandwidth didnt update"* / *"while install and setup app, ask autostart permission... dynamically show one and one"* / *"so yea do build after finishing things"* / *"i said this app need to be in rust, add somewhere which is important where when i update, this app is in rustt"*
+- **Summary of Changes**:
+  - **Symmetrical Classic Vector Logo (`ic_launcher_foreground.xml`, `ic_launcher_monochrome.xml`, `ic_prostats_logo.xml`, `logo_preview.svg`, `logo_preview.html`)**:
+    - Fixed arrow skew and center crossover glitch by reconstructing mathematically balanced 45° surge arrowhead and non-intersecting lightning path.
+  - **Default Material You & Pure Black OLED Toggle (`Theme.kt`, `SettingsScreen.kt`)**:
+    - Made Material You dynamic Monet theming default across System Default, Dark, and Light modes.
+    - Added dedicated toggle for **Deep / Pure Black (OLED)** providing pitch black `#000000` power savings while keeping vibrant Material You color accents.
+  - **Real-Time Network Bandwidth & Interfaces (`SystemMonitor.kt`, `SystemInfoScreen.kt`)**:
+    - Wired live `TrafficStats` byte delta sampling into the periodic 1s refresh loop, calculating real-time download/upload transfer rates in KB/s and MB/s alongside detected physical and virtual interface states.
+  - **Dynamic One-by-One Setup Flow & OEM Autostart (`OnboardingScreen.kt`)**:
+    - Refactored permissions walkthrough into a single-card dynamic wizard with 1-2 line explanations of purpose and importance.
+    - Integrated multi-vendor OEM Autostart intent launcher (Xiaomi HyperOS, Samsung, Oppo, Vivo, OnePlus) with non-blocking skip options.
+  - **Rust Native Engine (`core-rs`) Highlighting (`SettingsScreen.kt`, `SystemInfoScreen.kt`, `RELEASE_NOTES.md`, `BatteryHealthEstimator.kt`)**:
+    - Featured Rust native core engine (`core-rs` JNI) in Settings About card, System Info Device Identity, and release updates.
+    - Hardened native library initialization with graceful Kotlin fallback.
+  - **Release Build**: Compiled updated `ProStats-v2.5.apk` (9.8MB) and deployed to `pro-stats/releases/`.
+
+---
+
 ### [2026-10-07] Enhanced Classic App Shortcut Logo & Robust SOT Graph Charging Reset
 - **User Prompts**: *"enhance this logo like dont change element just colour and apply it in my app"* / *"remove violet bro"* / *"i want a bit claasic"* / *"i said just add to logo in app shortcut, maybe show somwhere but not everywhere"* / *"screen on time graph not resetting when charged"* / *"check for any bugs by verifying everything"*
 - **Summary of Changes**:

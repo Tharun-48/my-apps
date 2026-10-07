@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProStats Logo Preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #090a0f;
+    color: #f3f4f6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 40px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.5px; }
+  .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 32px; text-align: center; }
+  
+  .grid {
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 960px;
+  }
+  
+  .card {
+    background: #11141e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 280px;
+  }
+  .card h3 { font-size: 16px; margin-bottom: 16px; color: #e2e8f0; }
+  .card p { font-size: 12px; color: #94a3b8; text-align: center; margin-top: 14px; line-height: 1.5; }
+  
+  .icon-preview {
+    width: 160px;
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .squircle {
+    border-radius: 36px;
+    overflow: hidden;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.6);
+  }
+  
+  .circle {
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.6);
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .badge {
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="badge">UPDATED LOGO ARROW</div>
+  <h1>ProStats App Icon & Logo</h1>
+  <p class="subtitle">Fixed center crossover &bull; Solid unified lightning surge &bull; Symmetrical 45° arrowhead</p>
+
+  <div class="grid">
+    <!-- Card 1: Android Squircle -->
+    <div class="card">
+      <h3>Android Squircle Icon</h3>
+      <div class="icon-preview squircle">
+        <img src="logo_preview.svg" alt="New ProStats Logo">
+      </div>
+      <p>Clean lightning transition without pinched overlap or crossed lines. Symmetrical arrowhead.</p>
+    </div>
+
+    <!-- Card 2: Round Launcher Icon -->
+    <div class="card">
+      <h3>Round Launcher Icon</h3>
+      <div class="icon-preview circle">
+        <img src="logo_preview.svg" alt="Round Icon">
+      </div>
+      <p>Pixel-perfect scaling across launcher shapes on Android 12+ and Material You.</p>
+    </div>
+
+    <!-- Card 3: AMOLED Pure Black -->
+    <div class="card">
+      <h3>AMOLED Pure Black</h3>
+      <div class="icon-preview squircle" style="background: #000; border: 1px solid #1a1a20;">
+        <img src="logo_preview.svg" alt="AMOLED Icon">
+      </div>
+      <p>True OLED pitch-black contrast with high-visibility Ice Blue surge lighting.</p>
+    </div>
+  </div>
+
+</body>
+</html>

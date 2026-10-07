@@ -84,8 +84,8 @@
 
     <!-- Negative Space Cutout Gap behind Lightning Bolt -->
     <path
-        android:pathData="M22,74 L50,46 L45,61 L76,32 L70,27 L90,22 L86,42 L80,37 L54,64 L58,49 Z"
-        android:strokeWidth="4"
+        android:pathData="M 18,82 L 55,45 L 49,62 L 74,37 L 66,31 L 88,27 L 84,49 L 78,41 L 45,74 L 51,57 Z"
+        android:strokeWidth="4.5"
         android:strokeColor="#0A0C10"
         android:strokeLineJoin="round"
         android:strokeLineCap="round"
@@ -93,7 +93,7 @@
 
     <!-- Hero Lightning Bolt & Upward Surge Arrow (Ice Blue Gradient) -->
     <path
-        android:pathData="M22,74 L50,46 L45,61 L76,32 L70,27 L90,22 L86,42 L80,37 L54,64 L58,49 Z">
+        android:pathData="M 18,82 L 55,45 L 49,62 L 74,37 L 66,31 L 88,27 L 84,49 L 78,41 L 45,74 L 51,57 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"

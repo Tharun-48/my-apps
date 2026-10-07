@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#141824" />
+      <stop offset="100%" stop-color="#07080c" />
+    </radialGradient>
+
+    <!-- Phone Chassis Gradient -->
+    <linearGradient id="phoneGrad" x1="256" y1="118" x2="256" y2="412" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="50%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+
+    <!-- Battery Cap Gradient -->
+    <linearGradient id="capGrad" x1="256" y1="90" x2="256" y2="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#93C5FD" />
+      <stop offset="100%" stop-color="#60A5FA" />
+    </linearGradient>
+
+    <!-- Lightning Arrow Surge Gradient -->
+    <linearGradient id="arrowGrad" x1="85" y1="375" x2="418" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="40%" stop-color="#7DD3FC" />
+      <stop offset="80%" stop-color="#BAE6FD" />
+      <stop offset="100%" stop-color="#FFFFFF" />
+    </linearGradient>
+
+    <!-- Drop Shadow Filter for Glow -->
+    <filter id="subtleGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0284C7" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Squircle App Icon Background -->
+  <rect width="512" height="512" rx="114" fill="url(#bgGrad)" stroke="rgba(255, 255, 255, 0.08)" stroke-width="2" />
+
+  <!-- Centered Scaled Logo Group (Scale 108 -> 512: factor 4.4) -->
+  <g transform="translate(256, 256) scale(4.4) translate(-54, -54)">
+    
+    <!-- Battery Top Cap -->
+    <path d="M46,25 L46,22 C46,20.5 47.5,19 49,19 L59,19 C60.5,19 62,20.5 62,22 L62,25 Z" fill="url(#capGrad)" />
+
+    <!-- Outer Phone Chassis with Rounded Corners -->
+    <path d="M41,25 L67,25 C72.5,25 77,29.5 77,35 L77,77 C77,82.5 72.5,87 67,87 L41,87 C35.5,87 31,82.5 31,77 L31,35 C31,29.5 35.5,25 41,25 Z"
+          stroke-width="4.5" stroke="url(#phoneGrad)" fill="none" />
+
+    <!-- Top Speaker Notch -->
+    <path d="M48,29 L60,29 C60.8,29 61.5,29.7 61.5,30.5 C61.5,31.3 60.8,32 60,32 L48,32 C47.2,32 46.5,31.3 46.5,30.5 C46.5,29.7 47.2,29 48,29 Z"
+          fill="#BAE6FD" />
+
+    <!-- Bottom Home Pill Indicator -->
+    <path d="M48,80.5 L60,80.5 C60.8,80.5 61.5,81.2 61.5,82 C61.5,82.8 60.8,83.5 60,83.5 L48,83.5 C47.2,83.5 46.5,82.8 46.5,82 C46.5,81.2 47.2,80.5 48,80.5 Z"
+          fill="#BAE6FD" />
+
+    <!-- 6 Rising Histogram Bars -->
+    <rect x="36.5" y="62" width="3.6" height="14" rx="1.8" fill="#2563EB" />
+    <rect x="42.5" y="55" width="3.6" height="21" rx="1.8" fill="#3B82F6" />
+    <rect x="48.5" y="48" width="3.6" height="28" rx="1.8" fill="#3B82F6" />
+    <rect x="54.5" y="41" width="3.6" height="35" rx="1.8" fill="#60A5FA" />
+    <rect x="60.5" y="34" width="3.6" height="42" rx="1.8" fill="#60A5FA" />
+    <rect x="66.5" y="28" width="3.6" height="48" rx="1.8" fill="#93C5FD" />
+
+    <!-- Negative Space Cutout Gap behind Lightning Bolt -->
+    <path d="M 18,82 L 55,45 L 49,62 L 74,37 L 66,31 L 88,27 L 84,49 L 78,41 L 45,74 L 51,57 Z"
+          stroke-width="5" stroke="#07080c" stroke-linejoin="round" stroke-linecap="round" fill="#07080c" />
+
+    <!-- True Lightning Bolt & Symmetrical Upward Surge Arrow -->
+    <path d="M 18,82 L 55,45 L 49,62 L 74,37 L 66,31 L 88,27 L 84,49 L 78,41 L 45,74 L 51,57 Z"
+          fill="url(#arrowGrad)" stroke-linejoin="round" filter="url(#subtleGlow)" />
+
+  </g>
+</svg>

@@ -10,6 +10,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.TrafficStats
 import android.net.wifi.WifiManager
 import android.opengl.EGL14
 import android.opengl.EGLConfig
@@ -23,6 +24,7 @@ import android.os.Environment
 import android.os.PowerManager
 import android.os.Process
 import android.os.StatFs
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
@@ -106,7 +108,11 @@ data class NetworkInfo(
     val upstreamBandwidthKbps: Int = 0,
     val isVpn: Boolean = false,
     val activeInterfaceName: String = "",
-    val interfaces: List<NetworkInterfaceDetail> = emptyList()
+    val interfaces: List<NetworkInterfaceDetail> = emptyList(),
+    val rxSpeedBps: Long = 0L,
+    val txSpeedBps: Long = 0L,
+    val totalRxBytes: Long = 0L,
+    val totalTxBytes: Long = 0L
 )
 
 data class StorageInfo(
@@ -132,6 +138,13 @@ class SystemMonitor(private val context: Context) {
 
     // Cached app name lookups to avoid repeated PackageManager queries
     private val appNameCache = ConcurrentHashMap<String, String>()
+
+    // Network live traffic bandwidth tracking
+    private var lastRxBytes: Long = -1L
+    private var lastTxBytes: Long = -1L
+    private var lastNetworkSampleTime: Long = -1L
+    private var liveRxSpeedBps: Long = 0L
+    private var liveTxSpeedBps: Long = 0L
 
     private fun getAppName(packageName: String): String {
         return appNameCache.getOrPut(packageName) {
@@ -1809,6 +1822,24 @@ class SystemMonitor(private val context: Context) {
             ipAddress = if (connectionType != "Disconnected") "Assigned via DHCP" else "No Connection"
         }
 
+        val totalRx = try { TrafficStats.getTotalRxBytes() } catch (e: Exception) { -1L }
+        val totalTx = try { TrafficStats.getTotalTxBytes() } catch (e: Exception) { -1L }
+        val now = SystemClock.elapsedRealtime()
+
+        if (totalRx >= 0 && totalTx >= 0) {
+            if (lastRxBytes >= 0 && lastNetworkSampleTime > 0) {
+                val timeDeltaMs = (now - lastNetworkSampleTime).coerceAtLeast(100L)
+                val rxDelta = (totalRx - lastRxBytes).coerceAtLeast(0L)
+                val txDelta = (totalTx - lastTxBytes).coerceAtLeast(0L)
+
+                liveRxSpeedBps = (rxDelta * 1000L) / timeDeltaMs
+                liveTxSpeedBps = (txDelta * 1000L) / timeDeltaMs
+            }
+            lastRxBytes = totalRx
+            lastTxBytes = totalTx
+            lastNetworkSampleTime = now
+        }
+
         return NetworkInfo(
             connectionType = connectionType,
             wifiSsid = wifiSsid,
@@ -1819,7 +1850,11 @@ class SystemMonitor(private val context: Context) {
             upstreamBandwidthKbps = upKbps,
             isVpn = isVpn,
             activeInterfaceName = activeInterface,
-            interfaces = interfaceList
+            interfaces = interfaceList,
+            rxSpeedBps = liveRxSpeedBps,
+            txSpeedBps = liveTxSpeedBps,
+            totalRxBytes = if (totalRx >= 0) totalRx else 0L,
+            totalTxBytes = if (totalTx >= 0) totalTx else 0L
         )
     }
 

@@ -53,11 +53,13 @@ fun SystemInfoScreen() {
         onDispose { sensorReader.stop() }
     }
 
-    // Refresh live readings every 1000ms
+    // Refresh live readings and network bandwidth every 1000ms
     LaunchedEffect(Unit) {
         while (true) {
             liveReadings = sensorReader.getSnapshot()
             batteryInfo = hardwareMonitor.getBatteryInfo()
+            val nInfo = withContext(Dispatchers.IO) { systemMonitor.getNetworkInfo() }
+            networkInfo = nInfo
             kotlinx.coroutines.delay(1000)
         }
     }
@@ -120,6 +122,7 @@ fun SystemInfoScreen() {
                     InfoRow("Board", di.board)
                     InfoRow("Hardware Platform", di.hardware)
                     InfoRow("Android OS Version", di.androidVersion)
+                    InfoRow("App Runtime Engine", "🦀 Rust Native Core (core-rs) + Compose")
                 }
             }
         }
@@ -221,6 +224,10 @@ fun SystemInfoScreen() {
         networkInfo?.let { net ->
             item {
                 InfoCard(title = "Network Interfaces & Bandwidth", icon = Icons.Default.Info, iconColor = colors.accentBlue) {
+                    InfoRow("Live Speed (Down / Up)", "${formatNetworkSpeed(net.rxSpeedBps)}  ↓   /   ${formatNetworkSpeed(net.txSpeedBps)}  ↑")
+                    if (net.totalRxBytes > 0 || net.totalTxBytes > 0) {
+                        InfoRow("Total Traffic (Rx / Tx)", "${formatDataBytes(net.totalRxBytes)}  /  ${formatDataBytes(net.totalTxBytes)}")
+                    }
                     InfoRow("Connection Type", net.connectionType)
                     if (net.activeInterfaceName.isNotBlank()) {
                         InfoRow("Active Interface", net.activeInterfaceName)
@@ -231,7 +238,7 @@ fun SystemInfoScreen() {
                         InfoRow("Link Speed", "${net.linkSpeedMbps} Mbps")
                     }
                     if (net.downstreamBandwidthKbps > 0) {
-                        InfoRow("Downlink Est.", "${net.downstreamBandwidthKbps / 1000} Mbps")
+                        InfoRow("Link Capacity Est.", "${net.downstreamBandwidthKbps / 1000} Mbps")
                     }
                     if (net.ipAddress.isNotBlank()) {
                         InfoRow("IPv4 Address", net.ipAddress)
@@ -463,5 +470,23 @@ fun SensorRow(sensor: SensorInfo, liveReading: FloatArray? = null) {
                 )
             }
         }
+    }
+}
+
+private fun formatNetworkSpeed(bytesPerSec: Long): String {
+    return when {
+        bytesPerSec <= 0 -> "0 KB/s"
+        bytesPerSec < 1024 -> "$bytesPerSec B/s"
+        bytesPerSec < 1024 * 1024 -> "${bytesPerSec / 1024} KB/s"
+        else -> String.format(java.util.Locale.US, "%.1f MB/s", bytesPerSec / (1024f * 1024f))
+    }
+}
+
+private fun formatDataBytes(bytes: Long): String {
+    return when {
+        bytes <= 0 -> "0 MB"
+        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+        bytes < 1024 * 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f MB", bytes / (1024f * 1024f))
+        else -> String.format(java.util.Locale.US, "%.2f GB", bytes / (1024f * 1024f * 1024f))
     }
 }

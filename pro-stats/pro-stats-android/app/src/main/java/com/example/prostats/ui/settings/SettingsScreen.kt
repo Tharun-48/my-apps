@@ -68,7 +68,13 @@ fun SettingsScreen(
     var resetFeedbackText by remember { mutableStateOf<String?>(null) }
 
     val prefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
-    var currentTheme by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
+    val initialTheme = prefs.getString("app_theme", "System Default") ?: "System Default"
+    var currentTheme by remember {
+        mutableStateOf(if (initialTheme == "Material You") "System Default" else if (initialTheme == "Pure Black (AMOLED)") "Dark" else initialTheme)
+    }
+    var pureBlackEnabled by remember {
+        mutableStateOf(prefs.getBoolean("amoled_pure_black", initialTheme == "Pure Black (AMOLED)"))
+    }
 
     var latestVersion by remember { mutableStateOf<String?>(null) }
     var updateAvailable by remember { mutableStateOf(false) }
@@ -431,10 +437,9 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     val themes = listOf(
-                        Triple("Material You", "Dynamic colors from system wallpaper", colors.accentGreen),
-                        Triple("Dark", "Sleek slate dark theme with high contrast", Color(0xFF86EFAC)),
-                        Triple("Pure Black (AMOLED)", "Deep OLED black for power savings", Color.White),
-                        Triple("Light", "Clean bright background with sharp typography", colors.accentBlue)
+                        Triple("System Default", "Follows device day/night mode with Material You", colors.accentGreen),
+                        Triple("Dark", "Sleek slate appearance with Material You accents", Color(0xFF86EFAC)),
+                        Triple("Light", "Clean bright appearance with Material You accents", colors.accentBlue)
                     )
 
                     themes.forEachIndexed { index, (theme, desc, dotColor) ->
@@ -450,7 +455,10 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Box(
                                     modifier = Modifier
                                         .size(10.dp)
@@ -473,6 +481,57 @@ fun SettingsScreen(
                         }
                         if (index < themes.size - 1) {
                             HorizontalDivider(color = colors.borderColorSubtle)
+                        }
+                    }
+
+                    val isEffectiveDark = currentTheme == "Dark" || (currentTheme == "System Default" && colors.isDark)
+
+                    if (isEffectiveDark) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = colors.borderColorSubtle)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    val newVal = !pureBlackEnabled
+                                    pureBlackEnabled = newVal
+                                    prefs.edit().putBoolean("amoled_pure_black", newVal).apply()
+                                }
+                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(Color.White, CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text("Deep / Pure Black (OLED)", color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text("Pitch black #000000 for OLEDs while keeping dynamic Material You accents", color = colors.textSecondary, fontSize = 11.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = pureBlackEnabled,
+                                onCheckedChange = { newVal ->
+                                    pureBlackEnabled = newVal
+                                    prefs.edit().putBoolean("amoled_pure_black", newVal).apply()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = colors.accentGreen,
+                                    uncheckedThumbColor = colors.textSecondary,
+                                    uncheckedTrackColor = colors.elevatedSurface
+                                )
+                            )
                         }
                     }
                 }
@@ -964,6 +1023,27 @@ fun SettingsScreen(
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text("v${com.example.prostats.BuildConfig.VERSION_NAME}", color = colors.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Native Engine", color = colors.textSecondary, fontSize = 13.sp)
+                            Text("High-performance zero-overhead core", color = colors.textTertiary, fontSize = 10.sp)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .background(colors.accentOrange.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                                .border(1.dp, colors.accentOrange.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("🦀 Rust Native Core (core-rs)", color = colors.accentOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 

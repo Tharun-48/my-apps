@@ -33,7 +33,11 @@ data class BatteryHealthData(
  */
 object BatteryHealthEstimator {
     init {
-        System.loadLibrary("core_rs")
+        try {
+            System.loadLibrary("core_rs")
+        } catch (e: Throwable) {
+            Log.w("BatteryHealthEstimator", "core_rs native library fallback: ${e.message}")
+        }
     }
 
     private const val PREFS_NAME = "battery_health_prefs"
@@ -335,7 +339,15 @@ object BatteryHealthEstimator {
     }
 
     private fun calculateHealthScore(cycles: Int, currentCapacity: Int, designCapacity: Int): Int {
-        return calculateHealthScoreNative(cycles, currentCapacity, designCapacity)
+        return try {
+            calculateHealthScoreNative(cycles, currentCapacity, designCapacity)
+        } catch (_: Throwable) {
+            val capacityRatio = if (designCapacity > 0) {
+                (currentCapacity.toFloat() / designCapacity.toFloat()).coerceIn(0f, 1.1f)
+            } else 1.0f
+            val cycleFactor = (1.0f - (cycles.toFloat() / 1500f)).coerceIn(0.3f, 1.0f)
+            ((capacityRatio * 0.7f + cycleFactor * 0.3f) * 100f).toInt().coerceIn(0, 100)
+        }
     }
 
     @JvmStatic

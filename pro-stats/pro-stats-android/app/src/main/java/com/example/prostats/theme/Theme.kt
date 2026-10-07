@@ -74,21 +74,21 @@ fun darkAppColors() = AppColors(
     isDark = true
 )
 
-fun amoledAppColors() = AppColors(
+fun amoledAppColors(dynamicScheme: androidx.compose.material3.ColorScheme? = null) = AppColors(
     background = Color.Black,
-    cardSurface = Color(0xFF0F0F12),
-    elevatedSurface = Color(0xFF1A1A1E),
-    surfaceContainerLow = Color(0xFF070708),
-    surfaceContainerHigh = Color(0xFF24242A),
+    cardSurface = Color(0xFF08090C),
+    elevatedSurface = Color(0xFF14161B),
+    surfaceContainerLow = Color(0xFF040405),
+    surfaceContainerHigh = Color(0xFF1C1E24),
     textPrimary = Color(0xFFFFFFFF),
     textSecondary = Color(0xFFA1A1AA),
     textTertiary = Color(0xFF71717A),
     borderColor = Color(0x1CFFFFFF), // Subtle hairline (alpha ≈ 0.11)
     borderColorSubtle = Color(0x0FFFFFFF), // Ultra-subtle hairline (alpha ≈ 0.06)
-    accentGreen = Color(0xFF4ADE80),
+    accentGreen = dynamicScheme?.primary ?: Color(0xFF4ADE80),
     accentOrange = Color(0xFFFB923C),
-    accentPurple = Color(0xFFA78BFA),
-    accentBlue = Color(0xFF38BDF8),
+    accentPurple = dynamicScheme?.secondary ?: Color(0xFFA78BFA),
+    accentBlue = dynamicScheme?.tertiary ?: Color(0xFF38BDF8),
     accentYellow = Color(0xFFFBBF24),
     navBarColor = Color.Black,
     isDark = true
@@ -170,15 +170,24 @@ fun ProStatsTheme(
 ) {
     val context = LocalContext.current
 
-    // Reactively observe the theme preference so Compose recomposes on change
+    // Reactively observe theme preference and pure black OLED toggle
     val prefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
-    var themePref by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
+    var themePref by remember {
+        val stored = prefs.getString("app_theme", "System Default") ?: "System Default"
+        mutableStateOf(if (stored == "Material You") "System Default" else stored)
+    }
+    var pureBlackPref by remember {
+        mutableStateOf(prefs.getBoolean("amoled_pure_black", prefs.getString("app_theme", "") == "Pure Black (AMOLED)"))
+    }
 
-    // Register a SharedPreferences listener to update state on any theme change
     DisposableEffect(prefs) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == "app_theme") {
-                themePref = prefs.getString("app_theme", "Material You") ?: "Material You"
+                val stored = prefs.getString("app_theme", "System Default") ?: "System Default"
+                themePref = if (stored == "Material You") "System Default" else stored
+            }
+            if (key == "amoled_pure_black") {
+                pureBlackPref = prefs.getBoolean("amoled_pure_black", false)
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -190,30 +199,34 @@ fun ProStatsTheme(
     val isDark = when (themePref) {
         "Light" -> false
         "Dark", "Pure Black (AMOLED)" -> true
-        else -> darkTheme // Material You follows system
+        else -> darkTheme // "System Default" follows system day/night
     }
 
-    val colorScheme = when {
-        themePref == "Pure Black (AMOLED)" -> DarkColorScheme.copy(
+    val isPureBlack = isDark && (pureBlackPref || themePref == "Pure Black (AMOLED)")
+
+    // Dynamic Material You (Monet) color scheme on Android 12+
+    val dynamicScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } else null
+
+    val baseScheme = dynamicScheme ?: if (isDark) DarkColorScheme else LightColorScheme
+
+    val colorScheme = if (isPureBlack) {
+        baseScheme.copy(
             background = Color.Black,
             surface = Color.Black,
-            surfaceVariant = Color(0xFF141414)
+            surfaceVariant = Color(0xFF101216)
         )
-        themePref == "Material You" && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        isDark -> DarkColorScheme
-        else -> LightColorScheme
+    } else {
+        baseScheme
     }
 
-    // Select app-specific color palette based on theme
-    val appColors = when (themePref) {
-        "Pure Black (AMOLED)" -> amoledAppColors()
-        "Light" -> lightAppColors()
-        "Dark" -> darkAppColors()
-        else -> { // Material You — dynamic palette from system Monet ColorScheme
-            dynamicAppColors(colorScheme, isDark)
-        }
+    // Select app colors with Material You dynamic tokens by default
+    val appColors = when {
+        isPureBlack -> amoledAppColors(dynamicScheme)
+        dynamicScheme != null -> dynamicAppColors(dynamicScheme, isDark = isDark)
+        isDark -> darkAppColors()
+        else -> lightAppColors()
     }
 
     CompositionLocalProvider(LocalAppColors provides appColors) {

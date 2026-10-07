@@ -1,14 +1,14 @@
 # ProStats — Release Notes & Version Updates
 
 ### **Version 2.5 (Current Release)**
-- **Interactive Timeline Scrubber**: Added an interactive draggable timeline scrubber with parallel vertical indicator line on the battery usage chart. Drag or tap anywhere on the graph or adjust the time slider to inspect active app drain during that specific timeframe.
-- **Real-Time Battery & Hardware Thermal Monitoring**: Fixed battery temperature refresh issues by integrating direct hardware sensor queries with instant kernel sysfs power supply fallback.
-- **Refined Battery Analytics**:
-  - Reorganized into **Battery Usage Stats** with simplified range options (*Since Charge* and *24h*).
-  - Cleaned up diagnostic logging panels for a streamlined, lightweight settings experience.
-- **Material Design 3 Polish**:
-  - Dynamic versioning displays (`v2.5`) across all screens.
-  - Smoothed out gauge transitions and elevated hairline surface borders.
+- **Rust Native Engine (`core-rs`)**: High-performance, memory-safe native core powering battery health scoring and telemetry calculations with zero garbage-collector overhead.
+- **Refined Symmetrical Classic Logo**: Fixed arrow skew and center crossover with a mathematically balanced 45° surge vector icon and adaptive launcher shortcuts.
+- **Default Material You & OLED Deep Black**:
+  - Material You dynamic system colors are now active by default across System Default, Dark, and Light modes.
+  - Added dedicated **Deep / Pure Black (OLED)** toggle for true `#000000` power savings while preserving vibrant Monet dynamic accents.
+- **Real-Time Network Bandwidth & Interfaces**: Live 1-second periodic bandwidth polling measuring download and upload speeds (KB/s and MB/s) and detected physical/virtual interface states.
+- **Step-by-Step Onboarding with Autostart**: Dynamic one-by-one setup card flow with 1-2 line explanations and non-blocking OEM Autostart configuration for Xiaomi, Samsung, Oppo, Vivo, and OnePlus.
+- **Charging SOT Baseline Reset**: Auto-reset baseline threshold options and manual reset actions ensuring uninterrupted graph tracking upon unplugging from charge.
 
 ---
 
