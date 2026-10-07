@@ -13,7 +13,7 @@ This document maintains a historical log of user inputs and corresponding code c
     - Added dedicated Discord community section with custom vector icon and invite launcher.
   - **Buy Me a Coffee with GPay / UPI (`SettingsScreen.kt`, `ic_gpay.xml`)**:
     - Added support card with Google Pay vector icon, copyable UPI ID chip (`ganapathytharun448@oksbi`), and one-tap UPI intent launcher.
-  - **Build Status**: APK compilation paused per explicit user directive until confirmation.
+  - **Release Build**: Compiled updated `ProStats-v2.5.apk` (9.8MB) and deployed to `pro-stats/releases/`.
 
 ### [2026-10-08] Symmetrical Classic Logo, Material You OLED Theme, Real-Time Bandwidth & Dynamic Setup Flow
 - **User Prompts**: *"app logo arrow looks inaccurate / weird"* / *"material you should be the default, show light, dark, system default, in dark give toggle for deep / pure black"* / *"network interface and bandwidth didnt update"* / *"while install and setup app, ask autostart permission... dynamically show one and one"* / *"so yea do build after finishing things"* / *"i said this app need to be in rust, add somewhere which is important where when i update, this app is in rustt"*
