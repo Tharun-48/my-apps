@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.Job
@@ -58,12 +59,19 @@ fun SotDetailScreen(
     // Interactive timeline draggable range state (startMs, endMs)
     var selectedRange by remember { mutableStateOf<Pair<Long, Long>?>(null) }
 
-    // Periodic refresh loop every 15s for live metrics
+    // Periodic refresh loop every 15s for live metrics and auto-charge reset
     LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            BatteryTracker.checkAndResetIfCharged(context)
+        }
+        lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
         while (true) {
+            kotlinx.coroutines.delay(15000)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                BatteryTracker.checkAndResetIfCharged(context)
+            }
             lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
             refreshTick++
-            kotlinx.coroutines.delay(15000)
         }
     }
 
@@ -86,11 +94,40 @@ fun SotDetailScreen(
         }
     }
 
-    // History points
-    val points = remember(startTime, refreshTick, timeRange) {
-        when (timeRange) {
+    val totalSotMs by produceState(initialValue = 0L, key1 = startTime, key2 = refreshTick) {
+        val now = System.currentTimeMillis()
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            systemMonitor.getScreenOnTimeMs(startTime, now)
+        }
+    }
+
+    // History points: ensures live anchor point so graph always connects seamlessly to 'now'
+    val points = remember(startTime, refreshTick, timeRange, totalSotMs) {
+        val raw = when (timeRange) {
             "Since Charge" -> BatteryTracker.getHistorySinceLastCharge(context)
             else -> BatteryTracker.getHistory24h(context)
+        }
+        val currentLevel = BatteryTracker.getBatteryPctNow(context)
+        val currentTemp = BatteryTracker.getBatteryTempNow(context)
+        val now = System.currentTimeMillis()
+
+        if (raw.isEmpty()) {
+            listOf(
+                HistoryPoint(startTime, currentLevel, 0L, currentTemp),
+                HistoryPoint(now, currentLevel, totalSotMs, currentTemp)
+            )
+        } else if (raw.size == 1) {
+            listOf(
+                raw.first(),
+                HistoryPoint(now, currentLevel, totalSotMs, currentTemp)
+            )
+        } else {
+            val last = raw.last()
+            if (now - last.timestamp > 60000L) {
+                raw + HistoryPoint(now, currentLevel, totalSotMs, currentTemp)
+            } else {
+                raw
+            }
         }
     }
 
@@ -104,13 +141,6 @@ fun SotDetailScreen(
         val qEnd = selectedRange?.second ?: now
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             systemMonitor.getScreenOnTimeMs(qStart, qEnd)
-        }
-    }
-
-    val totalSotMs by produceState(initialValue = 0L, key1 = startTime, key2 = refreshTick) {
-        val now = System.currentTimeMillis()
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            systemMonitor.getScreenOnTimeMs(startTime, now)
         }
     }
 
@@ -244,6 +274,28 @@ fun SotDetailScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            BatteryTracker.resetBaseline(context)
+                            lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
+                            selectedRange = null
+                            refreshTick++
+                        },
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .size(38.dp)
+                            .background(colors.elevatedSurface, CircleShape)
+                            .border(1.dp, colors.borderColorSubtle, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Reset SOT Baseline",
                             tint = colors.textPrimary,
                             modifier = Modifier.size(18.dp)
                         )

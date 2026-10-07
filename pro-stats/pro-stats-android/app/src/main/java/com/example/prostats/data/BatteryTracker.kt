@@ -126,6 +126,9 @@ object BatteryTracker {
             val temp = getBatteryTempNow(context)
             val isCharging = isChargingOrFull(context)
 
+            // Check if device reached target level, was unplugged, or gained charge
+            checkAndResetIfCharged(context)
+
             // Update in-progress charge metrics
             if (isCharging) {
                 if (currentChargeStartTime == 0L) {
@@ -146,13 +149,6 @@ object BatteryTracker {
             }
 
             val points = loadHistory(context).toMutableList()
-            val targetResetLevel = getTargetResetBatteryLevel(context)
-
-            // Auto-reset baseline when device is on charger at or above reset threshold (e.g. 90%)
-            if (isCharging && level >= targetResetLevel) {
-                updateLastUnplugFromFullTimestamp(context, now)
-                Log.d(TAG, "Device charging at $level% (>= $targetResetLevel%) — SOT baseline auto-reset")
-            }
 
             // Add new data point
             points.add(HistoryPoint(now, level, sotToday, temp))
@@ -178,6 +174,14 @@ object BatteryTracker {
         currentChargeStartLevel = level
         currentChargePeakTemp = temp
         currentChargeCurrentSamples.clear()
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean(KEY_WAS_CHARGING, true)
+            .putLong(KEY_CHARGE_START_TIME, now)
+            .putInt(KEY_CHARGE_START_LEVEL, level)
+            .apply()
+
         Log.d(TAG, "Power connected at $level%, temp $temp°C")
     }
 
@@ -186,12 +190,8 @@ object BatteryTracker {
         val now = System.currentTimeMillis()
         val level = getBatteryPctNow(context)
         finalizeChargingSession(context, now, level)
-        
-        val targetResetLevel = getTargetResetBatteryLevel(context)
-        if (level >= targetResetLevel) {
-            updateLastUnplugFromFullTimestamp(context, now)
-            Log.d(TAG, "Unplugged at $level% >= $targetResetLevel% — Reset baseline")
-        }
+        checkAndResetIfCharged(context)
+        Log.d(TAG, "Power disconnected at $level%")
     }
 
     private fun finalizeChargingSession(context: Context, endTime: Long, endLevel: Int) {
@@ -370,6 +370,10 @@ object BatteryTracker {
     private const val KEY_LAST_UNPLUG_FROM_FULL = "last_unplug_from_full_ts"
     private const val KEY_BASELINE_INITIALIZED = "baseline_initialized"
     private const val KEY_RESET_BATTERY_LEVEL = "reset_battery_level_pct"
+    private const val KEY_WAS_CHARGING = "was_charging"
+    private const val KEY_CHARGE_START_TIME = "charge_start_time"
+    private const val KEY_CHARGE_START_LEVEL = "charge_start_level"
+    private const val KEY_LAST_RECORDED_LEVEL = "last_recorded_level"
 
     // Alarm preferences (Battery Guru feature)
     const val KEY_CHARGE_ALARM_ENABLED = "charge_alarm_enabled"
@@ -486,7 +490,86 @@ object BatteryTracker {
         }
     }
 
-    private fun getBatteryPctNow(context: Context): Int {
+    fun resetBaseline(context: Context) {
+        val now = System.currentTimeMillis()
+        val level = getBatteryPctNow(context)
+        val temp = getBatteryTempNow(context)
+        updateLastUnplugFromFullTimestamp(context, now)
+
+        val points = loadHistory(context).toMutableList()
+        points.add(HistoryPoint(now, level, 0L, temp))
+        saveHistory(context, points)
+        cachedHistory = points
+        cacheTimestamp = now
+        Log.d(TAG, "SOT baseline explicitly reset at $level%")
+    }
+
+    @Synchronized
+    fun checkAndResetIfCharged(context: Context): Boolean {
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val intent = context.registerReceiver(null, filter) ?: return false
+        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        val pct = if (level >= 0 && scale > 0) (level * 100) / scale else -1
+        if (pct < 0) return false
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val targetResetLevel = getTargetResetBatteryLevel(context)
+        val wasCharging = prefs.getBoolean(KEY_WAS_CHARGING, false)
+        val chargeStartLevel = prefs.getInt(KEY_CHARGE_START_LEVEL, -1)
+        val chargeStartTime = prefs.getLong(KEY_CHARGE_START_TIME, 0L)
+        val lastRecordedLevel = prefs.getInt(KEY_LAST_RECORDED_LEVEL, -1)
+        val lastUnplugTs = getLastUnplugFromFullTimestamp(context)
+        val now = System.currentTimeMillis()
+
+        var didReset = false
+
+        // Case 1: Was charging, now disconnected
+        if (wasCharging && !isCharging) {
+            val gainedPct = if (chargeStartLevel > 0) pct - chargeStartLevel else 0
+            if (pct >= targetResetLevel || gainedPct >= 10 || (lastRecordedLevel > 0 && pct > lastRecordedLevel + 5)) {
+                updateLastUnplugFromFullTimestamp(context, now)
+                didReset = true
+                Log.d(TAG, "Unplugged after charge at $pct% (start $chargeStartLevel%) — SOT baseline reset")
+            }
+            prefs.edit()
+                .putBoolean(KEY_WAS_CHARGING, false)
+                .putLong(KEY_CHARGE_START_TIME, 0L)
+                .putInt(KEY_CHARGE_START_LEVEL, -1)
+                .apply()
+        }
+        // Case 2: Currently on charger and reached or exceeded target level
+        else if (isCharging) {
+            if (!wasCharging) {
+                prefs.edit()
+                    .putBoolean(KEY_WAS_CHARGING, true)
+                    .putLong(KEY_CHARGE_START_TIME, now)
+                    .putInt(KEY_CHARGE_START_LEVEL, pct)
+                    .apply()
+            }
+            if (pct >= targetResetLevel && (now - lastUnplugTs > 30 * 60 * 1000L || lastUnplugTs < chargeStartTime)) {
+                updateLastUnplugFromFullTimestamp(context, now)
+                didReset = true
+                Log.d(TAG, "Device charging at $pct% (>= $targetResetLevel%) — SOT baseline auto-reset")
+            }
+        }
+        // Case 3: Battery jumped significantly higher while app was closed / idle (missed broadcast)
+        else if (lastRecordedLevel > 0 && pct > lastRecordedLevel + 8 && now - lastUnplugTs > 10 * 60 * 1000L) {
+            updateLastUnplugFromFullTimestamp(context, now)
+            didReset = true
+            Log.d(TAG, "Battery level jump detected from $lastRecordedLevel% to $pct% — SOT baseline auto-reset")
+        }
+
+        prefs.edit()
+            .putInt(KEY_LAST_RECORDED_LEVEL, pct)
+            .apply()
+
+        return didReset
+    }
+
+    fun getBatteryPctNow(context: Context): Int {
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         val intent = context.registerReceiver(null, filter)
         val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
@@ -494,14 +577,14 @@ object BatteryTracker {
         return if (level >= 0 && scale > 0) (level * 100) / scale else 50
     }
 
-    private fun getBatteryTempNow(context: Context): Float {
+    fun getBatteryTempNow(context: Context): Float {
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         val intent = context.registerReceiver(null, filter)
         val temp = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
         return temp / 10.0f
     }
 
-    private fun isChargingOrFull(context: Context): Boolean {
+    fun isChargingOrFull(context: Context): Boolean {
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         val intent = context.registerReceiver(null, filter)
         val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1

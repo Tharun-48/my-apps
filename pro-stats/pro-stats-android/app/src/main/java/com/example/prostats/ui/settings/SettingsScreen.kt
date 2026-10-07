@@ -64,6 +64,8 @@ fun SettingsScreen(
     var tempAlarmLimit by remember { mutableIntStateOf(BatteryTracker.getTempAlarmLimit(context)) }
     var lowBatteryAlarmEnabled by remember { mutableStateOf(BatteryTracker.isLowBatteryAlarmEnabled(context)) }
     var lowBatteryAlarmLevel by remember { mutableIntStateOf(BatteryTracker.getLowBatteryAlarmLevel(context)) }
+    var resetBatteryLevel by remember { mutableIntStateOf(BatteryTracker.getTargetResetBatteryLevel(context)) }
+    var resetFeedbackText by remember { mutableStateOf<String?>(null) }
 
     val prefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
     var currentTheme by remember { mutableStateOf(prefs.getString("app_theme", "Material You") ?: "Material You") }
@@ -721,6 +723,69 @@ fun SettingsScreen(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = colors.borderColorSubtle)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // 4. SOT Graph Reset Baseline Threshold
+                    Column {
+                        Text("SOT Graph Reset Baseline", color = colors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text(
+                            "Auto-reset SOT cycle when battery reaches threshold or after unplugging from charge",
+                            color = colors.textSecondary,
+                            fontSize = 11.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(80, 85, 90, 100).forEach { lvl ->
+                                val selected = resetBatteryLevel == lvl
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(
+                                            if (selected) colors.accentBlue.copy(alpha = 0.2f) else colors.elevatedSurface,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (selected) colors.accentBlue else colors.borderColorSubtle,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable {
+                                            resetBatteryLevel = lvl
+                                            BatteryTracker.setTargetResetBatteryLevel(context, lvl)
+                                        }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$lvl%",
+                                        color = if (selected) colors.accentBlue else colors.textPrimary,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                BatteryTracker.resetBaseline(context)
+                                resetFeedbackText = "SOT baseline reset to now!"
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.accentBlue),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, colors.accentBlue.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(resetFeedbackText ?: "Reset SOT Baseline Now", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
 
@@ -870,20 +935,20 @@ fun SettingsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
-                                .background(colors.accentYellow.copy(alpha = 0.15f), CircleShape)
-                                .border(1.dp, colors.accentYellow.copy(alpha = 0.3f), CircleShape),
+                                .size(34.dp)
+                                .background(colors.elevatedSurface, CircleShape)
+                                .border(1.dp, colors.borderColorSubtle, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = colors.accentYellow,
-                                modifier = Modifier.size(16.dp)
+                                painter = androidx.compose.ui.res.painterResource(id = com.example.prostats.R.drawable.ic_prostats_logo),
+                                contentDescription = "ProStats Logo",
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("About & Release Status", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("About ProStats & Release Status", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                     Spacer(modifier = Modifier.height(14.dp))
                     Row(

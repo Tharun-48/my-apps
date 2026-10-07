@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- Battery Top Cap -->
+    <path
+        android:pathData="M42,14 L42,9 C42,7.3 43.3,6 45,6 L55,6 C56.7,6 58,7.3 58,9 L58,14 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="50"
+                android:startY="6"
+                android:endX="50"
+                android:endY="14">
+                <item android:offset="0.0" android:color="#93C5FD" />
+                <item android:offset="1.0" android:color="#60A5FA" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Outer Phone Chassis with Rounded Corners -->
+    <path
+        android:pathData="M37,14 L63,14 C69,14 74,19 74,25 L74,75 C74,81 69,86 63,86 L37,86 C31,86 26,81 26,75 L26,25 C26,19 31,14 37,14 Z"
+        android:strokeWidth="5"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="50"
+                android:startY="14"
+                android:endX="50"
+                android:endY="86">
+                <item android:offset="0.0" android:color="#60A5FA" />
+                <item android:offset="0.5" android:color="#3B82F6" />
+                <item android:offset="1.0" android:color="#1D4ED8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Top Speaker Notch -->
+    <path
+        android:pathData="M44,19 L56,19 C56.8,19 57.5,19.7 57.5,20.5 C57.5,21.3 56.8,22 56,22 L44,22 C43.2,22 42.5,21.3 42.5,20.5 C42.5,19.7 43.2,19 44,19 Z"
+        android:fillColor="#BAE6FD" />
+
+    <!-- Bottom Home Pill Indicator -->
+    <path
+        android:pathData="M44,78 L56,78 C56.8,78 57.5,78.7 57.5,79.5 C57.5,80.3 56.8,81 56,81 L44,81 C43.2,81 42.5,80.3 42.5,79.5 C42.5,78.7 43.2,78 44,78 Z"
+        android:fillColor="#BAE6FD" />
+
+    <!-- 6 Rising Histogram Bars -->
+    <path
+        android:pathData="M32,73 L32,59 C32,57.9 32.9,57 34,57 C35.1,57 36,57.9 36,59 L36,73 Z"
+        android:fillColor="#2563EB" />
+
+    <path
+        android:pathData="M39,73 L39,51 C39,49.9 39.9,49 41,49 C42.1,49 43,49.9 43,51 L43,73 Z"
+        android:fillColor="#3B82F6" />
+
+    <path
+        android:pathData="M46,73 L46,43 C46,41.9 46.9,41 48,41 C49.1,41 50,41.9 50,43 L50,73 Z"
+        android:fillColor="#3B82F6" />
+
+    <path
+        android:pathData="M53,73 L53,35 C53,33.9 53.9,33 55,33 C56.1,33 57,33.9 57,35 L57,73 Z"
+        android:fillColor="#60A5FA" />
+
+    <path
+        android:pathData="M60,73 L60,27 C60,25.9 60.9,25 62,25 C63.1,25 64,25.9 64,27 L64,73 Z"
+        android:fillColor="#60A5FA" />
+
+    <path
+        android:pathData="M67,73 L67,20 C67,18.9 67.9,18 69,18 C70.1,18 71,18.9 71,20 L71,73 Z"
+        android:fillColor="#93C5FD" />
+
+    <!-- Cutout Gap -->
+    <path
+        android:pathData="M16,71 L46,41 L41,57 L74,26 L68,21 L90,16 L85,38 L79,32 L51,61 L55,45 Z"
+        android:strokeWidth="4"
+        android:strokeColor="#0A0C10"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#0A0C10" />
+
+    <!-- Hero Lightning Bolt & Upward Surge Arrow -->
+    <path
+        android:pathData="M16,71 L46,41 L41,57 L74,26 L68,21 L90,16 L85,38 L79,32 L51,61 L55,45 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="16"
+                android:startY="71"
+                android:endX="90"
+                android:endY="16">
+                <item android:offset="0.0" android:color="#38BDF8" />
+                <item android:offset="0.4" android:color="#7DD3FC" />
+                <item android:offset="0.8" android:color="#BAE6FD" />
+                <item android:offset="1.0" android:color="#F0F9FF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+</vector>

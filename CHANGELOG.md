@@ -2,6 +2,22 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-10-07] Enhanced Classic App Shortcut Logo & Robust SOT Graph Charging Reset
+- **User Prompts**: *"enhance this logo like dont change element just colour and apply it in my app"* / *"remove violet bro"* / *"i want a bit claasic"* / *"i said just add to logo in app shortcut, maybe show somwhere but not everywhere"* / *"screen on time graph not resetting when charged"* / *"check for any bugs by verifying everything"*
+- **Summary of Changes**:
+  - **Enhanced Classic Logo & Launcher Icon (`ic_launcher_foreground.xml`, `ic_launcher_background.xml`, `ic_launcher_monochrome.xml`, `SettingsScreen.kt`)**:
+    - Created custom Ice Blue & Indigo vector artwork preserving all user geometry: smartphone chassis, top battery lug, notch, bottom pill indicator, 6-bar histogram, and surging lightning arrow.
+    - Added deep matte slate background with subtle radial depth and Material You monochrome vector icon support.
+    - Embedded branded logo in Settings About section without cluttering other dashboard screens.
+  - **SOT Graph Charging Reset & Baseline Tracking (`BatteryTracker.kt`, `SotDetailScreen.kt`, `MainActivity.kt`, `SettingsScreen.kt`)**:
+    - Implemented persistent charge tracking in `SharedPreferences` to detect charger unplugging, level jumps (>= 10%), or target threshold reached (>= 80%).
+    - Added `checkAndResetIfCharged` executed on resume, periodic refresh loop (every 15s), and charger disconnect.
+    - Updated `SotDetailScreen.kt` to synthesize a live anchor point up to `now`, guaranteeing smooth graph curve rendering without blank screens upon reset.
+    - Added dedicated manual **Reset SOT Baseline** action button in `SotDetailScreen.kt` TopAppBar and configurable threshold selector in `SettingsScreen.kt`.
+  - **Release Build**: Compiled `ProStats-v2.5.apk` (9.7MB) and deployed to `pro-stats/releases/`.
+
+---
+
 ### [2026-10-01] Fluid Battery Graph Drag Gestures & Refined Design Aesthetics
 - **User Prompts**: *"the graph line drag is too clunky it didnt move freely and i dont said to copy the exact colour tho. i know you take my input but make a little more better"*
 - **Summary of Changes**:

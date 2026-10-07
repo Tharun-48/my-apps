@@ -37,4 +37,14 @@ class MainActivity : ComponentActivity() {
       }
     }
   }
+
+  override fun onResume() {
+    super.onResume()
+    try {
+      com.example.prostats.data.BatteryTracker.checkAndResetIfCharged(applicationContext)
+      com.example.prostats.data.BatteryTracker.recordDataPoint(applicationContext)
+    } catch (e: Exception) {
+      android.util.Log.e("MainActivity", "Failed to check charge on resume", e)
+    }
+  }
 }
