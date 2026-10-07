@@ -2,8 +2,8 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
-### [2026-10-08] About Native Engine Removal, Release Notes Viewer, Discord Server & GPay Support
-- **User Prompts**: *"in about, native engine is not needed to show, you can remove it but dont build app for now"* / *"maybe give option to view release notes, give discord icon to join - https://discord.gg/ZE99xfAPnJ"* / *"and buy me a coffee with gpay icon - ganapathytharun448@oksbi"*
+### [2026-10-08] About Native Engine Removal, Release Notes Viewer, Discord Server & GPay Cleanup
+- **User Prompts**: *"in about, native engine is not needed to show, you can remove it but dont build app for now"* / *"maybe give option to view release notes, give discord icon to join - https://discord.gg/ZE99xfAPnJ"* / *"dont show upi id bro, change dont build for now"* / *"or remove whole gpay one, again dont build.... huh build i guess"*
 - **Summary of Changes**:
   - **Removed Native Engine Displays (`SettingsScreen.kt`, `SystemInfoScreen.kt`)**:
     - Removed native engine rows from the Settings About card and System Info Device Identity cards.
@@ -11,9 +11,9 @@ This document maintains a historical log of user inputs and corresponding code c
     - Added in-app Material 3 dialog showcasing current release highlights with a quick link to GitHub release notes.
   - **Discord Community Card (`SettingsScreen.kt`, `ic_discord.xml`)**:
     - Added dedicated Discord community section with custom vector icon and invite launcher.
-  - **Buy Me a Coffee with GPay / UPI (`SettingsScreen.kt`, `ic_gpay.xml`)**:
-    - Added support card with Google Pay vector icon, copyable UPI ID chip (`ganapathytharun448@oksbi`), and one-tap UPI intent launcher.
-  - **Release Build**: Compiled updated `ProStats-v2.5.apk` (9.8MB) and deployed to `pro-stats/releases/`.
+  - **Removed GPay / UPI Card (`SettingsScreen.kt`, `ic_gpay.xml`)**:
+    - Completely removed the GPay / UPI card and deleted unused vector drawable per user request.
+  - **Release Build**: Compiled clean `ProStats-v2.5.apk` (9.8MB) and deployed to `pro-stats/releases/`.
 
 ### [2026-10-08] Symmetrical Classic Logo, Material You OLED Theme, Real-Time Bandwidth & Dynamic Setup Flow
 - **User Prompts**: *"app logo arrow looks inaccurate / weird"* / *"material you should be the default, show light, dark, system default, in dark give toggle for deep / pure black"* / *"network interface and bandwidth didnt update"* / *"while install and setup app, ask autostart permission... dynamically show one and one"* / *"so yea do build after finishing things"* / *"i said this app need to be in rust, add somewhere which is important where when i update, this app is in rustt"*
