@@ -122,7 +122,6 @@ fun SystemInfoScreen() {
                     InfoRow("Board", di.board)
                     InfoRow("Hardware Platform", di.hardware)
                     InfoRow("Android OS Version", di.androidVersion)
-                    InfoRow("App Runtime Engine", "🦀 Rust Native Core (core-rs) + Compose")
                 }
             }
         }

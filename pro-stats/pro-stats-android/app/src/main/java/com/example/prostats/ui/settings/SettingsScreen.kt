@@ -1,8 +1,12 @@
 package com.example.prostats.ui.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -78,6 +82,7 @@ fun SettingsScreen(
 
     var latestVersion by remember { mutableStateOf<String?>(null) }
     var updateAvailable by remember { mutableStateOf(false) }
+    var showReleaseNotesDialog by remember { mutableStateOf(false) }
 
     // Auto-refresh Usage/Overlay status every 3s
     LaunchedEffect(Unit) {
@@ -1026,27 +1031,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("Native Engine", color = colors.textSecondary, fontSize = 13.sp)
-                            Text("High-performance zero-overhead core", color = colors.textTertiary, fontSize = 10.sp)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .background(colors.accentOrange.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                .border(1.dp, colors.accentOrange.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text("🦀 Rust Native Core (core-rs)", color = colors.accentOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
                     if (updateAvailable && latestVersion != null) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Box(
@@ -1075,18 +1059,236 @@ fun SettingsScreen(
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { showReleaseNotesDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.accentBlue.copy(alpha = 0.15f), contentColor = colors.accentBlue),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Release Notes", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Tharun-48/my-apps/tree/main/pro-stats/releases"))
+                                context.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.elevatedSurface, contentColor = colors.textPrimary),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("GitHub Releases", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Community & Discord Card
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .background(Color(0xFF5865F2).copy(alpha = 0.15f), CircleShape)
+                                .border(1.dp, Color(0xFF5865F2).copy(alpha = 0.4f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = androidx.compose.ui.res.painterResource(id = com.example.prostats.R.drawable.ic_discord),
+                                contentDescription = "Discord",
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Discord Community", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Join our server to discuss features, report issues, and connect directly with the developer.",
+                        color = colors.textSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
                     Button(
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Tharun-48/my-apps/tree/main/pro-stats/releases"))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/ZE99xfAPnJ"))
                             context.startActivity(intent)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.elevatedSurface, contentColor = colors.textPrimary),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5865F2), contentColor = Color.White),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Check Releases on GitHub", fontSize = 13.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = androidx.compose.ui.res.painterResource(id = com.example.prostats.R.drawable.ic_discord),
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Join Discord Server", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Support Development / Buy Me a Coffee Card
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, colors.borderColor, RoundedCornerShape(22.dp))
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .background(colors.elevatedSurface, CircleShape)
+                                .border(1.dp, colors.borderColorSubtle, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = androidx.compose.ui.res.painterResource(id = com.example.prostats.R.drawable.ic_gpay),
+                                contentDescription = "GPay",
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Buy Me a Coffee", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Support independent development of ProStats with Google Pay or UPI.",
+                        color = colors.textSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    // UPI ID Chip with Copy Button
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.elevatedSurface, RoundedCornerShape(12.dp))
+                            .border(1.dp, colors.borderColorSubtle, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("UPI ID", color = colors.textTertiary, fontSize = 10.sp)
+                            Text("ganapathytharun448@oksbi", color = colors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        TextButton(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("UPI ID", "ganapathytharun448@oksbi"))
+                                Toast.makeText(context, "UPI ID copied: ganapathytharun448@oksbi", Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Copy", color = colors.accentBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            try {
+                                val upiUri = Uri.parse("upi://pay?pa=ganapathytharun448@oksbi&pn=Tharun%20GV&cu=INR")
+                                val intent = Intent(Intent.ACTION_VIEW, upiUri)
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("UPI ID", "ganapathytharun448@oksbi"))
+                                Toast.makeText(context, "UPI ID copied: ganapathytharun448@oksbi", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.accentGreen, contentColor = Color.Black),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = androidx.compose.ui.res.painterResource(id = com.example.prostats.R.drawable.ic_gpay),
+                                contentDescription = null,
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Pay with GPay / UPI", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+
+            if (showReleaseNotesDialog) {
+                AlertDialog(
+                    onDismissRequest = { showReleaseNotesDialog = false },
+                    shape = RoundedCornerShape(24.dp),
+                    containerColor = colors.cardSurface,
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = androidx.compose.ui.res.painterResource(id = com.example.prostats.R.drawable.ic_prostats_logo),
+                                contentDescription = null,
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Release Notes (v2.5)", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                        }
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("• Symmetrical classic 45° surge vector launcher logo", color = colors.textPrimary, fontSize = 13.sp)
+                            Text("• Material You dynamic system colors by default with OLED Pure Black toggle", color = colors.textPrimary, fontSize = 13.sp)
+                            Text("• Real-time network bandwidth polling measuring download & upload speeds", color = colors.textPrimary, fontSize = 13.sp)
+                            Text("• Step-by-step setup walkthrough with multi-OEM autostart configuration", color = colors.textPrimary, fontSize = 13.sp)
+                            Text("• Battery charging baseline auto-reset for continuous SOT tracking", color = colors.textPrimary, fontSize = 13.sp)
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showReleaseNotesDialog = false
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Tharun-48/my-apps/blob/main/pro-stats/RELEASE_NOTES.md"))
+                                context.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.accentBlue, contentColor = Color.White),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("View on GitHub", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showReleaseNotesDialog = false },
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Close", color = colors.textSecondary, fontSize = 12.sp)
+                        }
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
