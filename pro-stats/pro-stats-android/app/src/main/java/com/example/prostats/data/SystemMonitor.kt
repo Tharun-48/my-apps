@@ -237,6 +237,18 @@ class SystemMonitor(private val context: Context) {
         context.startActivity(intent)
     }
 
+    fun launchAppDetails(packageName: String) {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = android.net.Uri.parse("package:$packageName")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Log.e("SystemMonitor", "Failed to launch app details settings for $packageName", e)
+        }
+    }
+
     fun requestShizukuPermission() {
         if (isShizukuRunning()) {
             try {
@@ -1409,46 +1421,6 @@ class SystemMonitor(private val context: Context) {
         }
 
         return@withContext success
-    }
-
-    // 6. Freeze App
-    suspend fun freezeApp(packageName: String): Boolean = kotlinx.coroutines.withContext(Dispatchers.IO) {
-        if (isShizukuRunning() && hasShizukuPermission()) {
-            return@withContext try {
-                val p1 = Shizuku.newProcess(arrayOf("sh", "-c", "pm disable-user --user 0 $packageName 2>&1"), null, null)
-                val exit1 = p1.waitFor()
-                if (exit1 == 0) true else {
-                    val p2 = Shizuku.newProcess(arrayOf("sh", "-c", "pm disable $packageName 2>&1"), null, null)
-                    p2.waitFor() == 0
-                }
-            } catch (e: Exception) {
-                Log.e("SystemMonitor", "Error freezing app", e)
-                false
-            }
-        } else {
-            return@withContext try {
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = android.net.Uri.parse("package:$packageName")
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                context.startActivity(intent)
-                true
-            } catch (e: Exception) {
-                false
-            }
-        }
-    }
-
-    // 7. Unfreeze App
-    suspend fun unfreezeApp(packageName: String): Boolean = kotlinx.coroutines.withContext(Dispatchers.IO) {
-        if (!isShizukuRunning() || !hasShizukuPermission()) return@withContext false
-        return@withContext try {
-            val process = Shizuku.newProcess(arrayOf("sh", "-c", "pm enable $packageName 2>&1"), null, null)
-            process.waitFor() == 0
-        } catch (e: Exception) {
-            Log.e("SystemMonitor", "Error unfreezing app", e)
-            false
-        }
     }
 
     // ========== NEW FEATURES: Battery Guru / DevCheck Inspired ==========

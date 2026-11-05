@@ -89,7 +89,7 @@ fun AppIcon(packageName: String, modifier: Modifier = Modifier) {
 fun MainScreen(
     uiState: MainScreenUiState,
     onForceStop: (String) -> Unit,
-    onFreeze: (String) -> Unit,
+    onAppInfo: (String) -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -224,7 +224,7 @@ fun MainScreen(
                                     item = item,
                                     sortBy = sortBy,
                                     onForceStop = onForceStop,
-                                    onFreeze = onFreeze
+                                    onAppInfo = onAppInfo
                                 )
                             }
                         }
@@ -342,7 +342,7 @@ fun ProcessRow(
     item: ProcessItem,
     sortBy: String,
     onForceStop: (String) -> Unit,
-    onFreeze: (String) -> Unit
+    onAppInfo: (String) -> Unit
 ) {
     val colors = ProStatsColors.current
     var showDialog by remember { mutableStateOf(false) }
@@ -374,13 +374,13 @@ fun ProcessRow(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Button(
-                        onClick = { onFreeze(item.packageName) },
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.accentPurple, contentColor = Color.White),
+                        onClick = { onAppInfo(item.packageName) },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.accentBlue, contentColor = Color.White),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier.height(34.dp)
                     ) {
-                        Text("Freeze", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("App Info", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -630,13 +630,21 @@ fun ProcessRow(
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = {
-                        onFreeze(item.packageName)
-                        showDialog = false
+                Row {
+                    TextButton(
+                        onClick = { showDialog = false }
+                    ) {
+                        Text("Cancel", color = colors.textSecondary)
                     }
-                ) {
-                    Text("Freeze App", color = colors.accentPurple, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    TextButton(
+                        onClick = {
+                            onAppInfo(item.packageName)
+                            showDialog = false
+                        }
+                    ) {
+                        Text("App Info", color = colors.accentBlue, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         )

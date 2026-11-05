@@ -2,6 +2,22 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-11-05] 24h Scrubber Crash Fix, Process Freeze Removal, Web Purge & Pure Android Consolidation
+- **User Prompts**: *"the error when change 24h java.lang.IllegalArgumentException: Cannot coerce value to an empty range"* / *"now its working tho"* / *"well also why is there freeze app option in manage process... it makes no sense"* / *"its inside running processes"* / *"yes"* / *"i only need android app ig"*
+- **Summary of Changes**:
+  - **24h Battery Graph Crash Fix (`SotDetailScreen.kt`)**:
+    - Fixed `IllegalArgumentException` in `BatteryGraph` scrubber caused by unconstrained `coerceIn` calculation when tapping or dragging near range boundaries.
+    - Added safe boundary clamping for `START_HANDLE`, `END_HANDLE`, and `MIDDLE_REGION` ensuring `minEnd <= maxTime` and `maxStart >= minTime`.
+    - Added range recalculation in `LaunchedEffect(selectedRange, minTime, maxTime)` when time filter switches to 24h.
+  - **Removed "Freeze App" & Replaced with "App Info" (`MainScreen.kt`, `MainScreenViewModel.kt`, `Navigation.kt`, `SystemMonitor.kt`, `SettingsScreen.kt`)**:
+    - Removed disruptive `pm disable` call that hid apps from the user's launcher without an unfreeze path.
+    - Replaced with standard "App Info" launcher (`Settings.ACTION_APPLICATION_DETAILS_SETTINGS`) in swipe action and process dialog.
+  - **Cleaned Repository for Pure Android**:
+    - Deleted `pro-stats-web/`, `app.js`, `index.html`, `style.css`, and legacy `app/src/main/assets`.
+    - Consolidated repository strictly to native Android app and release packages.
+  - **Release APK Build**:
+    - Compiled `ProStats-v2.5.apk` (9.78 MB) with R8 shrinking and deployed to `pro-stats/releases/`.
+
 ### [2026-11-05] Permanent Core Architecture Mandate: Hybrid Kotlin Compose + Native Rust Engine
 - **User Prompts**: *"what can i do now, you said completely not able to change to rust"* / *"which is more lighter?"* / *"ok proceed with step 1. write deep into agent or changelog now after every operation should continue with this condition"*
 - **Summary of Changes**:

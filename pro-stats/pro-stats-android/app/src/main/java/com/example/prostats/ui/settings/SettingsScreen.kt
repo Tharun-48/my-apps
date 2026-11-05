@@ -290,7 +290,7 @@ fun SettingsScreen(
                                 Text("Pro Mode Active", color = colors.accentGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "• Real-time CPU & RAM per process\n• Force stop & freeze background apps\n• Battery stats via dumpsys\n• Wakelock analysis via dumpsys power",
+                                    text = "• Real-time CPU & RAM per process\n• Force stop background apps & view app details\n• Battery stats via dumpsys\n• Wakelock analysis via dumpsys power",
                                     color = colors.textPrimary,
                                     fontSize = 12.sp,
                                     lineHeight = 18.sp

@@ -26,10 +26,8 @@ class MainScreenViewModel(private val systemMonitor: SystemMonitor) : ViewModel(
         }
     }
 
-    fun freeze(packageName: String) {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            systemMonitor.freezeApp(packageName)
-        }
+    fun openAppDetails(packageName: String) {
+        systemMonitor.launchAppDetails(packageName)
     }
 }
 

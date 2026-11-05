@@ -93,7 +93,7 @@ fun MainNavigation() {
           MainScreen(
             uiState = state,
             onForceStop = { vm.forceStop(it) },
-            onFreeze = { vm.freeze(it) },
+            onAppInfo = { vm.openAppDetails(it) },
             onNavigateBack = {
               backStack.removeLastOrNull()
             }

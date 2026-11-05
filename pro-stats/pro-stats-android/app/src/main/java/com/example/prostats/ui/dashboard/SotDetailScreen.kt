@@ -971,8 +971,14 @@ fun BatteryGraph(
     // Local visual range for 120fps direct dragging with zero pointer lag
     var visualRange by remember { mutableStateOf(selectedRange) }
 
-    LaunchedEffect(selectedRange) {
-        visualRange = selectedRange
+    LaunchedEffect(selectedRange, minTime, maxTime) {
+        if (selectedRange != null) {
+            val s = selectedRange.first.coerceIn(minTime, maxTime)
+            val e = selectedRange.second.coerceIn(s, maxTime)
+            visualRange = Pair(s, e)
+        } else {
+            visualRange = null
+        }
     }
 
     val coroutineScope = rememberCoroutineScope()
@@ -1024,14 +1030,16 @@ fun BatteryGraph(
                     if (currentRange == null) {
                         // First tap creates an initial slice centered at the touch point
                         val tappedTs = minTime + ((down.position.x / width).coerceIn(0f, 1f) * timeSpan).toLong()
-                        val defaultSpan = (timeSpan / 3L).coerceIn(45 * 60 * 1000L, 3 * 60 * 60 * 1000L)
-                        val s = (tappedTs - defaultSpan / 2).coerceAtLeast(minTime)
-                        val e = (s + defaultSpan).coerceAtMost(maxTime)
+                        val defaultSpan = (timeSpan / 3L).coerceIn(10 * 60 * 1000L, 3 * 60 * 60 * 1000L).coerceAtMost(timeSpan)
+                        val s = (tappedTs - defaultSpan / 2).coerceIn(minTime, (maxTime - defaultSpan).coerceAtLeast(minTime))
+                        val e = (s + defaultSpan).coerceIn(s, maxTime)
                         initialRange = Pair(s, e)
                         visualRange = initialRange
                         activeTarget = DragTarget.END_HANDLE
                     } else {
-                        initialRange = currentRange
+                        val clampedStart = currentRange.first.coerceIn(minTime, maxTime)
+                        val clampedEnd = currentRange.second.coerceIn(clampedStart, maxTime)
+                        initialRange = Pair(clampedStart, clampedEnd)
                         activeTarget = when {
                             distToStart <= hitTolerance && distToEnd <= hitTolerance -> {
                                 if (down.position.x < (startX + endX) / 2f) DragTarget.START_HANDLE else DragTarget.END_HANDLE
@@ -1065,23 +1073,26 @@ fun BatteryGraph(
                             lastX = curX
                             change.consume()
 
-                            val minWindowMs = 10 * 60 * 1000L
+                            val minWindowMs = (10 * 60 * 1000L).coerceAtMost((timeSpan / 4).coerceAtLeast(60000L))
                             val updatedRange = when (activeTarget) {
                                 DragTarget.START_HANDLE -> {
+                                    val maxStart = (activeRange.second - minWindowMs).coerceAtLeast(minTime)
                                     val newStart = (minTime + (curX / width).coerceIn(0f, 1f) * timeSpan).toLong()
-                                        .coerceIn(minTime, activeRange.second - minWindowMs)
+                                        .coerceIn(minTime, maxStart)
                                     Pair(newStart, activeRange.second)
                                 }
                                 DragTarget.END_HANDLE -> {
+                                    val minEnd = (activeRange.first + minWindowMs).coerceAtMost(maxTime)
                                     val newEnd = (minTime + (curX / width).coerceIn(0f, 1f) * timeSpan).toLong()
-                                        .coerceIn(activeRange.first + minWindowMs, maxTime)
+                                        .coerceIn(minEnd, maxTime)
                                     Pair(activeRange.first, newEnd)
                                 }
                                 DragTarget.MIDDLE_REGION -> {
                                     val dt = ((dx / width) * timeSpan).toLong()
-                                    val duration = activeRange.second - activeRange.first
-                                    val newStart = (activeRange.first + dt).coerceIn(minTime, maxTime - duration)
-                                    val newEnd = newStart + duration
+                                    val duration = (activeRange.second - activeRange.first).coerceAtMost(timeSpan)
+                                    val maxStart = (maxTime - duration).coerceAtLeast(minTime)
+                                    val newStart = (activeRange.first + dt).coerceIn(minTime, maxStart)
+                                    val newEnd = (newStart + duration).coerceAtMost(maxTime)
                                     Pair(newStart, newEnd)
                                 }
                                 DragTarget.NONE -> activeRange

@@ -15,7 +15,7 @@
 ## Mandatory Core Architecture: Hybrid Kotlin UI + Native Rust Engine
 - **Permanent Architecture Protocol**: All future operations and features must strictly adhere to the high-efficiency hybrid architecture:
   1. **Kotlin (Jetpack Compose)**: Solely responsible for the UI layer, Material Design 3 / Material You theming, system service hooks (`BatteryManager`, `NetworkStatsManager`, `ActivityManager`), lifecycle management, and edge-to-edge system insets.
-  2. **Native Rust Core (`core-rs` / `libcore_rs.so` & `pro_stats_web.wasm`)**: Solely responsible for heavy computational algorithms, battery degradation models, non-linear wear curves, CC-CV charging profile estimations, bandwidth calculus, and outlier-filtered statistics with zero garbage-collection overhead.
+  2. **Native Rust Core (`core-rs` / `libcore_rs.so`)**: Solely responsible for heavy computational algorithms, battery degradation models, non-linear wear curves, CC-CV charging profile estimations, bandwidth calculus, and outlier-filtered statistics with zero garbage-collection overhead.
   3. **No 100% Pure Rust UI (No Slint/Egui)**: Never attempt to replace the native Android UI framework with 100% pure Rust game-engine/canvas toolkits (Slint, Egui, NativeActivity). Maintaining native Compose ensures the lowest possible RAM footprint (~25–40MB), zero background battery drain, dynamic Monet theming, and full TalkBack/accessibility support.
   4. **JNI Parity & Safety**: Whenever extending native functions in Rust, verify exported JNI symbols match Kotlin native declarations exactly to prevent runtime `UnsatisfiedLinkError`. Always provide graceful fallback calculations in Kotlin.
 
