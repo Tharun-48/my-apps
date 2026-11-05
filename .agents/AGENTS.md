@@ -32,6 +32,7 @@
 ## Environment Constraints
 - **Hardware Limits**: The host machine is an older laptop (Intel Pentium N3710, 4-core Atom @ 1.6GHz, ~4–8GB RAM). Compiling Android applications and running heavy build tasks will take a significant amount of time. Give compilation processes ample time to complete.
 - **N3710 Optimizations**: Avoid spawning more than 4 parallel agents. Prefer sequential operations over parallel where possible. Never run heavy background indexing during builds.
+- **Pentium N3710 Async Scheduling & Long Timers**: On this low-power 1.6GHz Atom processor, Gradle compilation, AAPT2 linking, and APK packaging take 5 to 10 minutes. Agents MUST NOT spam short 10–30s polling loops or frequent status checks. Use long schedule timers (120–180 seconds or reactive event wakeups) and end turns patiently so CPU cycles remain dedicated to compilation.
 
 ## AI Model & Token Efficiency Rules
 - **Token Efficiency**: Keep prompts concise. Do not re-send large file contents if a diff suffices. Prefer targeted edits over full-file rewrites.

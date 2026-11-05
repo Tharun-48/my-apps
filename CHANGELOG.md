@@ -5,6 +5,13 @@ This document maintains a historical log of user inputs and corresponding code c
 ### [2026-11-05] Laptop Reset Recovery, Git Customization, Toolchain Installation & Rust Core Conversion
 - **User Prompts**: *"i reinstalled ide in my laptop, dont ask me cause im in another work, just read logs, customise git what to show i dont have idea on that but show only necessaries. change the entire app to rust i gave you full permission you always proceed yourself"* / *"connect git also"* / *"if you cant able to connect git ans github let me know and tell me what to doo for that"* / *"like i again said i reseted my laptop so install all necessaries that are previously downloaded like node git cli etc"* / *"you can try both try converting code or searching and apply, youre the one need to choose which have more accuracy"* / *"also convert fully to rust. if have drawbacks tell to me. i said previously some month ago but its still app.js here"*
 - **Summary of Changes**:
+  - **Android SDK Recovery & Fresh Release Compilation**:
+    - Downloaded and configured Android Command-Line Tools in `C:\sdk\cmdline-tools\latest`.
+    - Installed `platforms;android-36`, `build-tools;36.0.0`, and `platform-tools` with pre-accepted SDK licenses.
+    - Compiled fresh release binary `ProStats-v2.5.apk` (9.79 MB) and deployed to `pro-stats/releases/`.
+    - Deleted obsolete stub `package-lock.json` from workspace root.
+  - **Pentium N3710 Long Schedule Policy (`AGENTS.md`)**:
+    - Added dedicated policy enforcing 120–180s async schedules and eliminating tight polling loops on low-power Intel Atom CPUs.
   - **Toolchain & CLI Restoration**:
     - Installed Node.js LTS v26.13.0 & npm 11.20.0 to `%LOCALAPPDATA%\Programs\nodejs`.
     - Installed GitHub CLI (gh v2.103.3) to `%LOCALAPPDATA%\Programs\gh`.
