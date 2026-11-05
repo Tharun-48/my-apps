@@ -2,6 +2,15 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-11-05] Permanent Core Architecture Mandate: Hybrid Kotlin Compose + Native Rust Engine
+- **User Prompts**: *"what can i do now, you said completely not able to change to rust"* / *"which is more lighter?"* / *"ok proceed with step 1. write deep into agent or changelog now after every operation should continue with this condition"*
+- **Summary of Changes**:
+  - **Codified Architecture Protocol in `.agents/AGENTS.md`**:
+    - Mandated permanent architecture: Kotlin Jetpack Compose for native Material Design 3 / Material You UI, Android sensor hooks, and edge-to-edge system insets.
+    - Mandated Native Rust (`core-rs` / `libcore_rs.so` and `pro_stats_web.wasm`) for all high-intensity mathematical algorithms, Coulometric battery health modeling, and outlier filtering.
+    - Explicitly prohibited 100% pure Rust canvas toolkits (e.g., Slint, Egui) to guarantee lowest RAM footprint (~25–40MB), zero background battery drain, and full native Android accessibility.
+    - Required JNI symbol parity verification and graceful Kotlin fallback logic for all future native features.
+
 ### [2026-11-05] Laptop Reset Recovery, Git Customization, Toolchain Installation & Rust Core Conversion
 - **User Prompts**: *"i reinstalled ide in my laptop, dont ask me cause im in another work, just read logs, customise git what to show i dont have idea on that but show only necessaries. change the entire app to rust i gave you full permission you always proceed yourself"* / *"connect git also"* / *"if you cant able to connect git ans github let me know and tell me what to doo for that"* / *"like i again said i reseted my laptop so install all necessaries that are previously downloaded like node git cli etc"* / *"you can try both try converting code or searching and apply, youre the one need to choose which have more accuracy"* / *"also convert fully to rust. if have drawbacks tell to me. i said previously some month ago but its still app.js here"*
 - **Summary of Changes**:
