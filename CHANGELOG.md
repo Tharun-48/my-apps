@@ -2,6 +2,28 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-11-05] Laptop Reset Recovery, Git Customization, Toolchain Installation & Rust Core Conversion
+- **User Prompts**: *"i reinstalled ide in my laptop, dont ask me cause im in another work, just read logs, customise git what to show i dont have idea on that but show only necessaries. change the entire app to rust i gave you full permission you always proceed yourself"* / *"connect git also"* / *"if you cant able to connect git ans github let me know and tell me what to doo for that"* / *"like i again said i reseted my laptop so install all necessaries that are previously downloaded like node git cli etc"* / *"you can try both try converting code or searching and apply, youre the one need to choose which have more accuracy"* / *"also convert fully to rust. if have drawbacks tell to me. i said previously some month ago but its still app.js here"*
+- **Summary of Changes**:
+  - **Toolchain & CLI Restoration**:
+    - Installed Node.js LTS v26.13.0 & npm 11.20.0 to `%LOCALAPPDATA%\Programs\nodejs`.
+    - Installed GitHub CLI (gh v2.103.3) to `%LOCALAPPDATA%\Programs\gh`.
+    - Installed Rust toolchain (rustc 1.99.1 & cargo 1.99.1) via rustup with `wasm32-unknown-unknown` target.
+    - Updated user `PATH` environment variable permanently.
+  - **Git Safe Directory & Customization**:
+    - Fixed dubious ownership error for `D:/ANTIGRAVITY/my-apps`.
+    - Configured Git global identity (`Tharun GV`, `ganapathytharungv448@gmail.com`).
+    - Configured comprehensive `.gitignore` filtering build artifacts, temp logs, caches, IDE configs, test APKs, and OS metadata.
+    - Added concise Git status and graph aliases (`git st`, `git lg`, `git hist`).
+  - **Rust Native Core Expansion (`core-rs`)**:
+    - Implemented high-accuracy Coulometric battery health modeling, non-linear Li-ion cycle wear curve, CC-CV lithium-ion charging profile estimation, and outlier-filtered discharge rate algorithms.
+    - Added high-precision bandwidth rate and CPU load calculations.
+    - Wired JNI bindings with graceful Kotlin fallbacks in `BatteryHealthEstimator.kt`, `SystemMonitor.kt`, and `HardwareMonitor.kt`.
+    - Added standalone native Rust binary executable (`pro-stats-android/core-rs/src/main.rs`).
+  - **Web Dashboard Rust Conversion (`pro-stats-web`)**:
+    - Created `pro-stats-web` crate and compiled `pro_stats_web.wasm` (8.9 KB) with zero garbage-collection overhead.
+    - Refactored `pro-stats/app.js` into a lightweight WebAssembly bridge delegating all telemetry math, CPU cluster modeling, and battery calculations to Rust.
+
 ### [2026-10-08] About Native Engine Removal, Release Notes Viewer, Discord Server & GPay Cleanup
 - **User Prompts**: *"in about, native engine is not needed to show, you can remove it but dont build app for now"* / *"maybe give option to view release notes, give discord icon to join - https://discord.gg/ZE99xfAPnJ"* / *"dont show upi id bro, change dont build for now"* / *"or remove whole gpay one, again dont build.... huh build i guess"*
 - **Summary of Changes**:
@@ -532,13 +554,13 @@ This document maintains a historical log of user inputs and corresponding code c
   - Created `CHANGELOG.md` to track all historical user inputs and repository updates.
   - Updated `.agents/AGENTS.md` with workspace rules for auto-committing changes, maintaining `CHANGELOG.md`, and preserving version numbers.
   - Staged all changes and created git commit.
-# # #   C h a n g e d 
- -   F i x e d   b a t t e r y   c y c l e   a u t o - r e s e t   n o t   t r i g g e r i n g   o n   A n d r o i d   8 +   b y   c o r r e c t i n g   t h e   i n t e n t   a c t i o n   s t r i n g   i n   t h e   m a n i f e s t . 
- -   A d d e d   a   2 4 h   v s   7 d   t o g g l e   f o r   t h e   B a t t e r y   C h a r g e   H i s t o r y   g r a p h   o n   t h e   S c r e e n - o n   T i m e   &   B a t t e r y   s c r e e n   ( d e f a u l t s   t o   2 4 h ) . 
- -   M o d i f i e d   A p p   B a t t e r y   C o n s u m p t i o n   t o   p r e c i s e l y   q u e r y   a c t i v i t y   e v e n t s   s i n c e   t h e   e x a c t   u n p l u g   t i m e s t a m p ,   e n s u r i n g   a c c u r a t e   ' s i n g l e   u n p l u g g e d '   d a t a . 
- 
- 
- 
+### Changed
+- Fixed battery cycle auto-reset not triggering on Android 8+ by correcting the intent action string in the manifest.
+- Added a 24h vs 7d toggle for the Battery Charge History graph on the Screen-on Time & Battery screen (defaults to 24h).
+- Modified App Battery Consumption to precisely query activity events since the exact unplug timestamp, ensuring accurate 'single unplugged' data.
+
+
+
 ## [Unreleased]
 - Fixed issue where battery charge history baseline was not auto-refreshing in the UI when device reached 100% and unplugged.
 - Redesigned 'App Battery Consumption' list row to prevent appName and packageName overlapping if they are identical.

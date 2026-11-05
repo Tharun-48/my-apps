@@ -4,7 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["cdylib"]
+name = "core_rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "prostats"
+path = "src/main.rs"
 
 [dependencies]
 jni = "0.21.1"

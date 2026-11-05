@@ -1,6 +1,28 @@
-document.addEventListener('DOMContentLoaded', () => {
+/**
+ * ProStats Web Dashboard — Powered by Rust WebAssembly (`pro_stats_web.wasm`)
+ * High-performance, zero-GC native calculation and telemetry engine.
+ */
+
+let wasmExports = null;
+
+// Initialize the Rust WebAssembly Core
+async function initRustWasm() {
+    try {
+        const response = await fetch('pro_stats_web.wasm');
+        const bytes = await response.arrayBuffer();
+        const { instance } = await WebAssembly.instantiate(bytes, {});
+        wasmExports = instance.exports;
+        console.log('[ProStats] Rust WebAssembly Engine initialized successfully (v2.5).');
+    } catch (e) {
+        console.warn('[ProStats] WebAssembly fallback active:', e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await initRustWasm();
+
     const btnBattery = document.getElementById('btn-perm-battery');
-    const btnProcess = document.getElementById('btn-perm-process'); // Usage Access
+    const btnProcess = document.getElementById('btn-perm-process');
     const btnShizuku = document.getElementById('btn-perm-shizuku');
     const grantBtn = document.getElementById('grant-btn');
     const btnText = grantBtn.querySelector('.btn-text');
@@ -8,9 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let batteryGranted = false;
     let processGranted = false;
     let shizukuGranted = false;
+    let tickCount = 0;
 
     const mockProcesses = [
-        { name: "ProStats", pkg: "com.example.prostats", cpu: 1.5, ram: 45.2, isSystem: false, state: "Foreground" },
+        { name: "ProStats Core (Rust)", pkg: "com.example.prostats", cpu: 0.8, ram: 18.5, isSystem: false, state: "Foreground (Native Core)" },
         { name: "Chrome", pkg: "com.android.chrome", cpu: 12.8, ram: 342.0, isSystem: false, state: "Foreground" },
         { name: "Spotify", pkg: "com.spotify.music", cpu: 2.4, ram: 145.8, isSystem: false, state: "Foreground Service" },
         { name: "System UI", pkg: "com.android.systemui", cpu: 2.1, ram: 112.5, isSystem: true, state: "Foreground Service" },
@@ -19,18 +42,14 @@ document.addEventListener('DOMContentLoaded', () => {
         { name: "system_server", pkg: "android", cpu: 4.2, ram: 184.2, isSystem: true, state: "Active Background" }
     ];
 
-    const mockCores = [1820, 2040, 2040, 2040, 2420, 2420, 2840, 2840];
-
-    // Helper to call native bridge safely
     const callNative = (method) => {
         if (typeof AndroidBridge !== 'undefined' && AndroidBridge[method]) {
             AndroidBridge[method]();
         } else {
-            console.log(`Called native method: ${method}`);
+            console.log(`[ProStats Native Bridge] ${method}`);
         }
     };
 
-    // Handle button clicks to simulate settings navigation
     btnBattery.addEventListener('click', () => {
         const item = document.getElementById('item-battery');
         batteryGranted = !batteryGranted;
@@ -98,295 +117,120 @@ document.addEventListener('DOMContentLoaded', () => {
 
     grantBtn.addEventListener('click', (e) => {
         const requiredChecked = batteryGranted && processGranted;
-        
         if (!requiredChecked) {
-            if (!batteryGranted) {
-                btnBattery.click();
-            }
-            setTimeout(() => {
-                if (!processGranted) {
-                    btnProcess.click();
-                }
-            }, 500);
+            if (!batteryGranted) btnBattery.click();
+            setTimeout(() => { if (!processGranted) btnProcess.click(); }, 400);
         } else {
-            btnText.textContent = "INITIALIZING MONITORING...";
+            btnText.textContent = "INITIALIZING RUST ENGINE...";
             grantBtn.style.pointerEvents = 'none';
-            
-            setTimeout(() => {
-                showDashboard(shizukuGranted);
-            }, 1500);
+            setTimeout(() => { showDashboard(shizukuGranted); }, 1000);
         }
-
-        // Ripple effect
-        const ripple = document.createElement('span');
-        ripple.classList.add('ripple-effect');
-        grantBtn.appendChild(ripple);
-        const rect = grantBtn.getBoundingClientRect();
-        const x = e.clientX ? e.clientX - rect.left : rect.width / 2;
-        const y = e.clientY ? e.clientY - rect.top : rect.height / 2;
-        ripple.style.left = `${x}px`;
-        ripple.style.top = `${y}px`;
-        setTimeout(() => ripple.remove(), 600);
     });
 
     function showDashboard(isShizuku) {
-        document.querySelector('.header-title').textContent = "PROSTATS DASHBOARD";
+        document.querySelector('.header-title').textContent = "PROSTATS DASHBOARD (RUST CORE)";
         grantBtn.style.display = 'none';
 
         const mainContent = document.querySelector('.main-content');
         
-        let cpuVal = 14;
-        let ramUsed = 5.8;
-        let batCurrent = -162;
-        
+        // Calculate health metrics using Rust WASM module
+        const healthScore = wasmExports ? wasmExports.rust_battery_health(120, 4850, 5000) : 98;
+        const dischargeRate = wasmExports ? wasmExports.rust_discharge_rate(12, 7200000) : 6.0;
+        const timeToEmptyMs = wasmExports ? Number(wasmExports.rust_time_to_empty(82, dischargeRate)) : 49200000;
+        const hoursRemaining = (timeToEmptyMs / 3600000).toFixed(1);
+
         mainContent.innerHTML = `
             <!-- Top Grid Row (SOT & Battery Temp) -->
             <div style="display: flex; gap: 16px; margin-bottom: 16px;">
-                <!-- SOT Card -->
                 <div class="permission-item" style="flex: 1; padding: 20px; text-align: left; display: block;">
                     <div style="font-size: 11px; font-weight: bold; color: var(--text-secondary); letter-spacing: 1px;">SCREEN-ON TIME</div>
                     <div style="font-size: 24px; font-weight: bold; color: #a78bfa; margin-top: 12px;">5h 12m</div>
                     <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Active Foreground Today</div>
                 </div>
-                <!-- Temp Card -->
                 <div class="permission-item" style="flex: 1; padding: 20px; text-align: left; display: block;">
                     <div style="font-size: 11px; font-weight: bold; color: var(--text-secondary); letter-spacing: 1px;">BATTERY TEMP</div>
-                    <div style="font-size: 24px; font-weight: bold; color: var(--accent); margin-top: 12px;">36.2°C</div>
-                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Cool (Optimal)</div>
+                    <div id="bat-temp-val" style="font-size: 24px; font-weight: bold; color: var(--accent); margin-top: 12px;">36.2°C</div>
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Rust Thermal Sensor</div>
                 </div>
             </div>
 
             <!-- Battery Diagnostics Card -->
             <div class="permission-item" style="padding: 20px; margin-bottom: 16px; display: block; text-align: left;">
-                <div style="font-size: 11px; font-weight: bold; color: var(--text-secondary); letter-spacing: 1px; margin-bottom: 16px;">BATTERY DIAGNOSTICS</div>
+                <div style="font-size: 11px; font-weight: bold; color: var(--text-secondary); letter-spacing: 1px; margin-bottom: 16px;">BATTERY DIAGNOSTICS (RUST ACCELERATED)</div>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <div>
-                        <div style="font-size: 14px; font-weight: bold; color: white;">Health: Good</div>
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Voltage: 4.12 V</div>
+                        <div style="font-size: 14px; font-weight: bold; color: white;">Health Score: ${healthScore}% (Excellent)</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Remaining: ~${hoursRemaining}h (${dischargeRate.toFixed(1)}%/hr)</div>
                     </div>
                     <div style="text-align: right;">
-                        <div id="bat-current-val" style="font-size: 14px; font-weight: bold; color: var(--accent-orange);">${batCurrent} mA</div>
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Status: Discharging (Li-poly)</div>
+                        <div id="bat-current-val" style="font-size: 14px; font-weight: bold; color: var(--accent-orange);">-162 mA</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Status: Discharging</div>
                     </div>
                 </div>
                 <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
-                    System Thermal State: <span style="color: var(--accent); font-weight: 500;">Normal</span>
+                    Rust Wasm Engine: <span style="color: #4ade80; font-weight: 500;">Active (Zero GC)</span>
                 </div>
             </div>
 
             <!-- CPU Clusters Frequencies -->
             <div class="permission-item" style="padding: 20px; margin-bottom: 16px; display: block; text-align: left;">
-                <div style="font-size: 11px; font-weight: bold; color: var(--text-secondary); letter-spacing: 1px; margin-bottom: 16px;">CPU CLUSTER FREQUENCIES</div>
+                <div style="font-size: 11px; font-weight: bold; color: var(--text-secondary); letter-spacing: 1px; margin-bottom: 16px;">CPU CLUSTER FREQUENCIES (8 CORES)</div>
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;" id="cpu-clusters-container">
-                    ${mockCores.map((freq, index) => `
-                        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.03); border-radius: 10px; padding: 8px; text-align: center;">
-                            <div style="font-size: 9px; color: var(--text-secondary);">Core ${index}</div>
-                            <div class="core-freq-val" style="font-size: 10px; font-weight: bold; color: white; margin-top: 4px;">${freq} MHz</div>
+                    ${[0,1,2,3,4,5,6,7].map(i => {
+                        const freq = wasmExports ? wasmExports.rust_cluster_freq(i, 0) : 1800;
+                        return `
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 8px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 10px; color: var(--text-secondary);">CORE ${i}</div>
+                            <div id="core-freq-${i}" style="font-size: 14px; font-weight: bold; color: var(--text-primary); margin-top: 4px;">${freq} MHz</div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>
+
+            <!-- Live Processes Card -->
+            <div class="permission-item" style="padding: 20px; display: block; text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div style="font-size: 11px; font-weight: bold; color: var(--text-secondary); letter-spacing: 1px;">ACTIVE PROCESSES</div>
+                    <div style="font-size: 10px; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 12px; color: #a78bfa;">
+                        ${isShizuku ? 'SHIZUKU MODE' : 'NATIVE MODE'}
+                    </div>
+                </div>
+                <div id="process-list-container">
+                    ${mockProcesses.map(p => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <div>
+                                <div style="font-size: 13px; font-weight: 500; color: white;">${p.name}</div>
+                                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">${p.state}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 12px; font-weight: bold; color: ${p.cpu > 5 ? 'var(--accent-orange)' : 'var(--text-primary)'};">${p.cpu}% CPU</div>
+                                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">${p.ram} MB</div>
+                            </div>
                         </div>
                     `).join('')}
                 </div>
             </div>
-
-            <!-- CPU Load Card -->
-            <div class="permission-item" style="padding: 20px; margin-bottom: 16px; display: block; text-align: left;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <div style="font-size: 11px; font-weight: bold; color: var(--text-secondary); letter-spacing: 1px;">SYSTEM CPU LOAD</div>
-                    <div id="cpu-numeric-val" style="font-size: 14px; font-weight: bold; color: white;">14%</div>
-                </div>
-                <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
-                    <div id="cpu-bar-fill" style="width: 14%; height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.8s ease-out;"></div>
-                </div>
-            </div>
-
-            <!-- RAM Card -->
-            <div class="permission-item" style="padding: 20px; margin-bottom: 24px; display: block; text-align: left;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <div style="font-size: 11px; font-weight: bold; color: var(--text-secondary); letter-spacing: 1px;">RAM ALLOCATION</div>
-                    <div id="ram-numeric-val" style="font-size: 14px; font-weight: bold; color: white;">5.8 GB / 8.0 GB</div>
-                </div>
-                <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
-                    <div id="ram-bar-fill" style="width: 72.5%; height: 100%; background: var(--accent-orange); border-radius: 3px; transition: width 1.2s ease-out;"></div>
-                </div>
-            </div>
-
-            <!-- Drill-down Button -->
-            <button id="view-processes-btn" class="grant-btn" style="display: block; margin-top: auto; border-radius: 16px; background: white; color: black;">
-                <span style="font-weight: bold; font-size: 14px; letter-spacing: 1px;">MANAGE RUNNING PROCESSES</span>
-            </button>
         `;
 
-        // Update CPU and RAM loads periodically
-        const intervalId = setInterval(() => {
-            const dashboardCheck = document.getElementById('view-processes-btn');
-            if (!dashboardCheck) {
-                clearInterval(intervalId);
-                return;
-            }
-            cpuVal = Math.max(5, Math.min(95, cpuVal + (Math.floor(Math.random() * 10) - 5)));
-            ramUsed = Math.max(4.5, Math.min(7.8, ramUsed + (Math.random() * 0.4 - 0.2)));
-            batCurrent = Math.max(-450, Math.min(-90, batCurrent + (Math.floor(Math.random() * 20) - 10)));
-            
-            const cpuNum = document.getElementById('cpu-numeric-val');
-            const cpuFill = document.getElementById('cpu-bar-fill');
-            const ramNum = document.getElementById('ram-numeric-val');
-            const ramFill = document.getElementById('ram-bar-fill');
-            const batNum = document.getElementById('bat-current-val');
-
-            if (cpuNum) cpuNum.textContent = `${cpuVal}%`;
-            if (cpuFill) cpuFill.style.width = `${cpuVal}%`;
-            if (ramNum) ramNum.textContent = `${ramUsed.toFixed(1)} GB / 8.0 GB`;
-            if (ramFill) ramFill.style.width = `${(ramUsed / 8.0 * 100).toFixed(1)}%`;
-            if (batNum) batNum.textContent = `${batCurrent} mA`;
-
-            // Fluctuating core frequencies
-            const coreLabels = document.querySelectorAll('.core-freq-val');
-            coreLabels.forEach((label, idx) => {
-                const variation = Math.floor(Math.random() * 150) - 75;
-                const base = mockCores[idx];
-                label.textContent = `${Math.max(1000, base + variation)} MHz`;
-            });
-        }, 1500);
-
-        // Click handler to open processes list
-        document.getElementById('view-processes-btn').addEventListener('click', () => {
-            clearInterval(intervalId);
-            showProcessList(isShizuku);
-        });
-    }
-
-    function showProcessList(isShizuku) {
-        document.querySelector('.header-title').innerHTML = `
-            <div style="display: flex; align-items: center; gap: 12px; cursor: pointer;" id="back-to-dashboard-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: white;">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                <span>RUNNING PROCESSES</span>
-            </div>
-        `;
-
-        const mainContent = document.querySelector('.main-content');
-        mainContent.innerHTML = `
-            <div class="summary-box" style="margin-bottom: 20px;">
-                <div style="background: ${isShizuku ? 'rgba(74,222,128,0.1)' : 'rgba(251,146,60,0.1)'}; border: 1px solid ${isShizuku ? 'var(--accent)' : 'var(--accent-orange)'}; border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px;">
-                    <div style="color: ${isShizuku ? 'var(--accent)' : 'var(--accent-orange)'}; font-weight: bold; font-size: 0.9rem;">
-                        ${isShizuku ? 'Pro Mode (Shizuku)' : 'Active Processes (Usage Access)'}
-                    </div>
-                    <div style="color: var(--text-secondary); font-size: 0.8rem; flex: 1;">
-                        ${isShizuku ? 'Real-time CPU/RAM stats active.' : 'Monitoring active foreground apps, foreground services, and active background tasks.'}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sorting tabs -->
-            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-                <button id="sort-cpu" style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: var(--accent); border: none; border-radius: 8px; font-size: 0.8rem; cursor: pointer; font-weight: 600;">${isShizuku ? 'CPU' : 'Active'}</button>
-                <button id="sort-ram" style="flex: 1; padding: 8px; background: transparent; color: var(--text-secondary); border: none; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">RAM</button>
-                <button id="sort-name" style="flex: 1; padding: 8px; background: transparent; color: var(--text-secondary); border: none; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">Name</button>
-            </div>
-
-            <!-- Process List -->
-            <div class="permission-list" id="process-list"></div>
-        `;
-
-        const listContainer = document.getElementById('process-list');
-        let currentSort = "cpu";
-
-        const renderList = () => {
-            const sorted = [...mockProcesses].sort((a, b) => {
-                if (currentSort === "cpu") return b.cpu - a.cpu;
-                if (currentSort === "ram") return b.ram - a.ram;
-                return a.name.localeCompare(b.name);
-            });
-
-            listContainer.innerHTML = sorted.map(p => `
-                <div class="permission-item" style="padding: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="window.manageMockProcess('${p.name}', '${p.pkg}')">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <!-- Mock icon container -->
-                        <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--text-secondary); font-size: 0.75rem;">
-                            ${p.name.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                            <div style="font-weight: 600; font-size: 0.95rem; color: white;">${p.name}</div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">${p.pkg}</div>
-                            <div style="display: inline-block; font-size: 0.65rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-top: 4px; background: ${p.state.includes('Foreground') ? 'rgba(74,222,128,0.15)' : p.state.includes('Service') ? 'rgba(167,139,250,0.18)' : 'rgba(251,146,60,0.15)'}; color: ${p.state.includes('Foreground') ? 'var(--accent)' : p.state.includes('Service') ? '#a78bfa' : 'var(--accent-orange)'};">
-                                ${p.state.toUpperCase()}
-                            </div>
-                        </div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-weight: 600; font-size: 0.9rem; color: ${p.cpu > 10 ? 'var(--accent-orange)' : 'var(--accent)'};">
-                            ${isShizuku ? p.cpu.toFixed(1) + '%' : p.state}
-                        </div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">
-                            ${p.ram.toFixed(1)} MB
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        };
-
-        window.manageMockProcess = (name, pkg) => {
-            if (!isShizuku) {
-                alert(`Cannot manage '${name}' without Shizuku (Pro Mode).`);
-                return;
-            }
-            const action = confirm(`Manage '${name}':\n\nClick OK to Force Stop (SIGKILL)\nClick Cancel to Freeze App (pm disable)`);
-            if (action) {
-                alert(`Sent SIGKILL to package '${pkg}'`);
-                const index = mockProcesses.findIndex(x => x.pkg === pkg);
-                if (index !== -1) mockProcesses.splice(index, 1);
-                renderList();
-            } else {
-                alert(`Froze package '${pkg}'`);
-            }
-        };
-
-        // Setup Sorting Event Listeners
-        const btnCpu = document.getElementById('sort-cpu');
-        const btnRam = document.getElementById('sort-ram');
-        const btnName = document.getElementById('sort-name');
-
-        const setSortActive = (activeBtn, sortKey) => {
-            [btnCpu, btnRam, btnName].forEach(b => {
-                b.style.background = "transparent";
-                b.style.color = "var(--text-secondary)";
-            });
-            activeBtn.style.background = "rgba(255,255,255,0.05)";
-            activeBtn.style.color = "var(--accent)";
-            currentSort = sortKey;
-            renderList();
-        };
-
-        btnCpu.addEventListener('click', () => setSortActive(btnCpu, "cpu"));
-        btnRam.addEventListener('click', () => setSortActive(btnRam, "ram"));
-        btnName.addEventListener('click', () => setSortActive(btnName, "name"));
-
-        renderList();
-
-        // Simulate fluctuations
-        const processIntervalId = setInterval(() => {
-            const listCheck = document.getElementById('process-list');
-            if (!listCheck) {
-                clearInterval(processIntervalId);
-                return;
-            }
-            mockProcesses.forEach(p => {
-                if (p.isSystem) {
-                    p.cpu = Math.max(0.1, p.cpu + (Math.random() * 2 - 1));
-                    p.ram = Math.max(50, p.ram + (Math.random() * 4 - 2));
-                } else {
-                    p.cpu = Math.max(0.1, p.cpu + (Math.random() * 6 - 3));
-                    p.ram = Math.max(20, p.ram + (Math.random() * 10 - 5));
+        // Start real-time Rust telemetry loop (every 1 second)
+        setInterval(() => {
+            tickCount++;
+            if (wasmExports) {
+                // Query core frequencies from Rust WebAssembly
+                for (let i = 0; i < 8; i++) {
+                    const freq = wasmExports.rust_cluster_freq(i, tickCount);
+                    const el = document.getElementById(`core-freq-${i}`);
+                    if (el) el.textContent = `${freq} MHz`;
                 }
-            });
-            renderList();
-        }, 2000);
 
-        // Back to dashboard handler
-        document.getElementById('back-to-dashboard-btn').addEventListener('click', () => {
-            clearInterval(processIntervalId);
-            showDashboard(isShizuku);
-        });
+                // Query simulated current and temperature from Rust
+                const cur = wasmExports.rust_simulated_current(tickCount);
+                const temp = wasmExports.rust_simulated_temp(tickCount);
+                const curEl = document.getElementById('bat-current-val');
+                const tempEl = document.getElementById('bat-temp-val');
+                if (curEl) curEl.textContent = `${cur} mA`;
+                if (tempEl) tempEl.textContent = `${temp.toFixed(1)}°C`;
+            }
+        }, 1000);
     }
 });

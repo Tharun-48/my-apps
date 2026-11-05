@@ -270,13 +270,21 @@ object BatteryHealthEstimator {
         val estimatedTimeToFull = if (isCharging && currentMa > 0 && pct < 100) {
             val remainingPct = 100 - pct
             val remainingMah = (designCapacity * remainingPct) / 100f
-            ((remainingMah / currentMa) * 3600 * 1000).toLong()
+            try {
+                estimateTimeToFullNative((designCapacity - remainingMah).toInt(), designCapacity, currentMa)
+            } catch (_: Throwable) {
+                ((remainingMah / currentMa) * 3600 * 1000).toLong()
+            }
         } else 0L
 
         // Discharge rate and battery life estimation
         val dischargeRate = calculateDischargeRate(context)
         val estimatedBatteryLife = if (!isCharging && dischargeRate > 0f && pct > 0) {
-            ((pct / dischargeRate) * 3600 * 1000).toLong()
+            try {
+                estimateTimeToEmptyNative(pct, dischargeRate)
+            } catch (_: Throwable) {
+                ((pct / dischargeRate) * 3600 * 1000).toLong()
+            }
         } else 0L
 
         val avgDailySot = calculateAvgDailySot(context)
@@ -353,6 +361,15 @@ object BatteryHealthEstimator {
     @JvmStatic
     external fun calculateHealthScoreNative(cycles: Int, currentCapacity: Int, designCapacity: Int): Int
 
+    @JvmStatic
+    external fun calculateDischargeRateNative(drainLevel: Int, elapsedMs: Long): Float
+
+    @JvmStatic
+    external fun estimateTimeToEmptyNative(currentLevel: Int, dischargeRatePctPerHour: Float): Long
+
+    @JvmStatic
+    external fun estimateTimeToFullNative(currentCapacity: Int, designCapacity: Int, chargeSpeedMa: Int): Long
+
     private fun calculateDischargeRate(context: Context): Float {
         val points = BatteryTracker.getHistorySinceLastCharge(context)
         if (points.size < 2) return 0f
@@ -368,7 +385,11 @@ object BatteryHealthEstimator {
         if (drain <= 0) return 0f
 
         val elapsedHours = elapsed / (1000f * 60f * 60f)
-        return drain / elapsedHours
+        return try {
+            calculateDischargeRateNative(drain, elapsed)
+        } catch (_: Throwable) {
+            drain / elapsedHours
+        }
     }
 
     private fun calculateAvgDailySot(context: Context): Long {

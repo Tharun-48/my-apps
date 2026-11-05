@@ -1,7 +1,8 @@
-# Ignore local workspace scripts
+# Scripts & Temporary Files
 scripts/
+gcm-diagnose.log
 
-# Build artifacts & executables
+# Build Artifacts & Executables
 target/
 **/target/
 build/
@@ -11,14 +12,50 @@ build/
 *.exe
 *.tmp
 *.log
+*.class
+*.dex
+
+# IDE & Workspace Environments (shows only necessary files in Source Control)
 .idea/
 **/.idea/
+.vscode/
+**/.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
 
-# Ensure release APKs are explicitly tracked
+# Android Build & Environment
+local.properties
+.externalNativeBuild/
+**/.externalNativeBuild/
+.cxx/
+**/.cxx/
+captures/
+**/captures/
+*.hprof
+
+# Releases: Track only official release APKs, ignore intermediate/test APKs
+*.apk
 !pro-stats/releases/*.apk
 
-# Local secrets & private agent logs
-CHANGELOG.md
+# Node & Package Managers
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+
+# Secrets & Environment Variables
 .env
 .env.local
 .env.*.local
+
+# OS Metadata
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store

@@ -366,4 +366,15 @@ class SensorLiveReader(context: Context) : SensorEventListener {
     }
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
+
+    companion object {
+        init {
+            try {
+                System.loadLibrary("core_rs")
+            } catch (_: Throwable) {}
+        }
+
+        @JvmStatic
+        external fun calculateCpuLoadNative(totalDelta: Long, idleDelta: Long): Float
+    }
 }

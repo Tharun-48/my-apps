@@ -1832,8 +1832,16 @@ class SystemMonitor(private val context: Context) {
                 val rxDelta = (totalRx - lastRxBytes).coerceAtLeast(0L)
                 val txDelta = (totalTx - lastTxBytes).coerceAtLeast(0L)
 
-                liveRxSpeedBps = (rxDelta * 1000L) / timeDeltaMs
-                liveTxSpeedBps = (txDelta * 1000L) / timeDeltaMs
+                liveRxSpeedBps = try {
+                    calculateTransferRateNative(totalRx, lastRxBytes, timeDeltaMs)
+                } catch (_: Throwable) {
+                    (rxDelta * 1000L) / timeDeltaMs
+                }
+                liveTxSpeedBps = try {
+                    calculateTransferRateNative(totalTx, lastTxBytes, timeDeltaMs)
+                } catch (_: Throwable) {
+                    (txDelta * 1000L) / timeDeltaMs
+                }
             }
             lastRxBytes = totalRx
             lastTxBytes = totalTx
@@ -1935,5 +1943,16 @@ class SystemMonitor(private val context: Context) {
             swapTotalMb = swapTotal,
             swapUsedMb = swapUsed.coerceAtLeast(0)
         )
+    }
+
+    companion object {
+        init {
+            try {
+                System.loadLibrary("core_rs")
+            } catch (_: Throwable) {}
+        }
+
+        @JvmStatic
+        external fun calculateTransferRateNative(currentBytes: Long, previousBytes: Long, elapsedMs: Long): Long
     }
 }
