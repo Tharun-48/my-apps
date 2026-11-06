@@ -1218,16 +1218,16 @@ class SystemMonitor(private val context: Context) {
         return ((baseMb * heapFactor * stateFactor) + jitter).coerceAtLeast(35f)
     }
 
-    // Pro mode using Shizuku
+    // High-accuracy Pro mode using Shizuku privileged dumpsys diagnostics
     private fun fetchProcessesViaShizuku(): List<ProcessItem> {
         val list = mutableListOf<ProcessItem>()
 
-        // Fetch SOT and Battery Estimation maps since last unplug from full
-        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        // 1. Fetch SOT and Battery Estimation maps since last unplug from full
+        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
         val lastUnplugTs = BatteryTracker.getLastUnplugFromFullTimestamp(context)
-        val startTime = if (lastUnplugTs > 0L) lastUnplugTs else System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+        val startTime = if (lastUnplugTs > 0L) lastUnplugTs else (System.currentTimeMillis() - 24 * 60 * 60 * 1000L)
         val stats = try {
-            usageStatsManager.queryUsageStats(
+            usageStatsManager?.queryUsageStats(
                 UsageStatsManager.INTERVAL_DAILY,
                 startTime,
                 System.currentTimeMillis()
@@ -1253,73 +1253,124 @@ class SystemMonitor(private val context: Context) {
             totalWeightedTime += weightedTime
         }
 
+        // 2. Cache installed packages for high-accuracy identity mapping
+        val pm = context.packageManager
+        val installedPackages = try {
+            pm.getInstalledPackages(0).map { it.packageName }.toSet()
+        } catch (e: Exception) {
+            emptySet<String>()
+        }
+
         try {
-            val process = Shizuku.newProcess(arrayOf("sh", "-c", "top -b -n 1 2>&1"), null, null)
+            // Execute unified privileged dumpsys: cpuinfo (real delta CPU) + meminfo --oom (exact PSS RAM & OOM lifecycle tier)
+            val cmd = "dumpsys cpuinfo 2>&1; echo '===MEM_SPLIT==='; dumpsys meminfo --oom 2>&1"
+            val process = Shizuku.newProcess(arrayOf("sh", "-c", cmd), null, null)
             val reader = BufferedReader(InputStreamReader(process.inputStream))
-            var line: String?
 
-            var headerFound = false
-            var colPid = -1
-            var colCpu = -1
-            var colRes = -1
-            var colName = -1
+            val cpuMap = mutableMapOf<Int, Float>() // pid -> cpu%
+            val cpuNameMap = mutableMapOf<String, Float>() // procName -> cpu%
 
-            // Group multi-process applications to aggregate their CPU/RAM cleanly
-            data class RawProcEntry(
+            var readingCpu = true
+            var currentCategory = "Background"
+
+            data class RawShizukuProc(
                 val pid: Int,
-                val rawName: String,
+                val rawProcName: String,
                 val basePkg: String,
-                val cpu: Float,
-                val ramMb: Float
+                val appName: String,
+                val ramKb: Long,
+                val oomCategory: String
             )
-            val rawEntries = mutableListOf<RawProcEntry>()
 
+            val rawProcList = mutableListOf<RawShizukuProc>()
+
+            val cpuLineRegex = Regex("""^\s*([+]?[0-9]+(?:\.[0-9]+)?)%\s+([0-9]+)/([^:]+):""")
+            val memProcRegex = Regex("""^\s*([0-9,]+)\s*(?:K|kB|kb|KB):\s+([^\s]+)\s+\(pid\s+([0-9]+)""")
+            val oomCategoryRegex = Regex("""^\s*([0-9,]+)\s*(?:K|kB|kb|KB):\s+([A-Za-z0-9 ]+)$""")
+
+            var line: String?
             while (reader.readLine().also { line = it } != null) {
-                val currentLine = line ?: break
-                if (currentLine.isBlank()) continue
-
-                val tokens = currentLine.trim().split("\\s+".toRegex())
-
-                if (!headerFound) {
-                    if (tokens.contains("PID") && (tokens.contains("NAME") || tokens.contains("Name") || tokens.contains("CMD") || tokens.contains("COMMAND") || tokens.contains("ARGS"))) {
-                        headerFound = true
-                        colPid = tokens.indexOf("PID")
-                        colCpu = tokens.indexOfFirst { it.contains("CPU", ignoreCase = true) }
-                        colRes = tokens.indexOfFirst { it.contains("RES", ignoreCase = true) || it.contains("RSS", ignoreCase = true) || it.contains("MEM", ignoreCase = true) }
-                        colName = tokens.indexOfFirst { it.contains("NAME", ignoreCase = true) || it.contains("CMD", ignoreCase = true) || it.contains("COMMAND", ignoreCase = true) || it.contains("ARGS", ignoreCase = true) }
-                    }
+                val l = line ?: continue
+                if (l.contains("===MEM_SPLIT===")) {
+                    readingCpu = false
                     continue
                 }
 
-                if (tokens.size > colPid && tokens[colPid].toIntOrNull() != null) {
-                    val pid = tokens[colPid].toInt()
-                    val cpuStr = if (colCpu != -1 && colCpu < tokens.size) tokens[colCpu].replace("%", "") else "0"
-                    val cpu = cpuStr.toFloatOrNull() ?: 0f
-                    val ramStr = if (colRes != -1 && colRes < tokens.size) tokens[colRes] else "0"
-                    val ramMb = parseRamToMb(ramStr)
-                    val name = if (colName != -1 && colName < tokens.size) tokens[colName] else "unknown"
+                if (readingCpu) {
+                    val match = cpuLineRegex.find(l)
+                    if (match != null) {
+                        val cpuVal = match.groupValues[1].replace("+", "").toFloatOrNull() ?: 0f
+                        val pidVal = match.groupValues[2].toIntOrNull() ?: -1
+                        val procNameVal = match.groupValues[3].trim()
+                        if (pidVal > 0) {
+                            cpuMap[pidVal] = cpuVal
+                        }
+                        if (procNameVal.isNotEmpty()) {
+                            cpuNameMap[procNameVal] = maxOf(cpuNameMap[procNameVal] ?: 0f, cpuVal)
+                            val base = procNameVal.substringBefore(":")
+                            cpuNameMap[base] = maxOf(cpuNameMap[base] ?: 0f, cpuVal)
+                        }
+                    }
+                } else {
+                    // Reading meminfo --oom
+                    if (!l.contains("(pid")) {
+                        val catMatch = oomCategoryRegex.find(l)
+                        if (catMatch != null) {
+                            val cat = catMatch.groupValues[2].trim()
+                            if (cat.isNotBlank() && !cat.all { it.isDigit() }) {
+                                currentCategory = cat
+                            }
+                        }
+                        continue
+                    }
 
-                    // Filter out shell self-invocations & kernel threads
-                    if (name == "top" || name == "sh" || name.startsWith("[") || name.startsWith("kworker/")) continue
+                    val memMatch = memProcRegex.find(l)
+                    if (memMatch != null) {
+                        val ramKbStr = memMatch.groupValues[1].replace(",", "")
+                        val ramKb = ramKbStr.toLongOrNull() ?: 0L
+                        val rawProcName = memMatch.groupValues[2].trim()
+                        val pid = memMatch.groupValues[3].toIntOrNull() ?: -1
 
-                    val basePkg = name.substringBefore(":")
-                    rawEntries.add(RawProcEntry(pid, name, basePkg, cpu, ramMb))
+                        if (pid <= 0 || rawProcName.isEmpty()) continue
+
+                        // Filter out pure low-level native OS daemons that have no user/app relevance
+                        if (currentCategory.equals("Native", ignoreCase = true) &&
+                            !rawProcName.equals("surfaceflinger", ignoreCase = true) &&
+                            !installedPackages.contains(rawProcName)
+                        ) {
+                            continue
+                        }
+
+                        // Smart package name & app label resolution
+                        val (basePkg, appLabel) = resolveAppIdentity(rawProcName, installedPackages)
+
+                        rawProcList.add(
+                            RawShizukuProc(
+                                pid = pid,
+                                rawProcName = rawProcName,
+                                basePkg = basePkg,
+                                appName = appLabel,
+                                ramKb = ramKb,
+                                oomCategory = currentCategory
+                            )
+                        )
+                    }
                 }
             }
             process.waitFor()
 
-            // Group by package or binary name
-            val grouped = rawEntries.groupBy { it.basePkg }
+            // Group multi-process applications to aggregate CPU & RAM accurately
+            val grouped = rawProcList.groupBy { it.basePkg }
             for ((pkg, entries) in grouped) {
-                val primaryPid = entries.first().pid
-                val totalCpu = entries.sumOf { it.cpu.toDouble() }.toFloat()
-                val totalRam = entries.sumOf { it.ramMb.toDouble() }.toFloat()
+                val primaryPid = entries.maxByOrNull { it.ramKb }?.pid ?: entries.first().pid
+                val appName = entries.first().appName
                 val subProcessCount = entries.size
 
-                val appName = if (pkg.contains(".")) {
-                    getAppName(pkg)
-                } else {
-                    pkg
+                val totalRamMb = entries.sumOf { it.ramKb } / 1024f
+                val totalCpu = entries.map { entry ->
+                    cpuMap[entry.pid] ?: cpuNameMap[entry.rawProcName] ?: 0f
+                }.sum().let { sum ->
+                    if (sum == 0f) cpuNameMap[pkg] ?: 0f else sum
                 }
 
                 val sotMs = combinedStats[pkg]?.first ?: 0L
@@ -1331,12 +1382,23 @@ class SystemMonitor(private val context: Context) {
                     0f
                 }
 
-                val processState = when {
-                    totalCpu >= 5.0f -> if (subProcessCount > 1) "Active (${subProcessCount} procs)" else "Active (High CPU)"
-                    totalCpu >= 0.5f -> if (subProcessCount > 1) "Active (${subProcessCount} procs)" else "Active (CPU)"
-                    subProcessCount > 1 -> "Background (${subProcessCount} procs)"
-                    totalRam > 0f -> "Background"
-                    else -> "Idle"
+                // Determine high-accuracy lifecycle state tag from OOM priority tier
+                val categories = entries.map { it.oomCategory }
+                val stateTag = when {
+                    categories.any { it.contains("Foreground", ignoreCase = true) } -> "Foreground"
+                    categories.any { it.contains("Visible", ignoreCase = true) } -> "Visible"
+                    categories.any { it.contains("Perceptible", ignoreCase = true) } -> "Foreground Service"
+                    categories.any { it.contains("Persistent", ignoreCase = true) } -> "Persistent System"
+                    categories.any { it.contains("Service", ignoreCase = true) } -> "Background Service"
+                    categories.any { it.contains("Home", ignoreCase = true) } -> "Launcher"
+                    categories.any { it.contains("Cached", ignoreCase = true) } -> "Cached"
+                    else -> "Background"
+                }
+
+                val finalProcessState = if (subProcessCount > 1) {
+                    "$stateTag ($subProcessCount procs)"
+                } else {
+                    stateTag
                 }
 
                 list.add(
@@ -1345,32 +1407,64 @@ class SystemMonitor(private val context: Context) {
                         name = appName,
                         packageName = pkg,
                         cpuUsage = String.format(java.util.Locale.US, "%.1f", totalCpu).toFloatOrNull() ?: totalCpu,
-                        ramUsageMb = String.format(java.util.Locale.US, "%.1f", totalRam).toFloatOrNull() ?: totalRam,
+                        ramUsageMb = String.format(java.util.Locale.US, "%.1f", totalRamMb).toFloatOrNull() ?: totalRamMb,
                         systemTimeForegroundMs = sotMs,
                         lastTimeUsedMs = lastTimeUsedMs,
                         isShizukuMode = true,
                         batteryUsagePct = String.format(java.util.Locale.US, "%.1f", batteryPct).toFloatOrNull() ?: batteryPct,
-                        processState = processState
+                        processState = finalProcessState
                     )
                 )
             }
         } catch (e: Exception) {
             Log.e("SystemMonitor", "Error fetching Shizuku stats", e)
         }
-        return list.sortedByDescending { it.cpuUsage }
+
+        // If privileged query returned empty (e.g. timeout or restricted ROM), gracefully fallback to UsageStats
+        return if (list.isNotEmpty()) {
+            list
+        } else {
+            fetchProcessesViaUsageStats()
+        }
     }
 
-    private fun parseRamToMb(ramStr: String): Float {
-        val clean = ramStr.uppercase()
-        return when {
-            clean.endsWith("G") -> (clean.replace("G", "").toFloatOrNull() ?: 0f) * 1024f
-            clean.endsWith("M") -> clean.replace("M", "").toFloatOrNull() ?: 0f
-            clean.endsWith("K") -> (clean.replace("K", "").toFloatOrNull() ?: 0f) / 1024f
-            else -> {
-                val bytes = clean.toFloatOrNull() ?: 0f
-                bytes / (1024f * 1024f)
+    private fun resolveAppIdentity(rawProcName: String, installedPackages: Set<String>): Pair<String, String> {
+        // Special Android OS system components
+        if (rawProcName.equals("system_server", ignoreCase = true)) {
+            return Pair("android", "Android System")
+        }
+        if (rawProcName.equals("surfaceflinger", ignoreCase = true)) {
+            return Pair("android", "Surface Flinger")
+        }
+        if (rawProcName.equals("com.android.systemui", ignoreCase = true) || rawProcName.startsWith("com.android.systemui:")) {
+            return Pair("com.android.systemui", "System UI")
+        }
+
+        // 1. Direct package match
+        if (installedPackages.contains(rawProcName)) {
+            return Pair(rawProcName, getAppName(rawProcName))
+        }
+
+        // 2. Colon-separated sub-process (e.g. com.android.chrome:sandboxed_process0)
+        if (rawProcName.contains(":")) {
+            val base = rawProcName.substringBefore(":")
+            if (installedPackages.contains(base)) {
+                return Pair(base, getAppName(base))
             }
         }
+
+        // 3. Dot-separated sub-process (e.g. com.google.android.gms.persistent -> com.google.android.gms)
+        val longestMatchingPkg = installedPackages
+            .filter { rawProcName.startsWith(it) && rawProcName.getOrNull(it.length) == '.' }
+            .maxByOrNull { it.length }
+
+        if (longestMatchingPkg != null) {
+            return Pair(longestMatchingPkg, getAppName(longestMatchingPkg))
+        }
+
+        // 4. Default fallback: use getAppName if available or clean string
+        val fallbackPkg = if (rawProcName.contains(":")) rawProcName.substringBefore(":") else rawProcName
+        return Pair(fallbackPkg, getAppName(fallbackPkg))
     }
 
     // 5. Force Stop

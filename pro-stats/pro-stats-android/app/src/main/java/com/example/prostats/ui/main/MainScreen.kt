@@ -185,23 +185,33 @@ fun MainScreen(
                     // Sorted Process List
                     val sortedList = remember(processes, sortBy) {
                         when (sortBy) {
-                            "CPU" -> processes.sortedByDescending { it.cpuUsage }
-                            "RAM" -> processes.sortedByDescending { it.ramUsageMb }
+                            "CPU" -> processes.sortedWith(
+                                compareByDescending<ProcessItem> { it.cpuUsage }
+                                    .thenByDescending { it.ramUsageMb }
+                            )
+                            "RAM" -> processes.sortedWith(
+                                compareByDescending<ProcessItem> { it.ramUsageMb }
+                                    .thenByDescending { it.cpuUsage }
+                            )
                             "Active" -> processes.sortedWith(
                                 compareByDescending<ProcessItem> {
                                     when {
                                         it.processState.contains("Foreground", ignoreCase = true) && !it.processState.contains("Service", ignoreCase = true) -> 100
-                                        it.processState.contains("Foreground Service", ignoreCase = true) -> 85
+                                        it.processState.contains("Visible", ignoreCase = true) -> 90
+                                        it.processState.contains("Foreground Service", ignoreCase = true) || it.processState.contains("Perceptible", ignoreCase = true) -> 85
                                         it.processState.contains("Background Service", ignoreCase = true) -> 70
+                                        it.processState.contains("Persistent", ignoreCase = true) -> 65
+                                        it.processState.contains("Launcher", ignoreCase = true) -> 60
                                         it.processState.contains("< 1m", ignoreCase = true) -> 50
                                         it.processState.contains("< 5m", ignoreCase = true) -> 30
                                         it.processState.contains("< 15m", ignoreCase = true) -> 15
                                         it.processState.contains("Background", ignoreCase = true) -> 10
+                                        it.processState.contains("Cached", ignoreCase = true) -> 5
                                         else -> 0
                                     }
-                                }.thenByDescending { it.lastTimeUsedMs }
+                                }.thenByDescending { it.cpuUsage }.thenByDescending { it.ramUsageMb }
                             )
-                            "Name" -> processes.sortedBy { it.name }
+                            "Name" -> processes.sortedBy { it.name.lowercase() }
                             "Recent" -> processes.sortedByDescending { it.lastTimeUsedMs }
                             else -> processes
                         }
@@ -219,7 +229,7 @@ fun MainScreen(
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            items(sortedList, key = { "${it.pid}-${it.packageName}" }) { item ->
+                            items(sortedList, key = { it.packageName.ifEmpty { "${it.pid}" } }) { item ->
                                 ProcessRow(
                                     item = item,
                                     sortBy = sortBy,
@@ -300,6 +310,7 @@ fun SortingHeader(
         if (isShizuku) {
             SortTab(title = "CPU Load", active = selectedSort == "CPU", onClick = { onSortChange("CPU") })
             SortTab(title = "RAM Usage", active = selectedSort == "RAM", onClick = { onSortChange("RAM") })
+            SortTab(title = "Active Status", active = selectedSort == "Active", onClick = { onSortChange("Active") })
         } else {
             SortTab(title = "Active Status", active = selectedSort == "Active", onClick = { onSortChange("Active") })
             SortTab(title = "RAM Usage", active = selectedSort == "RAM", onClick = { onSortChange("RAM") })
@@ -438,25 +449,27 @@ fun ProcessRow(
                         val (badgeBg, badgeFg) = when {
                             item.processState.contains("Foreground", ignoreCase = true) && !item.processState.contains("Service", ignoreCase = true) ->
                                 Pair(colors.accentGreen.copy(alpha = 0.15f), colors.accentGreen)
-                            item.processState.contains("Service", ignoreCase = true) ->
+                            item.processState.contains("Visible", ignoreCase = true) ->
+                                Pair(colors.accentBlue.copy(alpha = 0.18f), colors.accentBlue)
+                            item.processState.contains("Service", ignoreCase = true) || item.processState.contains("Perceptible", ignoreCase = true) ->
                                 Pair(colors.accentPurple.copy(alpha = 0.18f), colors.accentPurple)
+                            item.processState.contains("Persistent", ignoreCase = true) ->
+                                Pair(colors.accentBlue.copy(alpha = 0.14f), colors.accentBlue)
                             item.processState.contains("Background", ignoreCase = true) ->
                                 Pair(colors.accentOrange.copy(alpha = 0.15f), colors.accentOrange)
                             item.processState.contains("< 1m", ignoreCase = true) ->
                                 Pair(colors.accentGreen.copy(alpha = 0.12f), colors.accentGreen)
+                            item.processState.contains("Cached", ignoreCase = true) ->
+                                Pair(colors.elevatedSurface, colors.textTertiary)
                             else ->
                                 Pair(colors.elevatedSurface, colors.textSecondary)
                         }
-                        // Natural casing for badge text
-                        val badgeText = item.processState
-                            .lowercase()
-                            .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = badgeBg
                         ) {
                             Text(
-                                text = badgeText,
+                                text = item.processState,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = badgeFg,

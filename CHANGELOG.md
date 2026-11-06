@@ -2,6 +2,25 @@
 
 This document maintains a historical log of user inputs and corresponding code changes made across the repository.
 
+### [2026-11-07] Shizuku Running Processes Re-Architecture & High-Accuracy Diagnostics Engine
+- **User Prompts**: *"when using shizuku the running processes is fully broken. fix it with good accuracy"* / *"well my device is in work"*
+- **Summary of Changes**:
+  - **Rebuilt Shizuku Process Monitor (`SystemMonitor.kt`)**:
+    - Replaced inaccurate, non-delta `top -b -n 1` shell calls with unified privileged diagnostics (`dumpsys cpuinfo` + `dumpsys meminfo --oom`).
+    - Extracted true per-process CPU% calibrated directly by Android OS's `ProcessCpuTracker`.
+    - Extracted exact PSS RAM footprints and genuine lifecycle OOM tiers (`Foreground`, `Visible`, `Foreground Service`, `Background Service`, `Persistent System`, `Launcher`, `Cached`).
+  - **Smart Package & Identity Resolution (`SystemMonitor.kt`)**:
+    - Implemented `resolveAppIdentity` to map multi-process components (`Chrome` sandboxes, `Play Services` daemons, `System UI`, `Android System`) to their true base package and application icons.
+    - Filtered out raw low-level C++ native daemons (`logd`, `vold`, `netd`, `tombstoned`) to keep the process list clean and relevant.
+    - Aggregated multi-process applications into clean parent rows with process counts (e.g. `Foreground (3 procs)`).
+    - Added automatic fallback to `fetchProcessesViaUsageStats()` if privileged queries return empty.
+  - **UI & Sorting Improvements (`MainScreen.kt`)**:
+    - Added secondary tiebreakers to CPU and RAM sorting.
+    - Enabled "Active Status" tab in Shizuku mode alongside "CPU Load", "RAM Usage", "Recently Active", and "App Name".
+    - Bound unique, stable package keys to LazyColumn items.
+  - **Release APK Build**:
+    - Recompiled `ProStats-v2.5.apk` (9.78 MB) and deployed to `pro-stats/releases/`.
+
 ### [2026-11-05] 24h Scrubber Crash Fix, Process Freeze Removal, Web Purge & Pure Android Consolidation
 - **User Prompts**: *"the error when change 24h java.lang.IllegalArgumentException: Cannot coerce value to an empty range"* / *"now its working tho"* / *"well also why is there freeze app option in manage process... it makes no sense"* / *"its inside running processes"* / *"yes"* / *"i only need android app ig"*
 - **Summary of Changes**:
