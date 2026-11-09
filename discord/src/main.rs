@@ -1,10 +1,6 @@
 #![windows_subsystem = "windows"]
 
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::path::PathBuf;
-use std::time::Duration;
-use sysinfo::{Pid, ProcessesToUpdate, System};
 use tao::{
     dpi::LogicalSize,
     event::{Event, WindowEvent},
@@ -56,7 +52,7 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
         });
     }
 
-    // 2. Throttle background analytics/telemetry to preserve CPU cycles on Braswell
+    // 2. Throttle background analytics/telemetry to preserve CPU cycles
     const originalSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.send = function(...args) {
         if (this._url && (this._url.includes('/science') || this._url.includes('/metrics') || this._url.includes('sentry'))) {
@@ -94,24 +90,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     std::fs::create_dir_all(&data_dir)?;
     println!("[Storage] Persistent login profile at: {:?}", data_dir);
-
-    // Spawn lightweight background thread to monitor and log real RAM usage silently
-    let log_file_path = data_dir.join("telemetry.log");
-    std::thread::spawn(move || {
-        let mut sys = System::new();
-        let pid = Pid::from_u32(std::process::id());
-        loop {
-            std::thread::sleep(Duration::from_secs(10));
-            sys.refresh_processes(ProcessesToUpdate::Some(&[pid]));
-            if let Some(proc) = sys.process(pid) {
-                let mem_mb = (proc.memory() as f64) / (1024.0 * 1024.0);
-                let cpu_pct = proc.cpu_usage();
-                if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_file_path) {
-                    let _ = writeln!(file, "[Telemetry] Memory: {:.1} MB RSS | CPU: {:.1}%", mem_mb, cpu_pct);
-                }
-            }
-        }
-    });
 
     let event_loop = EventLoop::new();
 

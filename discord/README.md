@@ -30,8 +30,6 @@ A high-performance **native Rust desktop client for Discord** replacing Electron
    * Silently drops non-essential background analytics and telemetry requests to preserve CPU cycles.
 4. **Persistent Session Storage**:
    * Stores cookies, tokens, and local cache in `%APPDATA%\discord-rust\profile` so you stay logged in.
-5. **Silent Telemetry Logging**:
-   * Periodically records process RSS memory consumption and CPU usage silently to `telemetry.log`.
 
 ---
 
@@ -55,10 +53,3 @@ launch.bat
 ```powershell
 cargo run
 ```
-
----
-
-## ⚙️ Compilation Limits
-Configured in `.cargo/config.toml`:
-* `jobs = 2`: Compiles using 2 threads to keep your computer responsive during builds.
-* `panic = "abort"`: Strips unused stack unwinding tables to keep the binary small and memory low.
