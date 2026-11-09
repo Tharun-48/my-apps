@@ -37,16 +37,21 @@ A high-performance **native Rust desktop client for Discord** replacing Electron
 
 ## 🚀 How to Run
 
-### Method 1: Desktop Shortcut
-Launch directly from your Desktop via the **Discord** shortcut.
+### Method 1: Pre-built Binary
+Download and run the ready-to-use executable from the [`releases/`](./releases) directory:
+* [`releases/discord-rust-port-unofficial.exe`](./releases/discord-rust-port-unofficial.exe)
+* (Keep `WebView2Loader.dll` in the same folder)
 
-### Method 2: Launcher Script
+### Method 2: Desktop Shortcut
+Launch directly from your Desktop via the **Discord Rust Port (Unofficial)** shortcut.
+
+### Method 3: Launcher Script
 Run `launch.bat`:
 ```text
 launch.bat
 ```
 
-### Method 3: Command Line (Cargo)
+### Method 4: Command Line (Cargo)
 ```powershell
 cargo run
 ```
