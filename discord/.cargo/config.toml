@@ -1,0 +1,15 @@
+[build]
+# Limit compilation jobs to 2 threads to keep system responsive
+jobs = 2
+
+[profile.dev]
+opt-level = 1
+debug = 1
+incremental = true
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 2
+panic = "abort"
+strip = true

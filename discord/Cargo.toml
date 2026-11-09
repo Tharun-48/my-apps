@@ -1,0 +1,12 @@
+[package]
+name = "discord-rust-port-unofficial"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tharun GV"]
+description = "Discord Native Rust Client Port - High-Performance, Low Memory"
+
+[dependencies]
+tao = "0.30"
+wry = "0.47"
+dirs = "5.0"
+sysinfo = { version = "0.31", default-features = false, features = ["system"] }
