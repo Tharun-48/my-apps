@@ -83,11 +83,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Target Memory: ~180-250 MB RAM (saving >1 GB vs Electron)");
     println!("============================================================");
 
-    // Profile storage in %APPDATA%\discord-rust-port-unofficial\profile
-    let data_dir = dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("discord-rust-port-unofficial")
-        .join("profile");
+    // Use existing persistent profile session if present
+    let base_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
+    let legacy_profile = base_dir.join("discord-rust").join("profile");
+    let data_dir = if legacy_profile.exists() {
+        legacy_profile
+    } else {
+        base_dir.join("discord-rust-port-unofficial").join("profile")
+    };
 
     std::fs::create_dir_all(&data_dir)?;
     println!("[Storage] Persistent login profile at: {:?}", data_dir);
