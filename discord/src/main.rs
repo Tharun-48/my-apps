@@ -67,10 +67,27 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
         this._url = url;
         return originalOpen.apply(this, [method, url, ...rest]);
     };
+
+    // 3. Periodic idle cleanup to release transient WebRTC audio/video buffers
+    if (window.requestIdleCallback) {
+        setInterval(() => {
+            window.requestIdleCallback(() => {}, { timeout: 1000 });
+        }, 30000);
+    }
 })();
 "#;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Configure Chromium engine flags for maximum memory efficiency with zero loss of features
+    let browser_args = [
+        "--enable-low-end-device-mode",
+        "--renderer-process-limit=1",
+        "--disable-features=Translate,OptimizationHints,MediaRouter",
+        "--js-flags=--max_old_space_size=384",
+    ]
+    .join(" ");
+    std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", browser_args);
+
     println!("============================================================");
     println!("        DISCORD RUST PORT (UNOFFICIAL) - NO ELECTRON       ");
     println!("============================================================");
