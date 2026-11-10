@@ -16,12 +16,21 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
 (function() {
     console.log('[Discord-Rust] Initializing Native Rust Host Optimizations');
 
-    // 1. Optimize CSS: remove laggy backdrop filters while preserving 100% crisp text
+    // 1. Optimize CSS rendering passes: disable non-essential blur/backdrop-filters
     const style = document.createElement('style');
     style.id = 'discord-rust-optimizations';
     style.textContent = `
+        /* Optimize hardware-accelerated text and layers */
         body, html {
+            text-rendering: optimizeSpeed !important;
+            -webkit-font-smoothing: antialiased !important;
             background-color: #1e1f22 !important;
+        }
+
+        /* Reduce GPU composition latency */
+        [class*="backdrop-"], [class*="layer-"] {
+            transform: translateZ(0);
+            backface-visibility: hidden;
         }
 
         /* Custom subtle scrollbar matching Discord Dark theme */
@@ -62,16 +71,6 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
 "#;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Configure Chromium engine flags: hardware GPU rasterization, zero-copy textures, no Chrome bloat
-    let browser_args = [
-        "--enable-gpu-rasterization",
-        "--enable-zero-copy",
-        "--renderer-process-limit=1",
-        "--disable-features=Translate,OptimizationHints,MediaRouter",
-    ]
-    .join(" ");
-    std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", browser_args);
-
     println!("============================================================");
     println!("        DISCORD RUST PORT (UNOFFICIAL) - NO ELECTRON       ");
     println!("============================================================");
