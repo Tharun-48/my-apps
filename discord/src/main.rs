@@ -20,8 +20,17 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
     const style = document.createElement('style');
     style.id = 'discord-rust-optimizations';
     style.textContent = `
+        /* Optimize hardware-accelerated text and layers */
         body, html {
+            text-rendering: optimizeSpeed !important;
+            -webkit-font-smoothing: antialiased !important;
             background-color: #1e1f22 !important;
+        }
+
+        /* Reduce GPU composition latency */
+        [class*="backdrop-"], [class*="layer-"] {
+            transform: translateZ(0);
+            backface-visibility: hidden;
         }
 
         /* Custom subtle scrollbar matching Discord Dark theme */
@@ -33,43 +42,6 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
             background-color: #1a1b1e !important;
             border-radius: 4px !important;
         }
-
-        /* Stream Quality Selector Pill */
-        #discord-stream-quality-btn {
-            position: fixed;
-            bottom: 58px;
-            left: 80px;
-            z-index: 99999;
-            background-color: #2b2d31;
-            color: #dbdee1;
-            border: 1px solid #3f4147;
-            border-radius: 14px;
-            padding: 4px 10px;
-            font-size: 11px;
-            font-weight: 600;
-            font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-            transition: background 0.15s, border-color 0.15s, transform 0.1s;
-            user-select: none;
-        }
-        #discord-stream-quality-btn:hover {
-            background-color: #35373c;
-            border-color: #5865f2;
-            color: #ffffff;
-        }
-        #discord-stream-quality-btn:active {
-            transform: scale(0.96);
-        }
-        #discord-stream-quality-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background-color: #23a55a;
-        }
     `;
 
     if (document.head) {
@@ -80,94 +52,7 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
         });
     }
 
-    // 2. Stream Quality Controller (1080p 60FPS / 720p 30FPS)
-    let currentQuality = localStorage.getItem('discord_stream_quality') || '1080p60';
-
-    function updateQualityButton(btn) {
-        if (!btn) return;
-        const is1080p = currentQuality === '1080p60';
-        btn.innerHTML = `<span id="discord-stream-quality-dot" style="background-color: ${is1080p ? '#23a55a' : '#f0b232'}"></span> Stream: ${is1080p ? '1080p @ 60 FPS' : '720p @ 30 FPS'}`;
-        btn.title = `Click to toggle stream quality (Current: ${is1080p ? '1080p 60 FPS' : '720p 30 FPS'})`;
-    }
-
-    function initQualityButton() {
-        if (document.getElementById('discord-stream-quality-btn')) return;
-        const btn = document.createElement('button');
-        btn.id = 'discord-stream-quality-btn';
-        updateQualityButton(btn);
-
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            currentQuality = currentQuality === '1080p60' ? '720p30' : '1080p60';
-            localStorage.setItem('discord_stream_quality', currentQuality);
-            updateQualityButton(btn);
-            console.log('[Discord-Rust] Stream quality switched to:', currentQuality);
-        });
-
-        document.body.appendChild(btn);
-    }
-
-    if (document.body) {
-        initQualityButton();
-    } else {
-        document.addEventListener('DOMContentLoaded', initQualityButton);
-    }
-
-    // Hook Screen Share getDisplayMedia constraints
-    if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-        const _origGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
-        navigator.mediaDevices.getDisplayMedia = async function(constraints) {
-            constraints = constraints || {};
-            const is1080 = currentQuality === '1080p60';
-            const width = is1080 ? 1920 : 1280;
-            const height = is1080 ? 1080 : 720;
-            const fps = is1080 ? 60 : 30;
-
-            console.log(`[Discord-Rust] Requesting stream: ${width}x${height} @ ${fps}fps`);
-
-            constraints.video = Object.assign(
-                typeof constraints.video === 'object' ? constraints.video : {},
-                {
-                    width: { ideal: width, max: 2560 },
-                    height: { ideal: height, max: 1440 },
-                    frameRate: { ideal: fps, max: fps }
-                }
-            );
-            return _origGetDisplayMedia(constraints);
-        };
-    }
-
-    // Remove 2500 kbps WebRTC Bitrate Cap for Crystal Clear Streaming
-    if (window.RTCPeerConnection) {
-        const _origSetLocal = RTCPeerConnection.prototype.setLocalDescription;
-        RTCPeerConnection.prototype.setLocalDescription = function(desc) {
-            if (desc && desc.sdp) {
-                desc.sdp = desc.sdp.replace(/b=AS:2500/g, 'b=AS:8000').replace(/b=TIAS:2500000/g, 'b=TIAS:8000000');
-            }
-            return _origSetLocal.apply(this, arguments);
-        };
-
-        const _origSetRemote = RTCPeerConnection.prototype.setRemoteDescription;
-        RTCPeerConnection.prototype.setRemoteDescription = function(desc) {
-            if (desc && desc.sdp) {
-                desc.sdp = desc.sdp.replace(/b=AS:2500/g, 'b=AS:8000').replace(/b=TIAS:2500000/g, 'b=TIAS:8000000');
-            }
-            return _origSetRemote.apply(this, arguments);
-        };
-    }
-
-    // 3. Safe Native Notification Permission Bridge
-    if (typeof Notification !== 'undefined') {
-        const _origReqPerm = Notification.requestPermission.bind(Notification);
-        Notification.requestPermission = function(cb) {
-            return Promise.resolve('granted').then((res) => {
-                if (typeof cb === 'function') cb(res);
-                return res;
-            });
-        };
-    }
-
-    // 4. Throttle background analytics/telemetry to preserve CPU cycles
+    // 2. Throttle background analytics/telemetry to preserve CPU cycles
     const originalSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.send = function(...args) {
         if (this._url && (this._url.includes('/science') || this._url.includes('/metrics') || this._url.includes('sentry'))) {
