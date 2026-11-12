@@ -43,7 +43,7 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
         });
     }
 
-    // 2. Stream Quality Controller (Toggle via F7 key)
+    // 2. Stream Quality Controller (Toggle via Alt+S or F7)
     let currentQuality = localStorage.getItem('discord_stream_quality') || '1080p60';
 
     function showQualityToast(msg, is1080) {
@@ -51,26 +51,39 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
         if (!toast) {
             toast = document.createElement('div');
             toast.id = 'discord-rust-toast';
-            toast.style.cssText = 'position:fixed;top:16px;right:16px;z-index:999999;background:#2b2d31;color:#ffffff;border:1px solid #5865f2;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;font-family:sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.5);pointer-events:none;transition:opacity 0.2s;';
-            document.body.appendChild(toast);
+            toast.style.cssText = 'position:fixed !important;top:20px !important;right:20px !important;z-index:2147483647 !important;background:#2b2d31 !important;color:#ffffff !important;border:2px solid #5865f2 !important;border-radius:10px !important;padding:10px 18px !important;font-size:13px !important;font-weight:700 !important;font-family:sans-serif !important;box-shadow:0 6px 20px rgba(0,0,0,0.7) !important;pointer-events:none !important;transition:opacity 0.25s ease !important;';
+            (document.body || document.documentElement).appendChild(toast);
         }
         toast.innerHTML = (is1080 ? '🟢 ' : '🟡 ') + msg;
         toast.style.opacity = '1';
         clearTimeout(toast._timer);
         toast._timer = setTimeout(() => {
             if (toast) toast.style.opacity = '0';
-        }, 2000);
+        }, 2500);
     }
 
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'F7') {
+    function handleKeyToggle(e) {
+        // Support Alt+S, Ctrl+Shift+S, F7 (and Fn+F7)
+        if (e.key === 'F7' || (e.altKey && (e.key === 's' || e.key === 'S')) || (e.ctrlKey && e.shiftKey && (e.key === 's' || e.key === 'S'))) {
             e.preventDefault();
+            e.stopPropagation();
             currentQuality = currentQuality === '1080p60' ? '720p30' : '1080p60';
             localStorage.setItem('discord_stream_quality', currentQuality);
             const is1080 = currentQuality === '1080p60';
-            showQualityToast('Stream Quality: ' + (is1080 ? '1080p @ 60 FPS' : '720p @ 30 FPS'), is1080);
+            showQualityToast('Stream Quality: ' + (is1080 ? '1080p @ 60 FPS' : '720p @ 30 FPS') + ' (Alt+S)', is1080);
             console.log('[Discord-Rust] Stream quality toggled to:', currentQuality);
         }
+    }
+
+    window.addEventListener('keydown', handleKeyToggle, true);
+    document.addEventListener('keydown', handleKeyToggle, true);
+
+    // Show initial confirmation toast when Discord loads
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            const is1080 = currentQuality === '1080p60';
+            showQualityToast('Stream Quality: ' + (is1080 ? '1080p @ 60 FPS' : '720p @ 30 FPS') + ' (Press Alt+S to switch)', is1080);
+        }, 2500);
     });
 
     // Hook Screen Share getDisplayMedia constraints
