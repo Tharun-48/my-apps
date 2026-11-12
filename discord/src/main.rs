@@ -11,20 +11,15 @@ use wry::{WebContext, WebViewBuilder};
 
 const DISCORD_APP_URL: &str = "https://discord.com/app";
 
-// Performance injection script for low-overhead rendering
 const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
 (function() {
-    console.log('[Discord-Rust] Initializing Native Rust Host Optimizations');
-
-    // 1. Optimize CSS rendering passes: disable non-essential blur/backdrop-filters
+    // 1. CSS: background color + custom scrollbar
     const style = document.createElement('style');
     style.id = 'discord-rust-optimizations';
     style.textContent = `
         body, html {
             background-color: #1e1f22 !important;
         }
-
-        /* Custom subtle scrollbar matching Discord Dark theme */
         ::-webkit-scrollbar {
             width: 8px !important;
             height: 8px !important;
@@ -34,7 +29,6 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
             border-radius: 4px !important;
         }
     `;
-
     if (document.head) {
         document.head.appendChild(style);
     } else {
@@ -43,32 +37,37 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
         });
     }
 
-    // 2. Throttle background analytics/telemetry to preserve CPU cycles
+    // 2. Block telemetry via XHR
+    const originalOpen = XMLHttpRequest.prototype.open;
     const originalSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        this._url = url;
+        return originalOpen.apply(this, [method, url, ...rest]);
+    };
     XMLHttpRequest.prototype.send = function(...args) {
         if (this._url && (this._url.includes('/science') || this._url.includes('/metrics') || this._url.includes('sentry'))) {
-            // Drop heavy telemetry pings silently
             return;
         }
         return originalSend.apply(this, args);
     };
 
-    const originalOpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-        this._url = url;
-        return originalOpen.apply(this, [method, url, ...rest]);
+    // 3. Block telemetry via fetch()
+    const originalFetch = window.fetch;
+    window.fetch = function(url, ...args) {
+        if (typeof url === 'string' && (url.includes('/science') || url.includes('/metrics') || url.includes('sentry'))) {
+            return Promise.resolve(new Response('', { status: 200 }));
+        }
+        return originalFetch.apply(this, [url, ...args]);
     };
 })();
 "#;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("============================================================");
-    println!("        DISCORD RUST PORT (UNOFFICIAL) - NO ELECTRON       ");
-    println!("============================================================");
-    println!("Engine: Native Rust Core + DirectComposition WebView2");
-    println!("Target: Low-Overhead Resource Efficient Architecture");
-    println!("Target Memory: ~180-250 MB RAM (saving >1 GB vs Electron)");
-    println!("============================================================");
+    // Safe browser flags: reduce background services, limit renderer processes
+    std::env::set_var(
+        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        "--renderer-process-limit=1 --disable-features=Translate,OptimizationHints,MediaRouter",
+    );
 
     // Use existing persistent profile session if present
     let base_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
@@ -80,7 +79,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     std::fs::create_dir_all(&data_dir)?;
-    println!("[Storage] Persistent login profile at: {:?}", data_dir);
 
     let event_loop = EventLoop::new();
 
@@ -95,22 +93,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _webview = WebViewBuilder::with_web_context(&mut web_context)
         .with_url(DISCORD_APP_URL)
         .with_initialization_script(DISCORD_PERF_OPTIMIZATIONS)
-        .with_devtools(true)
+        .with_user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
+        .with_devtools(false)
         .build(&window)?;
-
-    println!("[Runtime] Official Discord loaded. Native Rust event loop active.");
-    println!("[Shortcuts] Ctrl+R to reload | Close window to exit.");
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
         if let Event::WindowEvent { event, .. } = event {
-            match event {
-                WindowEvent::CloseRequested => {
-                    println!("[Runtime] Closing Discord Rust client cleanly.");
-                    *control_flow = ControlFlow::Exit;
-                }
-                _ => {}
+            if let WindowEvent::CloseRequested = event {
+                *control_flow = ControlFlow::Exit;
             }
         }
     });
