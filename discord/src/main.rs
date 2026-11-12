@@ -27,6 +27,12 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
             background-color: #1e1f22 !important;
         }
 
+        /* Reduce GPU composition latency */
+        [class*="backdrop-"], [class*="layer-"] {
+            transform: translateZ(0);
+            backface-visibility: hidden;
+        }
+
         /* Custom subtle scrollbar matching Discord Dark theme */
         ::-webkit-scrollbar {
             width: 8px !important;
@@ -46,57 +52,7 @@ const DISCORD_PERF_OPTIMIZATIONS: &str = r#"
         });
     }
 
-    // 2. Desktop capabilities & stream settings bridge
-    if (!window.DiscordNative) {
-        window.DiscordNative = {
-            isPlatformEmbedded: true,
-            features: {
-                supports: () => true,
-                declareSupported: () => {},
-            },
-            app: {
-                getReleaseChannel: () => 'stable',
-                getVersion: () => '1.0.9000',
-                getBuildNumber: () => 9000,
-                dock: { setBadge: () => {} },
-            },
-            voice: {
-                getSupportedVideoCodecs: (cb) => {
-                    const codecs = ['H264', 'VP8', 'VP9', 'AV1'];
-                    if (typeof cb === 'function') cb(codecs);
-                    return codecs;
-                },
-            },
-            os: {
-                arch: 'x64',
-                release: '10.0.0',
-            },
-            clipboard: {
-                copy: (text) => navigator.clipboard && navigator.clipboard.writeText(text),
-                cut: () => document.execCommand('cut'),
-                paste: () => navigator.clipboard && navigator.clipboard.readText(),
-            },
-            gpuSettings: {
-                getEnableHardwareAcceleration: () => true,
-            },
-            ipc: {
-                send: () => {},
-                on: () => {},
-            }
-        };
-    }
-
-    // 3. Seamless native Windows notifications
-    if (window.Notification) {
-        window.Notification.permission = 'granted';
-        const _origRequestPermission = window.Notification.requestPermission;
-        window.Notification.requestPermission = function(cb) {
-            if (typeof cb === 'function') cb('granted');
-            return Promise.resolve('granted');
-        };
-    }
-
-    // 4. Throttle background analytics/telemetry to preserve CPU cycles
+    // 2. Throttle background analytics/telemetry to preserve CPU cycles
     const originalSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.send = function(...args) {
         if (this._url && (this._url.includes('/science') || this._url.includes('/metrics') || this._url.includes('sentry'))) {
@@ -147,7 +103,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _webview = WebViewBuilder::with_web_context(&mut web_context)
         .with_url(DISCORD_APP_URL)
-        .with_user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
         .with_initialization_script(DISCORD_PERF_OPTIMIZATIONS)
         .with_devtools(true)
         .build(&window)?;
